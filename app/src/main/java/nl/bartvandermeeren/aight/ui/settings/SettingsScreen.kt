@@ -1,0 +1,549 @@
+package nl.bartvandermeeren.aight.ui.settings
+
+import android.app.role.RoleManager
+import android.content.ActivityNotFoundException
+import android.content.Intent
+import android.provider.Settings
+import androidx.activity.compose.BackHandler
+import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.rounded.ArrowBack
+import androidx.compose.material.icons.outlined.CheckCircle
+import androidx.compose.material.icons.outlined.ErrorOutline
+import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Visibility
+import androidx.compose.material.icons.rounded.VisibilityOff
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
+import androidx.compose.material3.Text
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.launch
+import nl.bartvandermeeren.aight.BuildConfig
+import nl.bartvandermeeren.aight.R
+import nl.bartvandermeeren.aight.appContainer
+import nl.bartvandermeeren.aight.chat.userMessage
+import nl.bartvandermeeren.aight.data.AppSettings
+import nl.bartvandermeeren.aight.data.HermesApi
+import nl.bartvandermeeren.aight.data.ModelProfile
+import nl.bartvandermeeren.aight.data.ReasoningMode
+import nl.bartvandermeeren.aight.data.SttEngine
+import nl.bartvandermeeren.aight.data.TtsEngine
+import nl.bartvandermeeren.aight.ui.MainViewModel
+import nl.bartvandermeeren.aight.ui.chat.ModelPickerSheet
+import nl.bartvandermeeren.aight.ui.chat.Pill
+import nl.bartvandermeeren.aight.ui.chat.prettyModelName
+import nl.bartvandermeeren.aight.ui.components.AightMark
+import nl.bartvandermeeren.aight.ui.theme.Palette
+import nl.bartvandermeeren.aight.voice.ModelPackage
+import nl.bartvandermeeren.aight.voice.KokoroVoice
+
+private sealed interface TestState {
+    data object Idle : TestState
+    data object Testing : TestState
+    data class Ok(val model: String?) : TestState
+    data class Failed(val message: String) : TestState
+}
+
+@Composable
+fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean, onBack: (() -> Unit)?) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    var url by rememberSaveable { mutableStateOf(settings.serverUrl) }
+    // Not rememberSaveable: the decrypted key must not end up in the saved-state Bundle.
+    var key by remember { mutableStateOf(settings.apiKey) }
+    var name by rememberSaveable { mutableStateOf(settings.userName) }
+    var assistant by rememberSaveable { mutableStateOf(settings.assistantName) }
+    var language by rememberSaveable { mutableStateOf(settings.speechLanguage) }
+    var showKey by remember { mutableStateOf(false) }
+    var test by remember { mutableStateOf<TestState>(TestState.Idle) }
+
+    if (onBack != null) BackHandler(onBack = onBack)
+
+    fun connect() {
+        test = TestState.Testing
+        scope.launch {
+            val repo = vm.settingsRepository
+            try {
+                val model = context.appContainer.apiFor(HermesApi.ServerConfig(HermesApi.normalizeBaseUrl(url), key.trim())).verify()
+                repo.saveSetup(url, key, name, assistant, language)
+                test = TestState.Ok(model)
+                vm.refreshSessions()
+                vm.loadModels()
+            } catch (e: Exception) {
+                test = TestState.Failed(e.userMessage())
+            }
+        }
+    }
+
+    Box(Modifier.fillMaxSize().background(Palette.Background), contentAlignment = Alignment.TopCenter) {
+        Column(
+            Modifier
+                .widthIn(max = 720.dp)
+                .fillMaxSize()
+                .statusBarsPadding()
+                .navigationBarsPadding()
+                .imePadding()
+                .verticalScroll(rememberScrollState())
+                .padding(horizontal = 20.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(14.dp),
+        ) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(56.dp)) {
+                if (onBack != null) {
+                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.action_back), tint = Palette.Icon) }
+                    Spacer(Modifier.size(4.dp))
+                }
+                Text(
+                    stringResource(if (setupMode) R.string.setup_title else R.string.settings),
+                    style = MaterialTheme.typography.headlineSmall,
+                    color = Palette.TextPrimary,
+                )
+            }
+            if (setupMode) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
+                    AightMark(size = 36.dp)
+                    Text(stringResource(R.string.setup_intro), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+                }
+            }
+
+            SectionTitle(stringResource(R.string.section_connection))
+            Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://clarkbox:8642", keyboard = KeyboardType.Uri)
+            if (isInsecureRemote(url)) Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
+            Field(
+                key, { key = it; test = TestState.Idle }, stringResource(R.string.api_key),
+                keyboard = KeyboardType.Password,
+                visual = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                trailing = {
+                    IconButton(onClick = { showKey = !showKey }) {
+                        Icon(if (showKey) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = Palette.TextSecondary)
+                    }
+                },
+            )
+            Field(name, { name = it }, stringResource(R.string.your_name))
+            Field(assistant, { assistant = it }, stringResource(R.string.assistant_name))
+
+            Surface(
+                color = if (url.isNotBlank() && key.isNotBlank()) Palette.Button else Palette.Disabled,
+                shape = RoundedCornerShape(50),
+                modifier = Modifier
+                    .clip(RoundedCornerShape(50))
+                    .clickable(enabled = url.isNotBlank() && key.isNotBlank() && test != TestState.Testing) { connect() },
+            ) {
+                Row(Modifier.padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                    if (test == TestState.Testing) {
+                        CircularProgressIndicator(strokeWidth = 2.dp, color = Color.White, modifier = Modifier.size(16.dp))
+                        Spacer(Modifier.size(10.dp))
+                    }
+                    Text(
+                        stringResource(if (setupMode) R.string.connect else R.string.save_and_test),
+                        style = MaterialTheme.typography.labelLarge,
+                        color = Palette.ButtonText,
+                    )
+                }
+            }
+            when (val t = test) {
+                is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
+                is TestState.Failed -> Notice(stringResource(R.string.connection_failed, t.message), Palette.Danger, error = true)
+                else -> Unit
+            }
+
+            if (!setupMode) {
+                SectionTitle(stringResource(R.string.section_models))
+                ModelProfile.entries.forEach { profile -> ModelDefaultRow(vm, settings, profile) }
+
+                SectionTitle(stringResource(R.string.section_voice))
+                VoiceSettings(vm, settings)
+
+                SectionTitle(stringResource(R.string.section_speech_input))
+                SpeechInputSettings(vm, settings)
+
+                SectionTitle(stringResource(R.string.section_assistant))
+                DefaultAssistantCard()
+                Toggle(stringResource(R.string.listen_on_invoke), stringResource(R.string.listen_on_invoke_detail), settings.listenOnInvoke) {
+                    scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
+                }
+                Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
+                    scope.launch { vm.settingsRepository.setSpeakReplies(it) }
+                }
+                Field(
+                    language,
+                    { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } },
+                    stringResource(R.string.speech_language),
+                    placeholder = stringResource(R.string.speech_language_hint),
+                )
+
+                SectionTitle(stringResource(R.string.section_history))
+                Toggle(stringResource(R.string.show_all_channels), stringResource(R.string.show_all_channels_detail), settings.showAllChannels) {
+                    scope.launch {
+                        vm.settingsRepository.setShowAllChannels(it)
+                        vm.refreshSessions()
+                    }
+                }
+                Text(
+                    "aight ${BuildConfig.VERSION_NAME}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.TextTertiary,
+                    modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
+                )
+            }
+        }
+    }
+}
+
+/** One default model: what it's used for, what's picked, and a tap to change it. */
+@Composable
+private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: ModelProfile) {
+    var picking by remember { mutableStateOf(false) }
+    val catalog by vm.modelCatalog.collectAsStateWithLifecycle()
+    val choice = settings.modelFor(profile)
+    val name = choice.label?.takeIf { it != choice.model }
+        ?: choice.model?.let(::prettyModelName)
+        ?: catalog?.currentModel?.let { stringResource(R.string.model_server_default_named, prettyModelName(it)) }
+        ?: stringResource(R.string.model_default)
+    val mode = when (choice.reasoning) {
+        ReasoningMode.Default -> stringResource(R.string.reasoning_default)
+        ReasoningMode.Fast -> stringResource(R.string.reasoning_fast)
+        ReasoningMode.Extended -> stringResource(R.string.reasoning_extended)
+    }
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable {
+                vm.loadModels()
+                picking = true
+            }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(
+                stringResource(if (profile == ModelProfile.Chats) R.string.profile_chats else R.string.profile_assistant),
+                style = MaterialTheme.typography.bodyLarge,
+                color = Palette.TextPrimary,
+            )
+            Text(
+                stringResource(if (profile == ModelProfile.Chats) R.string.profile_chats_detail else R.string.profile_assistant_detail),
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.TextSecondary,
+            )
+        }
+        Text("$name · $mode", style = MaterialTheme.typography.labelLarge, color = Palette.Link)
+    }
+    if (picking) ModelPickerSheet(vm, settings, initialProfile = profile, onDismiss = { picking = false })
+}
+
+@Composable
+private fun VoiceSettings(vm: MainViewModel, settings: AppSettings) {
+    val scope = rememberCoroutineScope()
+    val model = vm.kokoroModel
+    val modelState by model.state.collectAsStateWithLifecycle()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Pill(stringResource(R.string.tts_kokoro), settings.ttsEngine == TtsEngine.Kokoro) {
+            scope.launch { vm.settingsRepository.setTtsEngine(TtsEngine.Kokoro) }
+        }
+        Pill(stringResource(R.string.tts_system), settings.ttsEngine == TtsEngine.System) {
+            scope.launch { vm.settingsRepository.setTtsEngine(TtsEngine.System) }
+        }
+    }
+    if (settings.ttsEngine != TtsEngine.Kokoro) return
+    Text(stringResource(R.string.tts_kokoro_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+    ModelStatus(
+        model,
+        ModelTexts(R.string.tts_kokoro_ready, R.string.tts_kokoro_downloading, R.string.tts_kokoro_download, R.string.tts_kokoro_crashed),
+    )
+    var open by remember { mutableStateOf(false) }
+    val current = KokoroVoice.VOICES.firstOrNull { it.id == settings.kokoroVoice } ?: KokoroVoice.VOICES.first()
+    val preview = stringResource(R.string.tts_preview_text, settings.userName.ifBlank { "there" })
+    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
+        Box(Modifier.weight(1f)) {
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { open = true }
+                    .padding(vertical = 8.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Column {
+                    Text(stringResource(R.string.tts_voice), style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
+                    Text(current.label, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+                }
+            }
+            DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.Menu) {
+                KokoroVoice.VOICES.forEach { voice ->
+                    DropdownMenuItem(
+                        text = { Text(voice.label) },
+                        onClick = {
+                            open = false
+                            scope.launch { vm.settingsRepository.setKokoroVoice(voice.id) }
+                        },
+                    )
+                }
+            }
+        }
+        if (modelState == ModelPackage.State.Ready) {
+            LinkAction(stringResource(R.string.tts_preview)) { vm.speaker.speak("preview", preview, "en-US") }
+        }
+    }
+}
+
+@Composable
+private fun SpeechInputSettings(vm: MainViewModel, settings: AppSettings) {
+    val scope = rememberCoroutineScope()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Pill(stringResource(R.string.stt_orukeet), settings.sttEngine == SttEngine.Orukeet) {
+            scope.launch { vm.settingsRepository.setSttEngine(SttEngine.Orukeet) }
+        }
+        Pill(stringResource(R.string.stt_system), settings.sttEngine == SttEngine.System) {
+            scope.launch { vm.settingsRepository.setSttEngine(SttEngine.System) }
+        }
+    }
+    if (settings.sttEngine != SttEngine.Orukeet) return
+    Text(stringResource(R.string.stt_orukeet_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+    ModelStatus(
+        vm.orukeetModel,
+        ModelTexts(R.string.stt_orukeet_ready, R.string.stt_orukeet_downloading, R.string.stt_orukeet_download, R.string.stt_orukeet_crashed),
+    )
+}
+
+/** The wording for one on-device model's status. */
+private class ModelTexts(
+    @param:StringRes val ready: Int,
+    @param:StringRes val downloading: Int,
+    @param:StringRes val download: Int,
+    @param:StringRes val crashed: Int,
+)
+
+/** Installed, downloading, missing, failed or crashed, with the action that fits. */
+@Composable
+private fun ModelStatus(model: ModelPackage, texts: ModelTexts) {
+    val modelState by model.state.collectAsStateWithLifecycle()
+    when (val state = modelState) {
+        ModelPackage.State.Ready -> Notice(stringResource(texts.ready), Palette.Success, ok = true)
+        is ModelPackage.State.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(
+                stringResource(texts.downloading, (state.fraction * 100).toInt()),
+                style = MaterialTheme.typography.bodyMedium,
+                color = Palette.TextSecondary,
+            )
+            LinearProgressIndicator(
+                progress = { state.fraction },
+                color = Palette.Link,
+                trackColor = Palette.Surface,
+                modifier = Modifier.fillMaxWidth(),
+            )
+        }
+        ModelPackage.State.Missing -> LinkAction(stringResource(texts.download, (model.sizeBytes / 1_000_000).toInt())) { model.download() }
+        is ModelPackage.State.Failed -> {
+            Notice(stringResource(R.string.model_failed, state.message), Palette.Danger, error = true)
+            LinkAction(stringResource(R.string.action_retry)) { model.download() }
+        }
+        ModelPackage.State.Crashed -> {
+            Notice(stringResource(texts.crashed), Palette.Danger, error = true)
+            LinkAction(stringResource(R.string.action_retry)) { model.retryAfterCrash() }
+        }
+    }
+}
+
+@Composable
+private fun LinkAction(text: String, onClick: () -> Unit) {
+    Text(
+        text,
+        style = MaterialTheme.typography.labelLarge,
+        color = Palette.Link,
+        modifier = Modifier
+            .clip(RoundedCornerShape(8.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 6.dp, horizontal = 2.dp),
+    )
+}
+
+@Composable
+private fun DefaultAssistantCard() {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var isDefault by remember { mutableStateOf(false) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            isDefault = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+        }
+    }
+    Surface(color = Palette.Surface, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                Icon(
+                    if (isDefault) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
+                    null,
+                    tint = if (isDefault) Palette.Success else Palette.TextSecondary,
+                    modifier = Modifier.size(22.dp),
+                )
+                Text(
+                    stringResource(if (isDefault) R.string.default_assistant_on else R.string.default_assistant_off),
+                    style = MaterialTheme.typography.titleMedium,
+                    color = Palette.TextPrimary,
+                )
+            }
+            Text(stringResource(R.string.default_assistant_detail), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+            Text(
+                stringResource(R.string.open_assistant_settings),
+                style = MaterialTheme.typography.labelLarge,
+                color = Palette.Link,
+                modifier = Modifier
+                    .clip(RoundedCornerShape(8.dp))
+                    .clickable {
+                        val intents = listOf(
+                            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+                            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+                            Intent(Settings.ACTION_SETTINGS),
+                        )
+                        for (intent in intents) {
+                            try {
+                                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                                break
+                            } catch (_: ActivityNotFoundException) {
+                                continue
+                            }
+                        }
+                    }
+                    .padding(vertical = 6.dp),
+            )
+        }
+    }
+}
+
+@Composable
+private fun SectionTitle(text: String) {
+    Text(text, style = MaterialTheme.typography.titleSmall, color = Palette.Link, modifier = Modifier.padding(top = 12.dp))
+}
+
+@Composable
+private fun Field(
+    value: String,
+    onChange: (String) -> Unit,
+    label: String,
+    placeholder: String? = null,
+    keyboard: KeyboardType = KeyboardType.Text,
+    visual: VisualTransformation = VisualTransformation.None,
+    trailing: (@Composable () -> Unit)? = null,
+) {
+    OutlinedTextField(
+        value = value,
+        onValueChange = onChange,
+        label = { Text(label) },
+        placeholder = placeholder?.let { { Text(it, color = Palette.TextTertiary) } },
+        singleLine = true,
+        visualTransformation = visual,
+        keyboardOptions = KeyboardOptions(keyboardType = keyboard),
+        trailingIcon = trailing,
+        shape = RoundedCornerShape(18.dp),
+        colors = OutlinedTextFieldDefaults.colors(
+            focusedBorderColor = Palette.Link,
+            unfocusedBorderColor = Palette.Outline,
+            focusedLabelColor = Palette.Link,
+            cursorColor = Palette.Link,
+        ),
+        modifier = Modifier.fillMaxWidth(),
+    )
+}
+
+@Composable
+private fun Toggle(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onChange(!checked) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(checkedTrackColor = Palette.Button, checkedThumbColor = Palette.ButtonText),
+        )
+    }
+}
+
+@Composable
+private fun Notice(text: String, tint: Color, ok: Boolean = false, error: Boolean = false) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Icon(
+            when {
+                ok -> Icons.Outlined.CheckCircle
+                error -> Icons.Outlined.ErrorOutline
+                else -> Icons.Outlined.Info
+            },
+            null,
+            tint = tint,
+            modifier = Modifier.size(20.dp),
+        )
+        Text(text, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+    }
+}
+
+/** http:// is fine inside the tailnet (WireGuard encrypts it); anywhere else the key travels in clear text. */
+fun isInsecureRemote(raw: String): Boolean {
+    val url = HermesApi.normalizeBaseUrl(raw)
+    if (!url.startsWith("http://")) return false
+    val host = url.removePrefix("http://").substringBefore('/').substringBefore(':').lowercase()
+    if (host.isEmpty()) return false
+    if (host == "localhost" || host == "127.0.0.1" || host == "10.0.2.2") return false
+    if (host.endsWith(".ts.net") || !host.contains('.')) return false // MagicDNS names
+    val parts = host.split('.').mapNotNull { it.toIntOrNull() }
+    if (parts.size == 4 && parts[0] == 100 && parts[1] in 64..127) return false // Tailscale CGNAT range
+    return true
+}

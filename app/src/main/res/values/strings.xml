@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">aight</string>
+
+    <!-- Chat -->
+    <string name="greeting_named">Hello, %1$s</string>
+    <string name="greeting_anonymous">Ready when you are</string>
+    <string name="composer_hint">Ask %1$s</string>
+    <string name="disclaimer">%1$s is an AI agent and can make mistakes.</string>
+    <string name="new_chat">New chat</string>
+    <string name="search_chats">Search chats</string>
+    <string name="search_hint">Search your chats</string>
+    <string name="no_results">No chats match that.</string>
+    <string name="skills">Skills</string>
+    <string name="skills_intro">Skills Hermes can use. Tap one to start a chat with it.</string>
+    <string name="skill_prompt">Use the %1$s skill: </string>
+    <string name="scheduled_tasks">Scheduled tasks</string>
+    <string name="no_jobs">No scheduled tasks.</string>
+    <string name="job_next">next %1$s</string>
+    <string name="job_paused">paused</string>
+    <string name="job_run_now">Run now</string>
+    <string name="job_pause">Pause</string>
+    <string name="job_resume">Resume</string>
+    <string name="recent">Recent</string>
+    <string name="no_chats">No chats yet</string>
+    <string name="untitled_chat">New chat</string>
+    <string name="you">You</string>
+    <string name="settings">Settings</string>
+    <string name="pin">Pin</string>
+    <string name="unpin">Unpin</string>
+    <string name="rename">Rename</string>
+    <string name="rename_chat">Rename chat</string>
+    <string name="delete">Delete</string>
+    <string name="delete_chat_title">Delete chat?</string>
+    <string name="delete_chat_body">This deletes \"%1$s\" from Hermes, including its history.</string>
+    <string name="cancel">Cancel</string>
+    <string name="save">Save</string>
+
+    <!-- Actions -->
+    <string name="action_add">Add</string>
+    <string name="action_send">Send</string>
+    <string name="action_stop">Stop</string>
+    <string name="action_stop_listening">Stop listening</string>
+    <string name="action_voice">Speak</string>
+    <string name="action_live">Live</string>
+    <string name="action_remove">Remove</string>
+    <string name="action_copy">Copy</string>
+    <string name="action_share">Share</string>
+    <string name="action_retry">Retry</string>
+    <string name="action_read_aloud">Read aloud</string>
+    <string name="action_stop_reading">Stop reading</string>
+    <string name="action_expand">Expand</string>
+    <string name="action_collapse">Collapse</string>
+    <string name="action_more">More</string>
+    <string name="action_back">Back</string>
+    <string name="action_close">Close</string>
+    <string name="action_open_sidebar">Open menu</string>
+    <string name="action_close_sidebar">Close menu</string>
+    <string name="action_scroll_down">Scroll to bottom</string>
+    <string name="attach_photos">Photos</string>
+    <string name="attach_camera">Camera</string>
+
+    <!-- Agent work -->
+    <string name="status_thinking">Thinking</string>
+    <string name="status_reconnecting">Connection dropped. Hermes keeps working; waiting for the result</string>
+    <string name="status_stopped">Stopped</string>
+    <string name="status_stopping">Stopping</string>
+    <string name="image_prepare_failed">Couldn\'t read one of the images. Try attaching it again.</string>
+    <string name="work_running">Working</string>
+    <string name="work_running_tool">Using %1$s</string>
+    <string name="work_done">Show steps</string>
+    <string name="work_done_duration">Worked for %1$s</string>
+    <string name="work_thoughts">Thoughts</string>
+    <string name="work_subagent">Subagent</string>
+    <string name="error_generic">Something went wrong.</string>
+    <string name="approval_title">Approval needed</string>
+    <string name="approval_once">Allow once</string>
+    <string name="approval_session">Allow for this chat</string>
+    <string name="approval_always">Always allow</string>
+    <string name="approval_deny">Deny</string>
+
+    <!-- Models -->
+    <string name="model_picker_title">Model</string>
+    <string name="model_default">Hermes</string>
+    <string name="model_default_detail">Server default: %1$s</string>
+    <string name="reasoning_title">Thinking</string>
+    <string name="reasoning_default">Auto</string>
+    <string name="reasoning_fast">Fast</string>
+    <string name="reasoning_extended">Extended</string>
+    <string name="model_server_default_named">Server default (%1$s)</string>
+    <string name="profile_chats">Chats</string>
+    <string name="profile_assistant">Assistant</string>
+    <string name="profile_chats_detail">Used for chats you start in the app</string>
+    <string name="profile_assistant_detail">Used for chats started from the assistant overlay or the assist gesture, also when you continue them in the app or in Live. Pick something quick.</string>
+
+    <!-- Voice -->
+    <string name="speech_unavailable">No speech recognition service on this device.</string>
+    <string name="mic_permission_needed">aight needs the microphone for voice input.</string>
+    <string name="live_listening">Listening</string>
+    <string name="live_thinking">Thinking</string>
+    <string name="live_speaking">%1$s is speaking. Tap to interrupt.</string>
+    <string name="live_paused">Paused</string>
+    <string name="live_error">Voice input stopped</string>
+    <string name="live_pause">Pause</string>
+    <string name="live_resume">Resume</string>
+    <string name="live_end">End</string>
+
+    <!-- Assistant overlay -->
+    <string name="ask_about_screen">Ask about screen</string>
+    <string name="screen_attached">Screen added</string>
+    <string name="open_full_chat">Open full chat</string>
+    <string name="notification_channel_replies">Replies</string>
+    <string name="assist_not_configured">aight isn\'t connected to Hermes yet. Tap to set it up.</string>
+
+    <!-- Settings -->
+    <string name="setup_title">Connect to Hermes</string>
+    <string name="setup_intro">Point aight at your Hermes Agent API server. Over Tailscale, use the MagicDNS name, for example http://clarkbox:8642.</string>
+    <string name="section_connection">Connection</string>
+    <string name="section_assistant">Assistant</string>
+    <string name="section_history">History</string>
+    <string name="section_models">Default models</string>
+    <string name="section_voice">Voice</string>
+    <string name="tts_kokoro">Kokoro</string>
+    <string name="tts_system">Android voice</string>
+    <string name="tts_kokoro_detail">Kokoro-82M runs on the phone and only speaks English. Dutch replies use the Android voice.</string>
+    <string name="tts_kokoro_ready">Voice model installed</string>
+    <string name="tts_kokoro_downloading">Downloading voice model… %1$d%%</string>
+    <string name="tts_kokoro_download">Download voice model (%1$d MB)</string>
+    <string name="model_failed">Download failed: %1$s</string>
+    <string name="tts_kokoro_crashed">Kokoro crashed while starting on this phone. Replies use the Android voice until you try again.</string>
+    <string name="tts_voice">Voice</string>
+    <string name="tts_preview">Preview</string>
+    <string name="section_speech_input">Speech input</string>
+    <string name="stt_orukeet">Orukeet</string>
+    <string name="stt_system">Android recognizer</string>
+    <string name="stt_orukeet_detail">Orukeet runs on the phone and understands 25 languages, Dutch and English among them. It works out the language by itself; the speech language setting only applies to the Android recognizer. Voice typing in other apps keeps using the phone\'s recognizer.</string>
+    <string name="stt_orukeet_ready">Speech model installed</string>
+    <string name="stt_orukeet_downloading">Downloading speech model… %1$d%%</string>
+    <string name="stt_orukeet_download">Download speech model (%1$d MB)</string>
+    <string name="stt_orukeet_crashed">Orukeet crashed while starting on this phone. Voice input uses the Android recognizer until you try again.</string>
+    <string name="tts_preview_text">Hi %1$s, this is how I sound when I read a reply aloud.</string>
+    <string name="server_url">Server URL</string>
+    <string name="api_key">API key (API_SERVER_KEY)</string>
+    <string name="your_name">Your name</string>
+    <string name="assistant_name">Assistant name</string>
+    <string name="connect">Connect</string>
+    <string name="save_and_test">Save and test</string>
+    <string name="connection_ok">Connected to %1$s</string>
+    <string name="connection_failed">Couldn\'t connect: %1$s</string>
+    <string name="insecure_url_warning">This http:// address is outside your tailnet, so the API key would travel unencrypted. Use a Tailscale address or https.</string>
+    <string name="default_assistant_on">aight is your default assistant</string>
+    <string name="default_assistant_off">aight isn\'t your default assistant yet</string>
+    <string name="default_assistant_detail">Choose aight under Default apps, Digital assistant app. On Samsung, also set Side button, Press and hold, to Digital assistant.</string>
+    <string name="open_assistant_settings">Open assistant settings</string>
+    <string name="listen_on_invoke">Listen right away</string>
+    <string name="listen_on_invoke_detail">Start listening when you open the assistant with the side button or a gesture</string>
+    <string name="speak_replies">Read replies aloud</string>
+    <string name="speak_replies_detail">After a spoken question in the assistant overlay</string>
+    <string name="speech_language">Speech language</string>
+    <string name="speech_language_hint">System default, or e.g. nl-NL</string>
+    <string name="show_all_channels">Show chats from all channels</string>
+    <string name="show_all_channels_detail">Include Telegram, CLI and other Hermes sessions in Recent</string>
+</resources>

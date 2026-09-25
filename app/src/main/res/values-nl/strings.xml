@@ -1,0 +1,161 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Chat -->
+    <string name="greeting_named">Vraag maar, %1$s</string>
+    <string name="greeting_anonymous">Ik ben er klaar voor</string>
+    <string name="composer_hint">Vraag het %1$s</string>
+    <string name="disclaimer">%1$s is een AI-agent en kan fouten maken.</string>
+    <string name="new_chat">Nieuw gesprek</string>
+    <string name="search_chats">Zoeken in gesprekken</string>
+    <string name="search_hint">Zoek in je gesprekken</string>
+    <string name="no_results">Geen gesprekken gevonden.</string>
+    <string name="skills">Skills</string>
+    <string name="skills_intro">Skills die Hermes kan gebruiken. Tik op een skill om er een gesprek mee te beginnen.</string>
+    <string name="skill_prompt">Gebruik de skill %1$s: </string>
+    <string name="scheduled_tasks">Geplande taken</string>
+    <string name="no_jobs">Geen geplande taken.</string>
+    <string name="job_next">volgende %1$s</string>
+    <string name="job_paused">gepauzeerd</string>
+    <string name="job_run_now">Nu uitvoeren</string>
+    <string name="job_pause">Pauzeren</string>
+    <string name="job_resume">Hervatten</string>
+    <string name="recent">Recent</string>
+    <string name="no_chats">Nog geen gesprekken</string>
+    <string name="untitled_chat">Nieuw gesprek</string>
+    <string name="you">Jij</string>
+    <string name="settings">Instellingen</string>
+    <string name="pin">Vastzetten</string>
+    <string name="unpin">Losmaken</string>
+    <string name="rename">Naam wijzigen</string>
+    <string name="rename_chat">Gesprek hernoemen</string>
+    <string name="delete">Verwijderen</string>
+    <string name="delete_chat_title">Gesprek verwijderen?</string>
+    <string name="delete_chat_body">Hiermee verwijder je \"%1$s\" uit Hermes, inclusief de geschiedenis.</string>
+    <string name="cancel">Annuleren</string>
+    <string name="save">Opslaan</string>
+
+    <!-- Actions -->
+    <string name="action_add">Toevoegen</string>
+    <string name="action_send">Versturen</string>
+    <string name="action_stop">Stoppen</string>
+    <string name="action_stop_listening">Stoppen met luisteren</string>
+    <string name="action_voice">Inspreken</string>
+    <string name="action_live">Live</string>
+    <string name="action_remove">Verwijderen</string>
+    <string name="action_copy">Kopiëren</string>
+    <string name="action_share">Delen</string>
+    <string name="action_retry">Opnieuw</string>
+    <string name="action_read_aloud">Voorlezen</string>
+    <string name="action_stop_reading">Stoppen met voorlezen</string>
+    <string name="action_expand">Uitklappen</string>
+    <string name="action_collapse">Inklappen</string>
+    <string name="action_more">Meer</string>
+    <string name="action_back">Terug</string>
+    <string name="action_close">Sluiten</string>
+    <string name="action_open_sidebar">Menu openen</string>
+    <string name="action_close_sidebar">Menu sluiten</string>
+    <string name="action_scroll_down">Naar beneden</string>
+    <string name="attach_photos">Foto\'s</string>
+    <string name="attach_camera">Camera</string>
+
+    <!-- Agent work -->
+    <string name="status_thinking">Aan het nadenken</string>
+    <string name="status_reconnecting">Verbinding verbroken. Hermes werkt door; wachten op het resultaat</string>
+    <string name="status_stopped">Gestopt</string>
+    <string name="status_stopping">Bezig met stoppen</string>
+    <string name="image_prepare_failed">Een van de afbeeldingen kon niet worden gelezen. Voeg hem opnieuw toe.</string>
+    <string name="work_running">Aan het werk</string>
+    <string name="work_running_tool">Gebruikt %1$s</string>
+    <string name="work_done">Stappen tonen</string>
+    <string name="work_done_duration">%1$s gewerkt</string>
+    <string name="work_thoughts">Gedachten</string>
+    <string name="work_subagent">Subagent</string>
+    <string name="error_generic">Er ging iets mis.</string>
+    <string name="approval_title">Goedkeuring nodig</string>
+    <string name="approval_once">Eén keer toestaan</string>
+    <string name="approval_session">Toestaan voor dit gesprek</string>
+    <string name="approval_always">Altijd toestaan</string>
+    <string name="approval_deny">Weigeren</string>
+
+    <!-- Models -->
+    <string name="model_picker_title">Model</string>
+    <string name="model_default">Hermes</string>
+    <string name="model_default_detail">Standaard op de server: %1$s</string>
+    <string name="reasoning_title">Denkniveau</string>
+    <string name="reasoning_default">Auto</string>
+    <string name="reasoning_fast">Snel</string>
+    <string name="reasoning_extended">Uitgebreid</string>
+    <string name="model_server_default_named">Standaard op de server (%1$s)</string>
+    <string name="profile_chats">Chats</string>
+    <string name="profile_assistant">Assistent</string>
+    <string name="profile_chats_detail">Voor chats die je in de app start</string>
+    <string name="profile_assistant_detail">Voor chats vanuit de assistent-overlay of het assistentgebaar, ook als je ze in de app of in Live voortzet. Kies iets snels.</string>
+
+    <!-- Voice -->
+    <string name="speech_unavailable">Dit toestel heeft geen spraakherkenning.</string>
+    <string name="mic_permission_needed">aight heeft de microfoon nodig voor spraakinvoer.</string>
+    <string name="live_listening">Luisteren</string>
+    <string name="live_thinking">Aan het nadenken</string>
+    <string name="live_speaking">%1$s praat. Tik om te onderbreken.</string>
+    <string name="live_paused">Gepauzeerd</string>
+    <string name="live_error">Spraakinvoer gestopt</string>
+    <string name="live_pause">Pauzeren</string>
+    <string name="live_resume">Hervatten</string>
+    <string name="live_end">Beëindigen</string>
+
+    <!-- Assistant overlay -->
+    <string name="ask_about_screen">Vraag over scherm</string>
+    <string name="screen_attached">Scherm toegevoegd</string>
+    <string name="open_full_chat">Volledig gesprek openen</string>
+    <string name="notification_channel_replies">Antwoorden</string>
+    <string name="assist_not_configured">aight is nog niet verbonden met Hermes. Tik om het in te stellen.</string>
+
+    <!-- Settings -->
+    <string name="setup_title">Verbinden met Hermes</string>
+    <string name="setup_intro">Laat aight naar je Hermes Agent API-server wijzen. Via Tailscale gebruik je de MagicDNS-naam, bijvoorbeeld http://clarkbox:8642.</string>
+    <string name="section_connection">Verbinding</string>
+    <string name="section_assistant">Assistent</string>
+    <string name="section_history">Geschiedenis</string>
+    <string name="section_models">Standaardmodellen</string>
+    <string name="section_voice">Stem</string>
+    <string name="tts_kokoro">Kokoro</string>
+    <string name="tts_system">Android-stem</string>
+    <string name="tts_kokoro_detail">Kokoro-82M draait op de telefoon en spreekt alleen Engels. Nederlandse antwoorden gebruiken de Android-stem.</string>
+    <string name="tts_kokoro_ready">Stemmodel geïnstalleerd</string>
+    <string name="tts_kokoro_downloading">Stemmodel downloaden… %1$d%%</string>
+    <string name="tts_kokoro_download">Stemmodel downloaden (%1$d MB)</string>
+    <string name="model_failed">Downloaden mislukt: %1$s</string>
+    <string name="tts_kokoro_crashed">Kokoro crashte bij het starten op deze telefoon. Antwoorden gebruiken de Android-stem tot je het opnieuw probeert.</string>
+    <string name="tts_voice">Stem</string>
+    <string name="tts_preview">Beluisteren</string>
+    <string name="section_speech_input">Spraakinvoer</string>
+    <string name="stt_orukeet">Orukeet</string>
+    <string name="stt_system">Android-herkenning</string>
+    <string name="stt_orukeet_detail">Orukeet draait op de telefoon en verstaat 25 talen, waaronder Nederlands en Engels. Het herkent zelf welke taal je spreekt; de instelling voor spraaktaal geldt alleen voor de Android-herkenning. Inspreken in andere apps blijft de herkenning van de telefoon gebruiken.</string>
+    <string name="stt_orukeet_ready">Spraakmodel geïnstalleerd</string>
+    <string name="stt_orukeet_downloading">Spraakmodel downloaden… %1$d%%</string>
+    <string name="stt_orukeet_download">Spraakmodel downloaden (%1$d MB)</string>
+    <string name="stt_orukeet_crashed">Orukeet crashte bij het starten op deze telefoon. Spraakinvoer gebruikt de Android-herkenning tot je het opnieuw probeert.</string>
+    <string name="tts_preview_text">Hi %1$s, this is how I sound when I read a reply aloud.</string>
+    <string name="server_url">Server-URL</string>
+    <string name="api_key">API-sleutel (API_SERVER_KEY)</string>
+    <string name="your_name">Je naam</string>
+    <string name="assistant_name">Naam van de assistent</string>
+    <string name="connect">Verbinden</string>
+    <string name="save_and_test">Opslaan en testen</string>
+    <string name="connection_ok">Verbonden met %1$s</string>
+    <string name="connection_failed">Verbinding mislukt: %1$s</string>
+    <string name="insecure_url_warning">Dit http://-adres valt buiten je tailnet. Je API-sleutel gaat dan onversleuteld over het netwerk. Gebruik een Tailscale-adres of https.</string>
+    <string name="default_assistant_on">aight is je standaardassistent</string>
+    <string name="default_assistant_off">aight is nog niet je standaardassistent</string>
+    <string name="default_assistant_detail">Kies aight bij Standaardapps, App voor digitale assistent. Zet op een Samsung ook Zijtoets, Ingedrukt houden, op Digitale assistent.</string>
+    <string name="open_assistant_settings">Assistentinstellingen openen</string>
+    <string name="listen_on_invoke">Direct luisteren</string>
+    <string name="listen_on_invoke_detail">Begin met luisteren zodra je de assistent opent met de zijtoets of een gebaar</string>
+    <string name="speak_replies">Antwoorden voorlezen</string>
+    <string name="speak_replies_detail">Na een ingesproken vraag in de assistent-overlay</string>
+    <string name="speech_language">Spraaktaal</string>
+    <string name="speech_language_hint">Systeemstandaard, of bijvoorbeeld nl-NL</string>
+    <string name="show_all_channels">Gesprekken van alle kanalen tonen</string>
+    <string name="show_all_channels_detail">Ook Telegram-, CLI- en andere Hermes-sessies tonen onder Recent</string>
+</resources>

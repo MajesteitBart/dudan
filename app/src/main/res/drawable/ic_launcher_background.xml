@@ -1,0 +1,42 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Navy backdrop and floor glow of assets/aight-icon.svg, in the same 400-unit coordinates. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:aapt="http://schemas.android.com/aapt"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="400"
+    android:viewportHeight="400">
+    <path android:pathData="M0,0 H400 V400 H0 Z">
+        <aapt:attr name="android:fillColor">
+            <gradient
+                android:centerX="200"
+                android:centerY="191.5"
+                android:gradientRadius="280"
+                android:type="radial">
+                <item android:color="#FF0A1433" android:offset="0" />
+                <item android:color="#FF050A1C" android:offset="0.55" />
+                <item android:color="#FF02040B" android:offset="1" />
+            </gradient>
+        </aapt:attr>
+    </path>
+
+    <!-- Floor glow: a circle squashed into the SVG's ellipse. -->
+    <group
+        android:pivotX="205.625"
+        android:pivotY="318.25"
+        android:scaleY="0.147368">
+        <path android:pathData="M75,318.25 a130.625,130.625 0 1,0 261.25,0 a130.625,130.625 0 1,0 -261.25,0 Z">
+            <aapt:attr name="android:fillColor">
+                <gradient
+                    android:centerX="205.625"
+                    android:centerY="318.25"
+                    android:gradientRadius="130.625"
+                    android:type="radial">
+                    <item android:color="#BF2A5BFF" android:offset="0" />
+                    <item android:color="#4D1A3BD1" android:offset="0.5" />
+                    <item android:color="#000B1A66" android:offset="1" />
+                </gradient>
+            </aapt:attr>
+        </path>
+    </group>
+</vector>

@@ -1,0 +1,82 @@
+package nl.bartvandermeeren.aight
+
+import android.content.Intent
+import android.graphics.Color
+import android.net.Uri
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.compose.setContent
+import androidx.activity.enableEdgeToEdge
+import androidx.activity.viewModels
+import androidx.core.content.IntentCompat
+import nl.bartvandermeeren.aight.data.AppVisibility
+import nl.bartvandermeeren.aight.data.ModelProfile
+import nl.bartvandermeeren.aight.ui.AightRoot
+import nl.bartvandermeeren.aight.ui.MainViewModel
+import nl.bartvandermeeren.aight.ui.theme.AightTheme
+
+class MainActivity : ComponentActivity() {
+    private val vm: MainViewModel by viewModels()
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
+        )
+        super.onCreate(savedInstanceState)
+        if (savedInstanceState == null) handleIntent(intent)
+        setContent {
+            AightTheme {
+                AightRoot(vm)
+            }
+        }
+    }
+
+    override fun onResume() {
+        super.onResume()
+        AppVisibility.activityResumed = true
+    }
+
+    override fun onPause() {
+        AppVisibility.activityResumed = false
+        super.onPause()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        handleIntent(intent)
+    }
+
+    private fun handleIntent(intent: Intent?) {
+        intent ?: return
+        val sessionId = intent.getStringExtra(EXTRA_SESSION_ID)
+        sessionId?.let { vm.openSession(it) }
+        val startVoice = intent.getBooleanExtra(EXTRA_START_VOICE, false)
+        val startLive = intent.getBooleanExtra(EXTRA_START_LIVE, false)
+        // The overlay hands over before its first message too; what follows is still an assistant chat.
+        if (sessionId == null && intent.getBooleanExtra(EXTRA_FROM_ASSISTANT, false)) vm.newChat(ModelProfile.Assistant)
+        when (intent.action) {
+            Intent.ACTION_ASSIST, Intent.ACTION_VOICE_COMMAND -> {
+                vm.newChat(ModelProfile.Assistant)
+                vm.requestVoice()
+            }
+            Intent.ACTION_SEND -> {
+                if (intent.type?.startsWith("image/") == true) {
+                    IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.let(vm::acceptSharedImage)
+                } else {
+                    intent.getStringExtra(Intent.EXTRA_TEXT)?.let(vm::acceptSharedText)
+                }
+            }
+        }
+        if (startVoice) vm.requestVoice()
+        if (startLive) vm.requestVoice(live = true)
+    }
+
+    companion object {
+        const val EXTRA_SESSION_ID = "nl.bartvandermeeren.aight.SESSION_ID"
+        const val EXTRA_START_VOICE = "nl.bartvandermeeren.aight.START_VOICE"
+        const val EXTRA_START_LIVE = "nl.bartvandermeeren.aight.START_LIVE"
+        const val EXTRA_FROM_ASSISTANT = "nl.bartvandermeeren.aight.FROM_ASSISTANT"
+    }
+}

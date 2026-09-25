@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Hermes usually sits behind Tailscale. WireGuard already encrypts tailnet traffic, so plain
+     http:// to a 100.x address or MagicDNS name is allowed. The app warns in settings when an
+     http:// URL points outside the tailnet. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true">
+        <trust-anchors>
+            <certificates src="system" />
+        </trust-anchors>
+    </base-config>
+</network-security-config>

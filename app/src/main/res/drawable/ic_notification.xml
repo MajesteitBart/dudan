@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Status bar silhouette of the orb, cropped to the mark with a wider notch than the launcher icon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="192"
+    android:viewportHeight="192">
+    <group
+        android:translateX="-105.5"
+        android:translateY="-104">
+        <path
+            android:fillColor="#FFFFFFFF"
+            android:pathData="M278.397,195.986 A78.375,78.375 0 1,0 202.376,278.343 A56.375,56.375 0 1,1 278.397,195.986 Z M190.5,233 a45.375,45.375 0 1,0 90.75,0 a45.375,45.375 0 1,0 -90.75,0 Z" />
+    </group>
+</vector>
