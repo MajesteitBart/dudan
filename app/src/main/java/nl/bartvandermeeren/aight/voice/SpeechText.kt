@@ -45,17 +45,17 @@ object SpeechText {
     }
 
     // Function words, plus the greetings and one-word answers that make up short replies. Words both
-    // languages use ("sorry", "we", "even") stay out.
+    // languages use ("is", "in", "of", "was", "we", "sorry") stay out, so they don't tip a short reply.
     private val dutch = setOf(
-        "de", "het", "een", "en", "is", "niet", "je", "ik", "van", "dat", "die", "voor", "op", "met", "zijn", "er",
+        "de", "het", "een", "en", "niet", "je", "ik", "van", "dat", "die", "voor", "op", "met", "zijn", "er",
         "maar", "ook", "wat", "kan", "naar", "als", "dit", "jij", "wij", "heb", "wordt", "nog", "bij", "uit",
         "goedemorgen", "goedemiddag", "goedenavond", "welterusten", "hoi", "hallo", "doei", "dag", "bedankt", "dank",
         "graag", "prima", "oké", "gedaan", "klopt", "zeker", "natuurlijk", "nee", "ja", "goed", "geen", "wel", "veel",
         "vandaag", "morgen", "gisteren", "straks", "misschien", "alleen", "altijd", "komt", "staat",
     )
     private val english = setOf(
-        "the", "and", "is", "not", "you", "to", "of", "that", "for", "on", "with", "are", "this", "it", "be",
-        "but", "also", "what", "can", "as", "have", "was", "will", "from", "your", "an", "or", "by", "at", "in",
+        "the", "and", "not", "you", "to", "that", "for", "on", "with", "are", "this", "it", "be",
+        "but", "also", "what", "can", "as", "have", "will", "from", "your", "an", "or", "by", "at",
         "hello", "hi", "thanks", "thank", "yes", "no", "sure", "okay", "great", "good", "morning", "evening", "night",
         "today", "tomorrow", "yesterday", "done", "please", "just", "all", "there", "here", "would", "could", "should",
     )

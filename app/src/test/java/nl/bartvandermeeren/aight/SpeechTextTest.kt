@@ -19,6 +19,10 @@ class SpeechTextTest {
         assertEquals("en-US", SpeechText.guessLanguage("Thanks, done."))
         // Nothing to go on: the caller falls back to the speech input or phone language.
         assertNull(SpeechText.guessLanguage("OK"))
+        // Words both languages use don't count for either.
+        assertNull(SpeechText.guessLanguage("In Amsterdam."))
+        assertEquals("nl-NL", SpeechText.guessLanguage("Of morgen."))
+        assertEquals("nl-NL", SpeechText.guessLanguage("Het was leuk."))
     }
 
     @Test
