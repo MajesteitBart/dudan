@@ -5,6 +5,7 @@
     <!-- Chat -->
     <string name="greeting_named">Hello, %1$s</string>
     <string name="greeting_anonymous">Ready when you are</string>
+    <string name="greeting_subtitle">What should we work on?</string>
     <string name="composer_hint">Ask %1$s</string>
     <string name="disclaimer">%1$s is an AI agent and can make mistakes.</string>
     <string name="new_chat">New chat</string>
@@ -59,6 +60,8 @@
     <string name="action_scroll_down">Scroll to bottom</string>
     <string name="attach_photos">Photos</string>
     <string name="attach_camera">Camera</string>
+    <string name="attach_photos_detail">Pick from your gallery</string>
+    <string name="attach_camera_detail">Take a photo</string>
 
     <!-- Agent work -->
     <string name="status_thinking">Thinking</string>

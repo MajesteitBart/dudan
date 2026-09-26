@@ -203,7 +203,7 @@ fun LiveScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Palette.BackdropEdge)
+            .background(Palette.SkyDeep.copy(alpha = 0.45f))
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { controller.interrupt() },
     ) {
         LiveGlow(controller.phase, level)
@@ -271,7 +271,7 @@ private val EndGlass = Color(0x99E5484D)
 private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
-            Modifier.size(68.dp).glass(CircleShape, color, solid = color.compositeOver(Palette.Background)).clickable(onClick = onClick),
+            Modifier.size(68.dp).glass(CircleShape, color, blur = false, solid = color.compositeOver(Palette.Background)).clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(30.dp))
@@ -301,7 +301,7 @@ private fun LiveGlow(phase: LivePhase, level: Float) {
         val radius = w * (0.75f + 0.35f * energy) * breathe
         drawRect(
             Brush.radialGradient(
-                listOf(Palette.SparkBlue.copy(alpha = 0.55f * energy), Palette.Live.copy(alpha = 0.35f * energy), Color.Transparent),
+                listOf(Palette.SparkBlue.copy(alpha = 0.55f * energy), Palette.GlowViolet.copy(alpha = 0.35f * energy), Color.Transparent),
                 center = Offset(w * (0.5f + drift), h * 1.08f),
                 radius = radius,
             ),

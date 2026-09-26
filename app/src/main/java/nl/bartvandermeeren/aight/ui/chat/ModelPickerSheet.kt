@@ -2,7 +2,6 @@ package nl.bartvandermeeren.aight.ui.chat
 
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -15,7 +14,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
@@ -36,6 +34,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
@@ -47,6 +46,7 @@ import nl.bartvandermeeren.aight.data.ReasoningMode
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.components.BlurBehindWindow
 import nl.bartvandermeeren.aight.ui.components.GlassDefaults
+import nl.bartvandermeeren.aight.ui.components.Segmented
 import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.components.windowGlass
 import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
@@ -76,15 +76,12 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
         Column(Modifier.border(edge, shape).navigationBarsPadding().padding(bottom = 12.dp)) {
             BottomSheetDefaults.DragHandle(Modifier.align(Alignment.CenterHorizontally))
             // Two defaults: regular chats, and quick chats started from the assistant.
-            Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ModelProfile.entries.forEach { option ->
-                    Pill(
-                        label = stringResource(if (option == ModelProfile.Chats) R.string.profile_chats else R.string.profile_assistant),
-                        active = profile == option,
-                        onClick = { profile = option },
-                    )
-                }
-            }
+            Segmented(
+                options = ModelProfile.entries.map { it to stringResource(if (it == ModelProfile.Chats) R.string.profile_chats else R.string.profile_assistant) },
+                selected = profile,
+                onSelect = { profile = it },
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
             Text(
                 stringResource(if (profile == ModelProfile.Chats) R.string.profile_chats_detail else R.string.profile_assistant_detail),
                 style = MaterialTheme.typography.bodySmall,
@@ -97,19 +94,18 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
                 color = Palette.TextSecondary,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 8.dp),
             )
-            Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                ReasoningMode.entries.forEach { mode ->
-                    Pill(
-                        label = when (mode) {
-                            ReasoningMode.Default -> stringResource(R.string.reasoning_default)
-                            ReasoningMode.Fast -> stringResource(R.string.reasoning_fast)
-                            ReasoningMode.Extended -> stringResource(R.string.reasoning_extended)
-                        },
-                        active = selected.reasoning == mode,
-                        onClick = { vm.setModel(profile, selected.copy(reasoning = mode)) },
-                    )
-                }
-            }
+            Segmented(
+                options = ReasoningMode.entries.map { mode ->
+                    mode to when (mode) {
+                        ReasoningMode.Default -> stringResource(R.string.reasoning_default)
+                        ReasoningMode.Fast -> stringResource(R.string.reasoning_fast)
+                        ReasoningMode.Extended -> stringResource(R.string.reasoning_extended)
+                    }
+                },
+                selected = selected.reasoning,
+                onSelect = { vm.setModel(profile, selected.copy(reasoning = it)) },
+                modifier = Modifier.padding(horizontal = 20.dp),
+            )
             Text(
                 stringResource(R.string.model_picker_title),
                 style = MaterialTheme.typography.titleMedium,
@@ -161,39 +157,27 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
     }
 }
 
-/** A toggle chip; the active one takes the orb's violet. */
-@Composable
-fun Pill(label: String, active: Boolean, onClick: () -> Unit) {
-    Box(
-        Modifier
-            .pane(CircleShape, if (active) Palette.Button else Palette.Surface)
-            .clickable(onClick = onClick)
-            .padding(horizontal = 18.dp, vertical = 10.dp),
-    ) {
-        Text(label, style = MaterialTheme.typography.labelLarge, color = if (active) Palette.ButtonText else Palette.TextPrimary)
-    }
-}
-
+/** A model in beautifului.dev's picker: the name, its id quieter underneath, a check on the one in use. */
 @Composable
 private fun ModelRow(title: String, subtitle: String?, selected: Boolean, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .then(if (selected) Modifier.pane(RoundedCornerShape(20.dp), Palette.Surface) else Modifier.clip(RoundedCornerShape(20.dp)))
+            .then(if (selected) Modifier.pane(RoundedCornerShape(16.dp), Palette.Surface, outline = Palette.Hairline) else Modifier.clip(RoundedCornerShape(16.dp)))
             .clickable(onClick = onClick)
-            .padding(horizontal = 16.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
     ) {
         Column(Modifier.weight(1f)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(title, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium), color = Palette.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (!subtitle.isNullOrBlank()) {
                 Text(subtitle, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
         if (selected) {
             Spacer(Modifier.size(12.dp))
-            Icon(Icons.Rounded.Check, contentDescription = null, tint = Palette.Link)
+            Icon(Icons.Rounded.Check, contentDescription = null, tint = Palette.TextPrimary, modifier = Modifier.size(20.dp))
         }
     }
 }

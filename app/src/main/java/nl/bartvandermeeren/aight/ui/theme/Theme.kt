@@ -23,60 +23,69 @@ import androidx.compose.ui.unit.sp
 import nl.bartvandermeeren.aight.R
 
 /**
- * Frosted glass over the navy and violet of the aight icon, in three levels (see Glass.kt):
- * - content sits on flat, quiet panes;
- * - chrome that floats over the scrolling chat (composer, top controls, sidebar) is blurred glass;
- * - dialogs, sheets, menus and the assistant overlay are denser glass in their own window.
- * Every translucent color has a solid counterpart for Reduce transparency.
+ * Dusk glass, after Superhuman's frosted panels over a twilight sky and beautifului.dev's quiet
+ * components. The sky (GlassBackdrop) runs from deep blue at the top to a lavender horizon. Glass cards
+ * frost it into slate-lavender that keeps white text above 7:1; Superhuman's own panels over bright sky
+ * measure 3.3 to 4.3:1, too low for reading replies all day. Inside a card, elements are outlined or
+ * flat. Every translucent color has a solid counterpart for Reduce transparency.
  */
 object Palette {
-    // The icon's navy backdrop, from its center outwards.
-    val Background = Color(0xFF050A1C)
-    val BackdropCenter = Color(0xFF0A1433)
-    val BackdropEdge = Color(0xFF02040B)
+    // The dusk sky, top to horizon, and the dark it fades to at the corners.
+    val SkyTop = Color(0xFF232C62)
+    val SkyHigh = Color(0xFF394891)
+    val SkyMid = Color(0xFF5061A6)
+    val SkyHorizon = Color(0xFF8676BA)
+    val SkyGlow = Color(0xFFC08AB4) // mauve light low in the sky, like the clouds in Superhuman's photo
+    val SkyDeep = Color(0xFF17173A)
+    val Background = Color(0xFF1E2350) // the sky's average; what glass and fallbacks blend toward
+    val BackdropCenter = SkyMid
+    val BackdropEdge = SkyDeep
 
-    // Content panes: a faint fill on the backdrop, no blur or lit edge.
-    val Surface = Color(0x12FFFFFF) // pills, selected rows, fields, cards
-    val Card = Color(0x1FFFFFFF)
-    val Hairline = Color(0x1AFFFFFF)
-    val Code = Color(0x42020412) // code blocks: darker than prose
-    val UserBubble = Color(0x3D7A6CFF)
+    // Glass cards: a violet-navy wash and a little white over the blurred sky, under a light edge.
+    val GlassWash = Color(0xB51B1942)
+    val Chrome = Color(0x0FFFFFFF)
+    val Composer = Color(0x0FFFFFFF)
+    val ChromeSolid = Color(0xFF383C68)
+    // The phone's full-screen sidebar: darker, so its list reads over the blurred chat.
+    val SidebarGlass = Color(0x731B1942)
 
-    // Chrome glass: tint over a blur of the chat. ChromeSolid replaces it with Reduce transparency.
-    val Chrome = Color(0x1CFFFFFF)
-    val Composer = Color(0x21FFFFFF)
-    val ChromeSolid = Color(0xFF1C2349)
-    // The phone's full-screen sidebar: a darker frost so its list reads over the blurred chat.
-    val SidebarGlass = Color(0xA60B1030)
+    // Inside a card: outlined chips and fields, flat bubbles and code.
+    val Surface = Color(0x0FFFFFFF) // selected rows, fields, quiet fills
+    val Card = Color(0x1AFFFFFF)
+    val Hairline = Color(0x1FFFFFFF)
+    val Outline = Color(0x38FFFFFF) // chip and field borders
+    val Code = Color(0x38000010) // code blocks: darker than the card
+    val UserBubble = Color(0x24FFFFFF)
 
     // Window glass: popups, dialogs and sheets live in their own window, where the app's blur can't
     // reach. The system blurs behind dialogs and sheets; menus and phones without that blur get the
     // solid versions.
-    val Menu = Color(0xF0151A3A)
-    val MenuSolid = Color(0xFF151A3A)
-    val Sheet = Color(0xE6111633)
-    val SheetSolid = Color(0xFF111633)
+    val Menu = Color(0xF52A2C52)
+    val MenuSolid = Color(0xFF2A2C52)
+    val Sheet = Color(0xEB262950)
+    val SheetSolid = Color(0xFF262950)
     // The assistant overlay floats over other apps, so its glass is darker still.
-    val OverlayGlass = Color(0xC70B1030)
-    val OverlaySolid = Color(0xFA0B1030)
+    val OverlayGlass = Color(0xD91F2148)
+    val OverlaySolid = Color(0xFA1F2148)
 
-    val Outline = Color(0x24FFFFFF)
-    val TextPrimary = Color(0xFFF3F4FF)
-    val TextSecondary = Color(0xFFB5B9D8)
-    // Lightened from #8288AD, which measured 4.9:1 over the floor glow; this keeps small print above 5.5:1.
-    val TextTertiary = Color(0xFF8E94BA)
-    val Icon = Color(0xFFE6E8FA)
+    val TextPrimary = Color(0xFFF7F7FC)
+    val TextSecondary = Color(0xFFCBCDE2)
+    val TextTertiary = Color(0xFFBCBFDA)
+    val Icon = Color(0xFFEDEEF8)
+    // White is the primary action, as in beautifului.dev's send button; dark ink goes on it.
+    val Primary = Color(0xFFF4F4F8)
+    val OnPrimary = Color(0xFF1E1C3A)
     val Send = Color(0xFF6A62F2)
-    val Live = Color(0x477A5CFF)
-    val Button = Color(0x597A6CFF)
-    val ButtonText = Color(0xFFF1F0FF)
-    val Disabled = Color(0x0FFFFFFF)
-    val Link = Color(0xFFB9C3FF)
-    val InlineCode = Color(0x1FFFFFFF)
-    val Danger = Color(0xFFFFB4B0)
-    val DangerPane = Color(0x2EFF5A5A)
-    val WarningPane = Color(0x1FF5A623)
-    val Success = Color(0xFF8FE0AE)
+    val Live = Color(0x1FFFFFFF)
+    val Button = Color(0x2EFFFFFF)
+    val ButtonText = Color(0xFFF7F7FC)
+    val Disabled = Color(0x14FFFFFF)
+    val Link = Color(0xFFD3D9FF)
+    val InlineCode = Color(0x29000010)
+    val Danger = Color(0xFFFFB0B3)
+    val DangerPane = Color(0x33FF5A6A)
+    val WarningPane = Color(0x26F5B84A)
+    val Success = Color(0xFF86E3AE)
 
     // The orb's gradient stops and glows, used for accents and the backdrop.
     val OrbViolet = Color(0xFFB867F7)

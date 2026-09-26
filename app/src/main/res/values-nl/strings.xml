@@ -3,6 +3,7 @@
     <!-- Chat -->
     <string name="greeting_named">Vraag maar, %1$s</string>
     <string name="greeting_anonymous">Ik ben er klaar voor</string>
+    <string name="greeting_subtitle">Waar gaan we aan werken?</string>
     <string name="composer_hint">Vraag het %1$s</string>
     <string name="disclaimer">%1$s is een AI-agent en kan fouten maken.</string>
     <string name="new_chat">Nieuw gesprek</string>
@@ -57,6 +58,8 @@
     <string name="action_scroll_down">Naar beneden</string>
     <string name="attach_photos">Foto\'s</string>
     <string name="attach_camera">Camera</string>
+    <string name="attach_photos_detail">Kies uit je galerij</string>
+    <string name="attach_camera_detail">Maak een foto</string>
 
     <!-- Agent work -->
     <string name="status_thinking">Aan het nadenken</string>

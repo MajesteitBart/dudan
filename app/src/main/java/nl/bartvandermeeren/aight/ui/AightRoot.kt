@@ -15,6 +15,7 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
@@ -53,14 +54,25 @@ import nl.bartvandermeeren.aight.ui.live.LiveScreen
 import nl.bartvandermeeren.aight.ui.settings.SettingsScreen
 import nl.bartvandermeeren.aight.voice.SpeechInput
 
+/** One dusk sky behind every screen; the glass cards on each of them frost it. */
 @Composable
 fun AightRoot(vm: MainViewModel) {
     val settingsState by vm.settings.collectAsStateWithLifecycle()
-    val settings = settingsState
-    if (settings == null) {
-        GlassBackdrop()
-        return
+    val conversation by vm.conversation.collectAsStateWithLifecycle()
+    val haze = rememberHazeState()
+    val emptyChat = vm.screen == Screen.Chat && conversation.messages.isEmpty() && !conversation.loading
+    Box(Modifier.fillMaxSize()) {
+        GlassBackdrop(Modifier.hazeSource(haze), glow = emptyChat || settingsState?.isConfigured == false)
+        CompositionLocalProvider(LocalHazeState provides haze) {
+            AightScreens(vm)
+        }
     }
+}
+
+@Composable
+private fun AightScreens(vm: MainViewModel) {
+    val settingsState by vm.settings.collectAsStateWithLifecycle()
+    val settings = settingsState ?: return
     if (!settings.isConfigured) {
         SettingsScreen(vm, settings, setupMode = true, onBack = null)
         return
@@ -202,11 +214,8 @@ private fun ChatLayout(
         HermesApi.normalizeBaseUrl(settings.serverUrl).substringAfter("://").substringBefore('/').substringBefore(':')
     }
 
-    // One backdrop behind the sidebar and the chat; the glass on both frosts it.
-    val haze = rememberHazeState()
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
-        GlassBackdrop(Modifier.hazeSource(haze), glow = conversation.messages.isEmpty() && !conversation.loading)
 
         @Composable
         fun SidebarContent(mode: SidebarMode, modifier: Modifier) {
@@ -233,44 +242,42 @@ private fun ChatLayout(
             )
         }
 
-        CompositionLocalProvider(LocalHazeState provides haze) {
-            if (wide) {
-                Row(Modifier.fillMaxSize()) {
-                    AnimatedVisibility(dockedOpen, enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
-                        SidebarContent(SidebarMode.Docked, Modifier.width(320.dp))
-                    }
-                    ChatPane(
-                        vm = vm,
-                        settings = settings,
-                        showMenuButton = !dockedOpen,
-                        onMenu = { dockedOpen = true; vm.refreshSessions() },
-                        listening = listening,
-                        voiceLevel = level,
-                        voiceText = heard,
-                        actions = actions,
-                        modifier = Modifier.weight(1f),
-                    )
+        if (wide) {
+            Row(Modifier.fillMaxSize()) {
+                AnimatedVisibility(dockedOpen, enter = expandHorizontally() + fadeIn(), exit = shrinkHorizontally() + fadeOut()) {
+                    SidebarContent(SidebarMode.Docked, Modifier.width(320.dp))
                 }
-            } else {
                 ChatPane(
                     vm = vm,
                     settings = settings,
-                    showMenuButton = true,
-                    onMenu = { overlayOpen = true; vm.refreshSessions() },
+                    showMenuButton = !dockedOpen,
+                    onMenu = { dockedOpen = true; vm.refreshSessions() },
                     listening = listening,
                     voiceLevel = level,
                     voiceText = heard,
                     actions = actions,
+                    modifier = Modifier.weight(1f),
                 )
-                AnimatedVisibility(
-                    overlayOpen,
-                    enter = slideInHorizontally { -it / 3 } + fadeIn(),
-                    exit = slideOutHorizontally { -it / 3 } + fadeOut(),
-                ) {
-                    SidebarContent(SidebarMode.Overlay, Modifier.fillMaxSize())
-                }
-                BackHandler(enabled = overlayOpen) { overlayOpen = false }
             }
+        } else {
+            ChatPane(
+                vm = vm,
+                settings = settings,
+                showMenuButton = true,
+                onMenu = { overlayOpen = true; vm.refreshSessions() },
+                listening = listening,
+                voiceLevel = level,
+                voiceText = heard,
+                actions = actions,
+            )
+            AnimatedVisibility(
+                overlayOpen,
+                enter = slideInHorizontally { -it / 3 } + fadeIn(),
+                exit = slideOutHorizontally { -it / 3 } + fadeOut(),
+            ) {
+                SidebarContent(SidebarMode.Overlay, Modifier.fillMaxSize())
+            }
+            BackHandler(enabled = overlayOpen) { overlayOpen = false }
         }
     }
 }

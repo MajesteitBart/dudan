@@ -57,10 +57,10 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -76,20 +76,21 @@ import nl.bartvandermeeren.aight.ui.components.Markdown
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.copyToClipboard
+import nl.bartvandermeeren.aight.ui.components.outlined
 import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.components.rememberImageBitmap
 import nl.bartvandermeeren.aight.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
-/** A violet bubble, its tail corner toward the edge the user writes from. */
-private val UserBubbleShape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp, bottomEnd = 8.dp, bottomStart = 26.dp)
+/** A light bubble like Superhuman's "yes!", its tail corner toward the edge the user writes from. */
+private val UserBubbleShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 6.dp, bottomStart = 22.dp)
 
 @Composable
 fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
     Column(
         modifier
             .fillMaxWidth()
-            .padding(start = 56.dp, end = 16.dp),
+            .padding(start = 56.dp, end = 12.dp),
         horizontalAlignment = Alignment.End,
         verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
@@ -166,7 +167,7 @@ fun AssistantMessageItem(
     Column(
         modifier
             .fillMaxWidth()
-            .padding(horizontal = 20.dp),
+            .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         val hasWork = message.steps.isNotEmpty() || message.reasoning.isNotBlank()
@@ -241,7 +242,7 @@ private fun ShimmerText(text: String) {
     Text("$text$dots", style = MaterialTheme.typography.bodyLarge, color = Palette.TextSecondary)
 }
 
-/** Gemini-style "Worked for 1m 10s" header that expands into the agent's steps. */
+/** beautifului.dev's "Thought for 4 seconds ⌄": a quiet line that expands into the agent's steps as tool chips. */
 @Composable
 private fun WorkPanel(message: UiMessage) {
     var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
@@ -269,14 +270,13 @@ private fun WorkPanel(message: UiMessage) {
         Modifier
             .fillMaxWidth()
             .animateContentSize(),
-        verticalArrangement = Arrangement.spacedBy(10.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp),
     ) {
-        // A capsule with the status; tapping it opens the steps on a pane below.
         Row(
             Modifier
-                .pane(CircleShape, Palette.Surface)
+                .clip(RoundedCornerShape(12.dp))
                 .clickable { expanded = !expanded }
-                .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
+                .padding(start = 2.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -307,9 +307,8 @@ private fun WorkPanel(message: UiMessage) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .pane(RoundedCornerShape(22.dp), Palette.Surface)
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                    .padding(start = 4.dp, top = 2.dp, bottom = 4.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (message.reasoning.isNotBlank()) {
                     StepRow(
@@ -347,6 +346,10 @@ private fun StepItem(step: Step) {
     }
 }
 
+/**
+ * One step as a beautifului.dev tool chip: icon, a bold label and, for tools, the call itself in a
+ * monospace pill on the same line. Prose details (thoughts, a subagent's result) go underneath.
+ */
 @Composable
 private fun StepRow(
     icon: @Composable () -> Unit,
@@ -356,20 +359,36 @@ private fun StepRow(
     detailLines: Int,
     titleLines: Int = 2,
 ) {
-    Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-        Box(Modifier.padding(top = 3.dp).size(20.dp), contentAlignment = Alignment.Center) { icon() }
-        Column(verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(
-                title,
-                style = MaterialTheme.typography.bodyMedium,
-                color = Palette.TextPrimary,
-                maxLines = titleLines,
-                overflow = TextOverflow.Ellipsis,
-            )
-            if (!detail.isNullOrBlank() && detailLines > 0) {
+    Row(horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+        Box(Modifier.padding(top = 2.dp).size(20.dp), contentAlignment = Alignment.Center) { icon() }
+        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text(
+                    title,
+                    style = MaterialTheme.typography.bodyMedium.copy(fontWeight = FontWeight.Medium),
+                    color = Palette.TextPrimary,
+                    maxLines = titleLines,
+                    overflow = TextOverflow.Ellipsis,
+                    modifier = Modifier.weight(1f, fill = false),
+                )
+                if (monospace && !detail.isNullOrBlank()) {
+                    Text(
+                        detail.lineSequence().first(),
+                        style = MaterialTheme.typography.bodySmall.copy(fontFamily = GoogleSansCode, fontSize = 12.5.sp),
+                        color = Palette.TextSecondary,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier
+                            .weight(1f, fill = false)
+                            .pane(RoundedCornerShape(8.dp), Palette.InlineCode, outline = Palette.Hairline)
+                            .padding(horizontal = 8.dp, vertical = 3.dp),
+                    )
+                }
+            }
+            if (!monospace && !detail.isNullOrBlank() && detailLines > 0) {
                 Text(
                     detail,
-                    style = MaterialTheme.typography.bodySmall.let { if (monospace) it.copy(fontFamily = GoogleSansCode, fontSize = 12.5.sp) else it },
+                    style = MaterialTheme.typography.bodySmall,
                     color = Palette.TextSecondary,
                     maxLines = detailLines,
                     overflow = TextOverflow.Ellipsis,
@@ -382,10 +401,10 @@ private fun StepRow(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
-    // Content, not chrome: a flat amber pane with an amber hairline, so it stands out from the reply.
-    val shape = RoundedCornerShape(24.dp)
-    Box(Modifier.fillMaxWidth().pane(shape, Palette.WarningPane, outline = Palette.SparkAmber.copy(alpha = 0.35f))) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+    // beautifului.dev's approval card: a darker card inside the chat card, one white primary choice.
+    val shape = RoundedCornerShape(20.dp)
+    Box(Modifier.fillMaxWidth().pane(shape, Palette.Code, outline = Palette.SparkAmber.copy(alpha = 0.4f))) {
+        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Outlined.Shield, contentDescription = null, tint = Palette.SparkAmber, modifier = Modifier.size(22.dp))
                 Text(stringResource(R.string.approval_title), style = MaterialTheme.typography.titleMedium, color = Palette.TextPrimary)
@@ -394,7 +413,7 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
             }
             request.command?.takeIf { it.isNotBlank() }?.let {
-                Box(Modifier.fillMaxWidth().pane(RoundedCornerShape(14.dp), Palette.Code)) {
+                Box(Modifier.fillMaxWidth().pane(RoundedCornerShape(12.dp), Palette.InlineCode, outline = Palette.Hairline)) {
                     Text(
                         it,
                         fontFamily = GoogleSansCode,
@@ -407,13 +426,14 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                     )
                 }
             }
+            val primary = request.choices.firstOrNull { it != "deny" }
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 request.choices.forEach { choice ->
                     val pending = request.pendingChoice == choice
-                    val deny = choice == "deny"
+                    val isPrimary = choice == primary
                     Box(
                         Modifier
-                            .pane(CircleShape, if (deny) Palette.Surface else Palette.Button)
+                            .then(if (isPrimary) Modifier.pane(CircleShape, Palette.Primary) else Modifier.outlined(CircleShape))
                             .clickable(enabled = request.pendingChoice == null) { onChoice(choice) },
                     ) {
                         Row(
@@ -421,12 +441,9 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            if (pending) CircularProgressIndicator(strokeWidth = 2.dp, color = Color.White, modifier = Modifier.size(14.dp))
-                            Text(
-                                approvalLabel(choice),
-                                style = MaterialTheme.typography.labelLarge,
-                                color = if (deny) Palette.TextPrimary else Palette.ButtonText,
-                            )
+                            val ink = if (isPrimary) Palette.OnPrimary else Palette.TextPrimary
+                            if (pending) CircularProgressIndicator(strokeWidth = 2.dp, color = ink, modifier = Modifier.size(14.dp))
+                            Text(approvalLabel(choice), style = MaterialTheme.typography.labelLarge, color = ink)
                         }
                     }
                 }

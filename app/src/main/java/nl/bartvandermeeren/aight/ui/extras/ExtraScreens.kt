@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
@@ -57,16 +58,16 @@ import nl.bartvandermeeren.aight.chat.userMessage
 import nl.bartvandermeeren.aight.data.JobInfo
 import nl.bartvandermeeren.aight.data.SkillInfo
 import nl.bartvandermeeren.aight.ui.MainViewModel
-import nl.bartvandermeeren.aight.ui.components.GlassBackdrop
+import nl.bartvandermeeren.aight.ui.components.GlassDefaults
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
-import nl.bartvandermeeren.aight.ui.components.pane
+import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.outlined
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 @Composable
 private fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable (() -> Unit)? = null, content: @Composable () -> Unit) {
     BackHandler(onBack = onBack)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        GlassBackdrop()
         Column(Modifier.widthIn(max = 880.dp).fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
             Row(
                 Modifier.fillMaxWidth().height(68.dp).padding(horizontal = 12.dp),
@@ -77,7 +78,7 @@ private fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable 
                     Icons.AutoMirrored.Rounded.ArrowBack,
                     stringResource(R.string.action_back),
                     onClick = onBack,
-                    modifier = Modifier.pane(CircleShape, Palette.Surface),
+                    modifier = Modifier.outlined(CircleShape),
                     size = 44.dp,
                     iconSize = 24.dp,
                 )
@@ -92,10 +93,10 @@ private fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable 
     }
 }
 
-/** A quiet pane in a list, inset from the screen edges. */
+/** A glass card on the sky, inset from the screen edges. */
 private fun Modifier.listCard(shape: Shape = RoundedCornerShape(22.dp)) = fillMaxWidth()
     .padding(horizontal = 16.dp)
-    .pane(shape, Palette.Surface)
+    .glass(shape)
 
 @Composable
 fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
@@ -112,7 +113,7 @@ fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
         title = null,
         onBack = onBack,
         header = {
-            Box(Modifier.fillMaxWidth().pane(CircleShape, Palette.Surface, outline = Palette.Hairline)) {
+            Box(Modifier.fillMaxWidth().glass(CircleShape)) {
                 Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Search, null, tint = Palette.TextSecondary, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.size(12.dp))
@@ -134,10 +135,13 @@ fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
             }
         },
     ) {
+        // All results on one glass card, rows split by hairlines, like the inbox panel in Superhuman's hero.
         LazyColumn(
-            Modifier.fillMaxSize(),
-            contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(8.dp),
+            Modifier
+                .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 12.dp)
+                .fillMaxSize()
+                .glass(GlassDefaults.CardShape),
+            contentPadding = PaddingValues(vertical = 6.dp),
         ) {
             if (results.isEmpty()) {
                 item {
@@ -145,16 +149,17 @@ fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
                         stringResource(if (query.isBlank()) R.string.no_chats else R.string.no_results),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Palette.TextTertiary,
-                        modifier = Modifier.padding(24.dp),
+                        modifier = Modifier.padding(22.dp),
                     )
                 }
             }
-            items(results, key = { it.id }) { session ->
+            itemsIndexed(results, key = { _, it -> it.id }) { index, session ->
+                if (index > 0) HorizontalDivider(color = Palette.Hairline, modifier = Modifier.padding(horizontal = 20.dp))
                 Column(
                     Modifier
-                        .listCard()
+                        .fillMaxWidth()
                         .clickable { vm.openSession(session.id) }
-                        .padding(horizontal = 18.dp, vertical = 14.dp),
+                        .padding(horizontal = 20.dp, vertical = 14.dp),
                 ) {
                     Text(
                         session.displayTitle.ifBlank { stringResource(R.string.untitled_chat) },
@@ -209,7 +214,7 @@ fun SkillsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     item(key = "g_$category") {
                         Column(Modifier.listCard(RoundedCornerShape(24.dp)).padding(vertical = 4.dp)) {
                             list.forEachIndexed { index, skill ->
-                                if (index > 0) HorizontalDivider(color = Palette.Outline.copy(alpha = 0.08f), modifier = Modifier.padding(horizontal = 18.dp))
+                                if (index > 0) HorizontalDivider(color = Palette.Hairline, modifier = Modifier.padding(horizontal = 18.dp))
                                 Column(
                                     Modifier
                                         .fillMaxWidth()
@@ -302,7 +307,7 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
 private fun JobButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Row(
         Modifier
-            .pane(CircleShape, Palette.Card)
+            .outlined(CircleShape)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

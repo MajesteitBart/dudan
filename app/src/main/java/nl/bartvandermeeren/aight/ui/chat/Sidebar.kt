@@ -1,6 +1,7 @@
 package nl.bartvandermeeren.aight.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
+import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -44,6 +45,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -90,13 +92,13 @@ fun Sidebar(
     modifier: Modifier = Modifier,
 ) {
     val frame = when (mode) {
-        // A floating pane beside the chat on the inner screen.
+        // A glass card on the sky beside the chat, like the panels in Superhuman's hero.
         SidebarMode.Docked -> Modifier
             .statusBarsPadding()
             .navigationBarsPadding()
-            .padding(start = 12.dp, top = 8.dp, bottom = 12.dp)
-            .glass(RoundedCornerShape(28.dp))
-        // A sheet of frosted glass over the whole chat on the cover screen.
+            .padding(start = 10.dp, top = 8.dp, bottom = 10.dp)
+            .glass(GlassDefaults.CardShape)
+        // A sheet of frosted sky over the whole chat on the cover screen.
         SidebarMode.Overlay -> Modifier
             .glass(RectangleShape, Palette.SidebarGlass, blurRadius = GlassDefaults.SheetBlur, border = false, solid = Palette.SheetSolid)
             .statusBarsPadding()
@@ -122,7 +124,7 @@ fun Sidebar(
         NavItem(Icons.Outlined.Schedule, stringResource(R.string.scheduled_tasks), onClick = onJobs)
         Spacer(Modifier.height(24.dp))
         Row(Modifier.padding(start = 32.dp, end = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.recent), style = MaterialTheme.typography.bodyLarge, color = Palette.TextSecondary)
+            Text(stringResource(R.string.recent), style = MaterialTheme.typography.labelLarge, color = Palette.TextSecondary)
             Spacer(Modifier.weight(1f))
             if (sessions.loading) CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.TextSecondary, modifier = Modifier.size(14.dp))
         }
@@ -178,7 +180,7 @@ fun Sidebar(
 
 /** Selected rows sit on a quiet pane; the rest are bare text on the sidebar's glass. */
 private fun Modifier.selectedPane(selected: Boolean, shape: Shape): Modifier =
-    if (selected) pane(shape, Palette.Card) else clip(shape)
+    if (selected) pane(shape, Palette.Surface, outline = Palette.Hairline) else clip(shape)
 
 @Composable
 private fun NavItem(icon: ImageVector, label: String, selected: Boolean = false, onClick: () -> Unit) {
@@ -226,13 +228,22 @@ private fun SessionItem(
                         menu = true
                     },
                 )
-                .padding(start = 20.dp, end = 12.dp),
+                .padding(start = 8.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
+            // Superhuman's selection mark: a short bar of light at the start of the row.
+            Box(
+                Modifier
+                    .width(3.dp)
+                    .height(20.dp)
+                    .clip(RoundedCornerShape(2.dp))
+                    .background(if (selected) Palette.Primary else Color.Transparent),
+            )
+            Spacer(Modifier.width(9.dp))
             Text(
                 session.displayTitle.ifBlank { stringResource(R.string.untitled_chat) },
                 style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
-                color = Palette.TextPrimary,
+                color = if (selected) Palette.TextPrimary else Palette.TextSecondary,
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),

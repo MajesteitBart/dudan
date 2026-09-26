@@ -6,7 +6,6 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -58,7 +57,6 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -83,13 +81,14 @@ import nl.bartvandermeeren.aight.data.SttEngine
 import nl.bartvandermeeren.aight.data.TtsEngine
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.chat.ModelPickerSheet
-import nl.bartvandermeeren.aight.ui.chat.Pill
 import nl.bartvandermeeren.aight.ui.chat.prettyModelName
 import nl.bartvandermeeren.aight.ui.components.AightMark
-import nl.bartvandermeeren.aight.ui.components.GlassBackdrop
-import nl.bartvandermeeren.aight.ui.components.GlassDefaults
+import nl.bartvandermeeren.aight.ui.components.CtaButton
+import nl.bartvandermeeren.aight.ui.components.Segmented
 import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
+import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.outlined
 import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.ModelPackage
@@ -135,7 +134,6 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
     }
 
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        GlassBackdrop(glow = setupMode)
         Column(
             Modifier
                 .widthIn(max = 720.dp)
@@ -153,7 +151,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                         Icons.AutoMirrored.Rounded.ArrowBack,
                         stringResource(R.string.action_back),
                         onClick = onBack,
-                        modifier = Modifier.pane(CircleShape, Palette.Surface),
+                        modifier = Modifier.outlined(CircleShape),
                         size = 44.dp,
                         iconSize = 24.dp,
                     )
@@ -195,25 +193,17 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 Field(assistant, { assistant = it }, stringResource(R.string.assistant_name))
 
                 val canConnect = url.isNotBlank() && key.isNotBlank()
-                Row(
-                    Modifier
-                        .padding(top = 4.dp)
-                        .clip(CircleShape)
-                        .background(if (canConnect) GlassDefaults.Orb else SolidColor(Palette.Disabled))
-                        .clickable(enabled = canConnect && test != TestState.Testing) { connect() }
-                        .padding(horizontal = 24.dp, vertical = 14.dp),
-                    verticalAlignment = Alignment.CenterVertically,
-                ) {
-                    if (test == TestState.Testing) {
-                        CircularProgressIndicator(strokeWidth = 2.dp, color = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.size(10.dp))
-                    }
-                    Text(
-                        stringResource(if (setupMode) R.string.connect else R.string.save_and_test),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = if (canConnect) Color.White else Palette.TextTertiary,
-                    )
-                }
+                CtaButton(
+                    stringResource(if (setupMode) R.string.connect else R.string.save_and_test),
+                    onClick = ::connect,
+                    enabled = canConnect && test != TestState.Testing,
+                    modifier = Modifier.padding(top = 4.dp),
+                    busy = if (test == TestState.Testing) {
+                        { CircularProgressIndicator(strokeWidth = 2.dp, color = Color.White, modifier = Modifier.size(16.dp)) }
+                    } else {
+                        null
+                    },
+                )
                 when (val t = test) {
                     is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
                     is TestState.Failed -> Notice(stringResource(R.string.connection_failed, t.message), Palette.Danger, error = true)
@@ -318,14 +308,11 @@ private fun VoiceSettings(vm: MainViewModel, settings: AppSettings) {
     val scope = rememberCoroutineScope()
     val model = vm.kokoroModel
     val modelState by model.state.collectAsStateWithLifecycle()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.tts_kokoro), settings.ttsEngine == TtsEngine.Kokoro) {
-            scope.launch { vm.settingsRepository.setTtsEngine(TtsEngine.Kokoro) }
-        }
-        Pill(stringResource(R.string.tts_system), settings.ttsEngine == TtsEngine.System) {
-            scope.launch { vm.settingsRepository.setTtsEngine(TtsEngine.System) }
-        }
-    }
+    Segmented(
+        options = listOf(TtsEngine.Kokoro to stringResource(R.string.tts_kokoro), TtsEngine.System to stringResource(R.string.tts_system)),
+        selected = settings.ttsEngine,
+        onSelect = { scope.launch { vm.settingsRepository.setTtsEngine(it) } },
+    )
     if (settings.ttsEngine != TtsEngine.Kokoro) return
     Text(stringResource(R.string.tts_kokoro_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     ModelStatus(
@@ -346,14 +333,11 @@ private fun DutchVoiceSettings(vm: MainViewModel, settings: AppSettings) {
     val scope = rememberCoroutineScope()
     val model = vm.supertonicModel
     val modelState by model.state.collectAsStateWithLifecycle()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.tts_supertonic), settings.dutchTtsEngine == DutchTtsEngine.Supertonic) {
-            scope.launch { vm.settingsRepository.setDutchTtsEngine(DutchTtsEngine.Supertonic) }
-        }
-        Pill(stringResource(R.string.tts_system), settings.dutchTtsEngine == DutchTtsEngine.System) {
-            scope.launch { vm.settingsRepository.setDutchTtsEngine(DutchTtsEngine.System) }
-        }
-    }
+    Segmented(
+        options = listOf(DutchTtsEngine.Supertonic to stringResource(R.string.tts_supertonic), DutchTtsEngine.System to stringResource(R.string.tts_system)),
+        selected = settings.dutchTtsEngine,
+        onSelect = { scope.launch { vm.settingsRepository.setDutchTtsEngine(it) } },
+    )
     if (settings.dutchTtsEngine != DutchTtsEngine.Supertonic) return
     Text(stringResource(R.string.tts_supertonic_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     ModelStatus(
@@ -409,14 +393,11 @@ private fun VoicePicker(voices: List<Pair<String, String>>, selected: String, on
 @Composable
 private fun SpeechInputSettings(vm: MainViewModel, settings: AppSettings) {
     val scope = rememberCoroutineScope()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.stt_orukeet), settings.sttEngine == SttEngine.Orukeet) {
-            scope.launch { vm.settingsRepository.setSttEngine(SttEngine.Orukeet) }
-        }
-        Pill(stringResource(R.string.stt_system), settings.sttEngine == SttEngine.System) {
-            scope.launch { vm.settingsRepository.setSttEngine(SttEngine.System) }
-        }
-    }
+    Segmented(
+        options = listOf(SttEngine.Orukeet to stringResource(R.string.stt_orukeet), SttEngine.System to stringResource(R.string.stt_system)),
+        selected = settings.sttEngine,
+        onSelect = { scope.launch { vm.settingsRepository.setSttEngine(it) } },
+    )
     if (settings.sttEngine != SttEngine.Orukeet) return
     Text(stringResource(R.string.stt_orukeet_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     ModelStatus(
@@ -530,19 +511,20 @@ private fun DefaultAssistantStatus() {
     }
 }
 
-/** A titled pane holding one group of settings. Nothing moves behind it, so it's a quiet fill, not glass. */
+/** A glass card on the sky holding one group of settings. */
 @Composable
 private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
-    Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-        Text(title, style = MaterialTheme.typography.titleSmall, color = Palette.Link, modifier = Modifier.padding(start = 6.dp))
-        Column(
-            Modifier
-                .fillMaxWidth()
-                .pane(RoundedCornerShape(26.dp), Palette.Surface, outline = Palette.Hairline)
-                .padding(horizontal = 18.dp, vertical = 16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp),
-            content = content,
-        )
+    Column(
+        Modifier
+            .padding(top = 4.dp)
+            .fillMaxWidth()
+            .glass(RoundedCornerShape(24.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // The title sits inside the card, like "Team workspace" on Superhuman's document panel.
+        Text(title, style = MaterialTheme.typography.titleSmall, color = Palette.TextPrimary)
+        content()
     }
 }
 
@@ -567,9 +549,9 @@ private fun Field(
         trailingIcon = trailing,
         shape = RoundedCornerShape(18.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Palette.Link,
+            focusedBorderColor = Palette.Primary,
             unfocusedBorderColor = Palette.Outline,
-            focusedLabelColor = Palette.Link,
+            focusedLabelColor = Palette.TextPrimary,
             unfocusedLabelColor = Palette.TextSecondary,
             focusedContainerColor = Palette.Surface,
             unfocusedContainerColor = Palette.Surface,
@@ -597,8 +579,8 @@ private fun Toggle(title: String, detail: String, checked: Boolean, onChange: (B
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedTrackColor = Palette.Send,
-                checkedThumbColor = Color.White,
+                checkedTrackColor = Palette.Primary,
+                checkedThumbColor = Palette.OnPrimary,
                 checkedBorderColor = Color.Transparent,
                 uncheckedTrackColor = Palette.Surface,
                 uncheckedThumbColor = Palette.TextSecondary,

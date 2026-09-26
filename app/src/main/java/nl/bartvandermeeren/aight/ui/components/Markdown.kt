@@ -4,6 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -22,9 +23,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Code as CodeIcon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
@@ -50,6 +51,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
@@ -123,12 +125,12 @@ private fun MarkdownBlock(node: Node, style: TextStyle, depth: Int) {
         is FencedCodeBlock -> CodeBlock(node.info?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }, node.literal.trimEnd('\n'))
         is IndentedCodeBlock -> CodeBlock(null, node.literal.trimEnd('\n'))
         is BlockQuote -> Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(Palette.OrbIndigo.copy(alpha = 0.7f)))
+            Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(Palette.Outline))
             Column(Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 node.children().forEach { MarkdownBlock(it, style.copy(color = Palette.TextSecondary), depth) }
             }
         }
-        is ThematicBreak -> HorizontalDivider(color = Palette.Outline, modifier = Modifier.padding(vertical = 4.dp))
+        is ThematicBreak -> HorizontalDivider(color = Palette.Hairline, modifier = Modifier.padding(vertical = 4.dp))
         is TableBlock -> TableView(node, style)
         is HtmlBlock -> Text(node.literal.trim(), style = style)
         else -> node.children().forEach { MarkdownBlock(it, style, depth) }
@@ -213,30 +215,43 @@ fun CodeBlock(language: String?, code: String) {
             copied = false
         }
     }
-    Box(Modifier.fillMaxWidth().pane(RoundedCornerShape(24.dp), Palette.Code, outline = Palette.Hairline)) {
-        Column {
-            Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(language ?: "code", style = MaterialTheme.typography.labelLarge, color = Palette.TextPrimary)
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { copyToClipboard(context, code); copied = true }) {
-                    Icon(
-                        if (copied) Icons.Rounded.Check else Icons.Outlined.ContentCopy,
-                        contentDescription = stringResource(R.string.action_copy),
-                        tint = Palette.Icon,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+    // beautifului.dev's code block: a header with the language and a Copy button, then numbered lines.
+    val lines = remember(code) { code.lines() }
+    val codeStyle = TextStyle(fontFamily = GoogleSansCode, fontSize = 13.5.sp, lineHeight = 21.sp)
+    Column(Modifier.fillMaxWidth().pane(RoundedCornerShape(16.dp), Palette.Code, outline = Palette.Hairline)) {
+        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.CodeIcon, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(language ?: "code", style = codeStyle.copy(fontWeight = FontWeight.Medium), color = Palette.TextPrimary)
+            Spacer(Modifier.weight(1f))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { copyToClipboard(context, code); copied = true }
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(if (copied) Icons.Rounded.Check else Icons.Outlined.ContentCopy, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(15.dp))
+                Text(stringResource(R.string.action_copy), style = MaterialTheme.typography.labelMedium, color = Palette.TextSecondary)
             }
+        }
+        HorizontalDivider(color = Palette.Hairline)
+        Row(Modifier.padding(top = 10.dp, bottom = 14.dp)) {
+            Text(
+                lines.indices.joinToString("\n") { "${it + 1}" },
+                style = codeStyle.copy(textAlign = TextAlign.End),
+                color = Palette.TextTertiary,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp),
+            )
             Text(
                 code,
-                fontFamily = GoogleSansCode,
-                fontSize = 14.sp,
-                lineHeight = 21.sp,
+                style = codeStyle,
                 color = Palette.TextPrimary,
                 softWrap = false,
                 modifier = Modifier
                     .horizontalScroll(rememberScrollState())
-                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp, top = 2.dp),
+                    .padding(end = 16.dp),
             )
         }
     }
@@ -260,7 +275,7 @@ private fun TableView(node: TableBlock, style: TextStyle) {
     Box(
         Modifier
             .horizontalScroll(rememberScrollState())
-            .pane(RoundedCornerShape(16.dp), Color.Transparent, outline = Palette.Outline),
+            .pane(RoundedCornerShape(16.dp), Color.Transparent, outline = Palette.Hairline),
     ) {
         Layout(
             content = {
@@ -281,7 +296,7 @@ private fun TableView(node: TableBlock, style: TextStyle) {
                 drawContent()
                 val stroke = 1.dp.toPx()
                 rowBottoms.dropLast(1).forEach { y ->
-                    drawLine(Palette.Outline, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), stroke)
+                    drawLine(Palette.Hairline, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), stroke)
                 }
             },
         ) { measurables, _ ->

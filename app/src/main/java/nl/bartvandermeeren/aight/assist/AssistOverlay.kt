@@ -198,6 +198,7 @@ fun AssistOverlay(state: AssistState) {
                     onLiveClick = state::openLive,
                     containerColor = panel,
                     solidColor = Palette.OverlaySolid,
+                    containerWash = Color.Transparent,
                 )
             }
         }
@@ -212,7 +213,7 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
     LaunchedEffect(conversation.messages.size, last?.text?.length, last?.steps?.size) {
         listState.scrollToItem(conversation.messages.size)
     }
-    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(30.dp), panel, solid = Palette.OverlaySolid)) {
+    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(28.dp), panel, solid = Palette.OverlaySolid, wash = Color.Transparent)) {
         Column {
             Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 AightMark(size = 18.dp, working = conversation.isBusy)
@@ -255,7 +256,7 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
 
 @Composable
 private fun NotConfiguredCard(panel: Color, onOpen: () -> Unit) {
-    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(26.dp), panel, solid = Palette.OverlaySolid).clickable(onClick = onOpen)) {
+    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(26.dp), panel, solid = Palette.OverlaySolid, wash = Color.Transparent).clickable(onClick = onOpen)) {
         Text(
             stringResource(R.string.assist_not_configured),
             style = MaterialTheme.typography.bodyLarge,
@@ -270,7 +271,7 @@ private fun Chip(panel: Color, icon: @Composable () -> Unit, label: String, onCl
     Row(
         Modifier
             .padding(start = 6.dp)
-            .glass(CircleShape, panel, solid = Palette.OverlaySolid)
+            .glass(CircleShape, panel, solid = Palette.OverlaySolid, wash = Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -292,7 +293,7 @@ private fun EdgeGlow(intensity: Float) {
         val h = size.height
         drawRect(
             Brush.radialGradient(
-                listOf(Palette.SparkViolet.copy(alpha = 0.55f * strength), Palette.Live.copy(alpha = 0.3f * strength), Color.Transparent),
+                listOf(Palette.SparkViolet.copy(alpha = 0.55f * strength), Palette.GlowViolet.copy(alpha = 0.3f * strength), Color.Transparent),
                 center = Offset(w * (0.1f + 0.15f * drift), h * 1.02f),
                 radius = w * 0.75f,
             ),
