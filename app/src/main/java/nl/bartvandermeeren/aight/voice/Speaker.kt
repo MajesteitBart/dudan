@@ -62,7 +62,10 @@ class Speaker(
         if (s.dutchTtsEngine == DutchTtsEngine.Supertonic) supertonic.warmUp(s.supertonicVoice)
     }
 
-    /** [languageHint] (the speech input language) only decides when the text itself doesn't tell. */
+    /**
+     * The reply's language decides the voice. When the text doesn't tell ("OK", a name), [languageHint]
+     * (the speech input language) does, and without one the phone's language.
+     */
     fun speak(id: String, markdown: String, languageHint: String? = null, onDone: (() -> Unit)? = null) {
         val text = SpeechText.withPauses(SpeechText.fromMarkdown(markdown))
         if (text.isBlank()) {
@@ -72,7 +75,7 @@ class Speaker(
         stop()
         // Message ids repeat (replaying a reply, Preview twice), so callbacks check this request's token instead.
         val mine = ++token
-        val language = SpeechText.guessLanguage(text) ?: languageHint?.takeIf { it.isNotBlank() } ?: "en-US"
+        val language = SpeechText.guessLanguage(text) ?: languageHint?.takeIf { it.isNotBlank() } ?: Locale.getDefault().toLanguageTag()
         val s = settings()
         _speakingId.value = id
         val finished = {
