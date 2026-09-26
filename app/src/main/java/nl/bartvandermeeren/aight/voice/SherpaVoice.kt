@@ -12,7 +12,6 @@ import android.os.SystemClock
 import android.util.Log
 import com.k2fsa.sherpa.onnx.OfflineTts
 import java.util.concurrent.Executors
-import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.atomic.AtomicLong
 
 /**
@@ -175,14 +174,15 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
 
     /**
      * Receives synthesized audio and queues it for a writer thread, so synthesis runs ahead of playback
-     * instead of waiting for room in the track's buffer: the next piece is ready when this one ends.
+     * instead of waiting for room in the track's buffer: the next piece is ready when this one ends. The
+     * queue holds at most [MAX_AHEAD_SECONDS] of audio; after that, synthesis waits.
      *
      * sherpa-onnx's JNI looks up `Integer invoke(float[])` on the callback's own class, and Kotlin 2
      * compiles lambdas through invokedynamic, which only has the erased `Object invoke(Object)`. So this
      * has to be a real class; proguard-rules.pro keeps the method.
      */
     protected class Sink(private val output: AudioTrack, private val current: () -> Boolean) : (FloatArray) -> Int {
-        private val queue = LinkedBlockingQueue<FloatArray>()
+        private val queue = AudioQueue(MAX_AHEAD_SECONDS * output.sampleRate)
         private val writer = Thread(::write, "voice-out").apply {
             priority = Thread.MAX_PRIORITY
             start()
@@ -201,16 +201,13 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
             invoke(FloatArray((output.sampleRate * seconds).toInt()))
         }
 
-        // sherpa hands over a fresh array each time, so it can be queued as it is.
-        override fun invoke(samples: FloatArray): Int {
-            if (!active) return 0
-            queue.put(samples)
-            return 1
-        }
+        // sherpa hands over a fresh array each time, so it can be queued as it is. The wait for room
+        // ends at a stop(), since the writer then stops taking audio.
+        override fun invoke(samples: FloatArray): Int = if (queue.put(samples) { active }) 1 else 0
 
         /** Waits until everything queued is in the track, or until playback stops. */
         fun finish() {
-            queue.put(END)
+            queue.close()
             writer.join()
         }
 
@@ -218,8 +215,7 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
         private fun write() {
             try {
                 while (true) {
-                    val samples = queue.take()
-                    if (samples === END) return
+                    val samples = queue.take() ?: return
                     var offset = 0
                     while (offset < samples.size) {
                         if (!current()) return
@@ -230,19 +226,18 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
                         written += count
                         if (count == 0) Thread.sleep(10)
                     }
+                    queue.release(samples)
                 }
             } catch (e: Throwable) {
                 // speak() rethrows it once synthesis has returned.
                 error = e
             }
         }
-
-        private companion object {
-            val END = FloatArray(0)
-        }
     }
 
     companion object {
+        /** Enough lead that the next sentence is ready in time, without keeping a long reply in memory. */
+        private const val MAX_AHEAD_SECONDS = 20
         private const val IDLE_RELEASE_MS = 3 * 60 * 1000L
         /** Output latency after the last frame leaves the buffer; Bluetooth headsets need the most. */
         private const val TAIL_MARGIN_MS = 300L
