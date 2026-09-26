@@ -42,6 +42,8 @@ class DutchTextTest {
             DutchText.normalize("Het kost €1.250, € 3,5 miljoen of 0,50 euro."),
         )
         assertEquals("Dat is twaalf euro.", DutchText.normalize("Dat is € 12,-."))
+        assertEquals("Twaalf dollar vijftig of vijftig cent.", DutchText.normalize("$12,50 of $0,50.").replaceFirstChar { it.uppercase() })
+        assertEquals("Open van negen uur tot zeventien uur dertig.", DutchText.normalize("Open van 9:00-17:30."))
         assertEquals(
             "Op vijfentwintig september tweeduizend zesentwintig of vijfentwintig september tweeduizend zesentwintig.",
             DutchText.normalize("Op 25-09-2026 of 2026-09-25."),
@@ -64,6 +66,11 @@ class DutchTextTest {
             "Saldo min twaalf euro vijftig, of min drie euro.",
             DutchText.normalize("Saldo -€12,50, of €-3."),
         )
+        assertEquals(
+            "Tussen min vijf tot min twee graden, of min vijf tot min twee graden.",
+            DutchText.normalize("Tussen -5--2°C, of -5 – -2°C."),
+        )
+        assertEquals("Morgen plus drie graden.", DutchText.normalize("Morgen +3°C."))
         // Hyphens between digits or after a letter are ranges, dates and names, not signs.
         assertEquals("Tien tot twaalf, of COVID-negentien.", DutchText.normalize("10-12, of COVID-19.").replaceFirstChar { it.uppercase() })
     }

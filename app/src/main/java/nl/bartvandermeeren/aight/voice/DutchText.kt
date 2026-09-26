@@ -8,14 +8,17 @@ package nl.bartvandermeeren.aight.voice
 object DutchText {
     fun normalize(text: String): String {
         var s = abbreviations(text)
-        // A sign before a number ("-5°C"); a hyphen after a digit or letter is a range, date or name.
+        s = s.replace(phone) { m -> m.value.filter { it.isDigit() || it == '+' }.map { if (it == '+') "plus" else number(it.digitToInt().toLong()) }.joinToString(" ") }
+        s = s.replace(isoDate) { date(it.groupValues[3], it.groupValues[2], it.groupValues[1]) ?: it.value }
+        s = s.replace(date) { date(it.groupValues[1], it.groupValues[2], it.groupValues[3]) ?: it.value }
+        // Ranges before signs, so "-5--2°C" keeps its separator: "-5 tot -2°C".
+        s = s.replace(range, " tot ")
+        // A sign before a number ("-5°C"); a hyphen after a digit or letter was a range, date or name.
         // With money the sign can sit on either side of the currency ("-€12,50", "€-12,50").
         s = s.replace(minusBeforeCurrency, "min $1")
         s = s.replace(minusAfterCurrency, "min $1")
         s = s.replace(minus, "min ")
-        s = s.replace(phone) { m -> m.value.filter { it.isDigit() || it == '+' }.map { if (it == '+') "plus" else number(it.digitToInt().toLong()) }.joinToString(" ") }
-        s = s.replace(isoDate) { date(it.groupValues[3], it.groupValues[2], it.groupValues[1]) ?: it.value }
-        s = s.replace(date) { date(it.groupValues[1], it.groupValues[2], it.groupValues[3]) ?: it.value }
+        s = s.replace(plus, "plus ")
         s = s.replace(clock) { time(it.groupValues[1], it.groupValues[2]) }
         s = s.replace(clockWithUur) { time(it.groupValues[1], it.groupValues[2]) }
         s = s.replace(euroScaled) { "${decimal(it.groupValues[1])} ${it.groupValues[2]} euro" }
@@ -25,7 +28,6 @@ object DutchText {
         s = s.replace(percent) { "${decimal(it.groupValues[1])} procent" }
         units.forEach { (pattern, word) -> s = s.replace(pattern, "$1 $word") }
         s = s.replace(ordinalNumber) { ordinal(it.groupValues[1].toLong()) }
-        s = s.replace(range, " tot ")
         s = s.replace(decimalNumber) { decimal(it.value) }
         s = s.replace(thousands) { number(it.value.replace(".", "").toLong()) }
         s = s.replace(integer) { m -> if (m.value.length > 1 && m.value.startsWith('0') || m.value.length > 12) digits(m.value) else number(m.value.toLong()) }
@@ -122,6 +124,7 @@ object DutchText {
     private val minus = Regex("(?<![\\p{L}\\p{N}])[-−](?=\\d)")
     private val minusBeforeCurrency = Regex("(?<![\\p{L}\\p{N}])[-−] ?([€$])(?= ?\\d)")
     private val minusAfterCurrency = Regex("([€$]) ?[-−](?=\\d)")
+    private val plus = Regex("(?<![\\p{L}\\p{N}])\\+(?=\\d)")
     private val phone = Regex("(?<![\\d\\p{L}])(?:\\+31[ -]?\\d{1,3}|0\\d{1,3})[ -]?\\d{6,8}(?!\\d)")
     private val isoDate = Regex("(?<!\\d)(\\d{4})-(\\d{2})-(\\d{2})(?!\\d)")
     private val date = Regex("(?<!\\d)(\\d{1,2})[-/](\\d{1,2})[-/](\\d{4})(?!\\d)")
@@ -130,10 +133,11 @@ object DutchText {
     private val euroScaled = Regex("€ ?(\\d+(?:,\\d+)?) ?(duizend|miljoen|miljard)\\b")
     private val euroSign = Regex("€ ?$AMOUNT(?:([.,])(\\d{2}|--?))?(?!\\d)")
     private val euroWord = Regex("(?<![\\d.])$AMOUNT(?:,(\\d{2}|--?))? ?(?:euro|EUR)\\b")
-    private val dollarSign = Regex("\\$ ?$AMOUNT(?:\\.(\\d{2}))?(?!\\d)")
+    private val dollarSign = Regex("\\$ ?$AMOUNT(?:[.,](\\d{2}))?(?!\\d)")
     private val percent = Regex("(\\d+(?:,\\d+)?) ?%")
     private val ordinalNumber = Regex("(?<![\\d\\p{L}])(\\d+)(?:ste|de|e)(?![\\p{L}])")
-    private val range = Regex("(?<=\\d) ?[–-] ?(?=\\d)")
+    // The second end may carry a sign or currency: "-5--2", "€ 10-€ 15".
+    private val range = Regex("(?<=\\d) ?[–-] ?(?=[-−]?[€$]? ?\\d)")
     private val decimalNumber = Regex("(?<![\\d\\p{L}])\\d+,\\d+(?![\\d\\p{L}])")
     private val thousands = Regex("(?<![\\d\\p{L}.])\\d{1,3}(?:\\.\\d{3})+(?![\\d\\p{L}])")
     private val integer = Regex("(?<![\\d\\p{L}])\\d+(?![\\d\\p{L}])")
