@@ -10,15 +10,18 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import nl.bartvandermeeren.aight.data.AppSettings
+import nl.bartvandermeeren.aight.data.DutchTtsEngine
 import nl.bartvandermeeren.aight.data.TtsEngine
 
 /**
- * Reads replies aloud. English goes to Kokoro when it's enabled and downloaded; Dutch, and
- * everything else, uses Android's voice. The language is guessed per reply, since Hermes answers in either.
+ * Reads replies aloud. English goes to Kokoro and Dutch to Supertonic when they're enabled and
+ * downloaded; everything else uses Android's voice. The language is guessed per reply, since Hermes
+ * answers in either.
  */
 class Speaker(
     private val context: Context,
     private val kokoro: KokoroVoice,
+    private val supertonic: SupertonicVoice,
     private val settings: () -> AppSettings,
 ) {
     private val main = Handler(Looper.getMainLooper())
@@ -49,14 +52,22 @@ class Speaker(
         }
     }
 
-    /** Loads Kokoro in the background when it will be needed soon (overlay shown, Live started). */
+    /**
+     * Loads the on-device voices in the background when they will be needed soon (overlay shown, Live
+     * started). Both, since the next reply can be in either language.
+     */
     fun warmUp() {
         val s = settings()
         if (s.ttsEngine == TtsEngine.Kokoro) kokoro.warmUp(s.kokoroVoice)
+        if (s.dutchTtsEngine == DutchTtsEngine.Supertonic) supertonic.warmUp(s.supertonicVoice)
     }
 
-    fun speak(id: String, markdown: String, languageOverride: String? = null, onDone: (() -> Unit)? = null) {
-        val text = SpeechText.fromMarkdown(markdown)
+    /**
+     * The reply's language decides the voice. When the text doesn't tell ("OK", a name), [languageHint]
+     * (the speech input language) does, and without one the phone's language.
+     */
+    fun speak(id: String, markdown: String, languageHint: String? = null, onDone: (() -> Unit)? = null) {
+        val text = SpeechText.withPauses(SpeechText.fromMarkdown(markdown))
         if (text.isBlank()) {
             onDone?.invoke()
             return
@@ -64,7 +75,7 @@ class Speaker(
         stop()
         // Message ids repeat (replaying a reply, Preview twice), so callbacks check this request's token instead.
         val mine = ++token
-        val language = languageOverride?.takeIf { it.isNotBlank() } ?: SpeechText.guessLanguage(text)
+        val language = SpeechText.guessLanguage(text) ?: languageHint?.takeIf { it.isNotBlank() } ?: Locale.getDefault().toLanguageTag()
         val s = settings()
         _speakingId.value = id
         val finished = {
@@ -73,17 +84,23 @@ class Speaker(
                 onDone?.invoke()
             }
         }
-        val usingKokoro = s.ttsEngine == TtsEngine.Kokoro && language.startsWith("en", ignoreCase = true) &&
-            kokoro.speak(text, s.kokoroVoice) { outcome ->
+        val onDevice = when {
+            language.startsWith("en", ignoreCase = true) && s.ttsEngine == TtsEngine.Kokoro -> kokoro to s.kokoroVoice
+            language.startsWith("nl", ignoreCase = true) && s.dutchTtsEngine == DutchTtsEngine.Supertonic -> supertonic to s.supertonicVoice
+            else -> null
+        }
+        val spoken = onDevice?.let { (voice, voiceId) ->
+            voice.speak(text, voiceId) { outcome ->
                 if (token != mine) return@speak
                 when (outcome) {
-                    KokoroVoice.Outcome.Done -> finished()
-                    // Kokoro broke (out of memory, damaged model); say it with Android's voice instead.
-                    KokoroVoice.Outcome.Failed -> speakWithSystem(mine, text, language, finished)
-                    KokoroVoice.Outcome.Stopped -> _speakingId.value = null
+                    SherpaVoice.Outcome.Done -> finished()
+                    // The model broke (out of memory, damaged files); say it with Android's voice instead.
+                    SherpaVoice.Outcome.Failed -> speakWithSystem(mine, text, language, finished)
+                    SherpaVoice.Outcome.Stopped -> _speakingId.value = null
                 }
             }
-        if (!usingKokoro) speakWithSystem(mine, text, language, finished)
+        } == true
+        if (!spoken) speakWithSystem(mine, text, language, finished)
     }
 
     private fun speakWithSystem(mine: Long, text: String, language: String, finished: () -> Unit) {
@@ -111,6 +128,7 @@ class Speaker(
         callbacks.clear()
         tts?.stop()
         kokoro.stop()
+        supertonic.stop()
         _speakingId.value = null
     }
 

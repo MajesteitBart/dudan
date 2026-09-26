@@ -16,6 +16,7 @@ import nl.bartvandermeeren.aight.voice.KokoroVoice
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.OrukeetEngine
 import nl.bartvandermeeren.aight.voice.Speaker
+import nl.bartvandermeeren.aight.voice.SupertonicVoice
 import okhttp3.OkHttpClient
 
 /** Process-wide singletons. The chat engine lives here so the app and the assistant overlay share runs. */
@@ -48,10 +49,14 @@ class AppContainer(context: Context) {
 
     val orukeetModel = ModelPackage(appContext, http, appScope, ModelPackage.ORUKEET)
 
+    val supertonicModel = ModelPackage(appContext, http, appScope, ModelPackage.SUPERTONIC)
+
     /** Speech recognition on the phone, shared by dictation, the overlay and Live. */
     val orukeet: OrukeetEngine by lazy { OrukeetEngine(orukeetModel) }
 
-    val speaker: Speaker by lazy { Speaker(appContext, KokoroVoice(appContext, kokoroModel)) { settingsSnapshot.value } }
+    val speaker: Speaker by lazy {
+        Speaker(appContext, KokoroVoice(appContext, kokoroModel), SupertonicVoice(appContext, supertonicModel)) { settingsSnapshot.value }
+    }
 
     init {
         ReplyNotifier(appContext, engine, settings, appScope)
@@ -59,6 +64,11 @@ class AppContainer(context: Context) {
         appScope.launch {
             settings.flow.map { it.ttsEngine }.distinctUntilChanged().collect { engine ->
                 if (engine == TtsEngine.Kokoro) kokoroModel.downloadWhenFree() else kokoroModel.stopWaitingForNetwork()
+            }
+        }
+        appScope.launch {
+            settings.flow.map { it.dutchTtsEngine }.distinctUntilChanged().collect { engine ->
+                if (engine == DutchTtsEngine.Supertonic) supertonicModel.downloadWhenFree() else supertonicModel.stopWaitingForNetwork()
             }
         }
         appScope.launch {

@@ -77,6 +77,7 @@ import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.data.ReasoningMode
+import nl.bartvandermeeren.aight.data.DutchTtsEngine
 import nl.bartvandermeeren.aight.data.SttEngine
 import nl.bartvandermeeren.aight.data.TtsEngine
 import nl.bartvandermeeren.aight.ui.MainViewModel
@@ -87,6 +88,7 @@ import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.KokoroVoice
+import nl.bartvandermeeren.aight.voice.SupertonicVoice
 
 private sealed interface TestState {
     data object Idle : TestState
@@ -204,6 +206,9 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 SectionTitle(stringResource(R.string.section_voice))
                 VoiceSettings(vm, settings)
 
+                SectionTitle(stringResource(R.string.section_dutch_voice))
+                DutchVoiceSettings(vm, settings)
+
                 SectionTitle(stringResource(R.string.section_speech_input))
                 SpeechInputSettings(vm, settings)
 
@@ -302,9 +307,50 @@ private fun VoiceSettings(vm: MainViewModel, settings: AppSettings) {
         model,
         ModelTexts(R.string.tts_kokoro_ready, R.string.tts_kokoro_downloading, R.string.tts_kokoro_download, R.string.tts_kokoro_crashed),
     )
-    var open by remember { mutableStateOf(false) }
-    val current = KokoroVoice.VOICES.firstOrNull { it.id == settings.kokoroVoice } ?: KokoroVoice.VOICES.first()
     val preview = stringResource(R.string.tts_preview_text, settings.userName.ifBlank { "there" })
+    VoicePicker(
+        voices = KokoroVoice.VOICES.map { it.id to it.label },
+        selected = settings.kokoroVoice,
+        onSelect = { scope.launch { vm.settingsRepository.setKokoroVoice(it) } },
+        onPreview = { vm.speaker.speak("preview", preview, "en-US") }.takeIf { modelState == ModelPackage.State.Ready },
+    )
+}
+
+@Composable
+private fun DutchVoiceSettings(vm: MainViewModel, settings: AppSettings) {
+    val scope = rememberCoroutineScope()
+    val model = vm.supertonicModel
+    val modelState by model.state.collectAsStateWithLifecycle()
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+        Pill(stringResource(R.string.tts_supertonic), settings.dutchTtsEngine == DutchTtsEngine.Supertonic) {
+            scope.launch { vm.settingsRepository.setDutchTtsEngine(DutchTtsEngine.Supertonic) }
+        }
+        Pill(stringResource(R.string.tts_system), settings.dutchTtsEngine == DutchTtsEngine.System) {
+            scope.launch { vm.settingsRepository.setDutchTtsEngine(DutchTtsEngine.System) }
+        }
+    }
+    if (settings.dutchTtsEngine != DutchTtsEngine.Supertonic) return
+    Text(stringResource(R.string.tts_supertonic_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+    ModelStatus(
+        model,
+        ModelTexts(R.string.tts_supertonic_ready, R.string.tts_supertonic_downloading, R.string.tts_supertonic_download, R.string.tts_supertonic_crashed),
+    )
+    val preview = stringResource(R.string.tts_preview_text_nl, settings.userName.ifBlank { "daar" })
+    VoicePicker(
+        voices = SupertonicVoice.VOICES.map { voice ->
+            voice.id to stringResource(if (voice.female) R.string.voice_female else R.string.voice_male, voice.number)
+        },
+        selected = settings.supertonicVoice,
+        onSelect = { scope.launch { vm.settingsRepository.setSupertonicVoice(it) } },
+        onPreview = { vm.speaker.speak("preview", preview, "nl-NL") }.takeIf { modelState == ModelPackage.State.Ready },
+    )
+}
+
+/** The voice in use with a menu of [voices] (id to label), and Preview once the model is in. */
+@Composable
+private fun VoicePicker(voices: List<Pair<String, String>>, selected: String, onSelect: (String) -> Unit, onPreview: (() -> Unit)?) {
+    var open by remember { mutableStateOf(false) }
+    val current = voices.firstOrNull { it.first == selected } ?: voices.first()
     Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.fillMaxWidth()) {
         Box(Modifier.weight(1f)) {
             Row(
@@ -316,24 +362,22 @@ private fun VoiceSettings(vm: MainViewModel, settings: AppSettings) {
             ) {
                 Column {
                     Text(stringResource(R.string.tts_voice), style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
-                    Text(current.label, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+                    Text(current.second, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
                 }
             }
             DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.Menu) {
-                KokoroVoice.VOICES.forEach { voice ->
+                voices.forEach { (id, label) ->
                     DropdownMenuItem(
-                        text = { Text(voice.label) },
+                        text = { Text(label) },
                         onClick = {
                             open = false
-                            scope.launch { vm.settingsRepository.setKokoroVoice(voice.id) }
+                            onSelect(id)
                         },
                     )
                 }
             }
         }
-        if (modelState == ModelPackage.State.Ready) {
-            LinkAction(stringResource(R.string.tts_preview)) { vm.speaker.speak("preview", preview, "en-US") }
-        }
+        onPreview?.let { LinkAction(stringResource(R.string.tts_preview), it) }
     }
 }
 

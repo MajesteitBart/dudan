@@ -11,7 +11,7 @@ Everything the agent does happens on the Hermes server. The app talks to the Her
 - Gemini's layout and styling: sidebar with recent chats, a greeting under the aight orb, pill composer with the navy glow, streaming markdown with code blocks and tables. The Fold 7 inner screen gets a docked sidebar; the cover screen gets a full-screen drawer.
 - Agent turns go through Hermes' Runs API. If the phone loses the connection mid-task, the run keeps going on the server and the app polls until the result is in.
 - A collapsible "Worked for 1m 10s" panel shows tool calls, commentary and reasoning. Dangerous commands surface as an approval card with Hermes' choices (once, this chat, always, deny).
-- Voice input with a live waveform, read-aloud per reply, and a hands-free Live mode. Speech is transcribed on the phone by [Orukeet](https://github.com/Oruk-AI/orukeet), Oruk's multilingual fine-tune of NVIDIA Parakeet TDT 0.6B v3, which handles Dutch and English without a language setting. English replies are read by Kokoro-82M, also on the phone; Dutch replies use the Android voice because Kokoro has no Dutch.
+- Voice input with a live waveform, read-aloud per reply, and a hands-free Live mode. Speech is transcribed on the phone by [Orukeet](https://github.com/Oruk-AI/orukeet), Oruk's multilingual fine-tune of NVIDIA Parakeet TDT 0.6B v3, which handles Dutch and English without a language setting. English replies are read by Kokoro-82M and Dutch replies by Supertonic 3, both on the phone. Before Supertonic reads a Dutch reply, the app writes out numbers, times, amounts and dates, because it misreads digits.
 - Assistant overlay on the side key: starts listening right away, can attach the current screen ("Ask about screen"), reads spoken questions' answers aloud, and hands off to the full app.
 - Model picker backed by Hermes' model inventory, with Auto, Fast and Extended thinking. There are two defaults: one for chats started in the app, and a quick one for chats started from the assistant overlay or the assist gesture. A chat keeps the model of the place it started, also when you continue it in the app.
 - Search, pin, rename and delete chats; browse Hermes skills; run, pause or resume scheduled tasks.
@@ -38,7 +38,7 @@ Keep the port inside the tailnet. The API server runs agent turns with terminal 
 3. Make aight the assistant: Settings > Apps > Choose default apps > Digital assistant app > Device assistance app > aight. The in-app Settings screen has a shortcut and shows whether it worked.
 4. On Samsung, set Settings > Advanced features > Side button > Press and hold to "Digital assistant".
 5. For "Ask about screen", enable "Use screenshot" in the same Digital assistant settings.
-6. On the first Wi-Fi connection the app downloads its two on-device models: Orukeet for speech input (487 MB download, 672 MB unpacked) and Kokoro for reading aloud (132 MB, 168 MB unpacked). Settings > Speech input and Settings > Voice show the progress and have a download button for mobile data. Until Orukeet is in, voice input uses the phone's recognizer.
+6. On the first Wi-Fi connection the app downloads its three on-device models: Orukeet for speech input (487 MB download, 672 MB unpacked), Kokoro for English replies (350 MB download, 384 MB unpacked) and Supertonic for Dutch replies (401 MB download, 399 MB installed). Settings > Speech input, English voice and Dutch voice show the progress and have a download button for mobile data. Until Orukeet is in, voice input uses the phone's recognizer.
 
 Choosing aight as assistant also makes its recognition service the system default. That service forwards to the phone's real recognizer, so voice typing in other apps keeps working.
 
@@ -87,7 +87,7 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 - `data/`: Hermes HTTP client, SSE reader, payload parsing, settings with the API key encrypted by an Android Keystore key
 - `chat/`: `ChatEngine` owns every conversation and run for the whole process, shared by the app, the overlay and Live mode; `TurnReducer` folds stream events into a message; `HistoryMapper` turns a Hermes transcript into bubbles
 - `assist/`: voice interaction service, the overlay session (Compose inside a `VoiceInteractionSession`) and the proxy recognition service
-- `voice/`: `ModelPackage` downloads and verifies the on-device models; `SpeechInput` records with Orukeet (`LocalSpeechSession`, `Endpointer`, `OrukeetEngine`) or falls back to the phone's recognizer; `KokoroVoice` reads aloud through sherpa-onnx, and `Speaker` picks Kokoro or the Android voice per reply
+- `voice/`: `ModelPackage` downloads and verifies the on-device models; `SpeechInput` records with Orukeet (`LocalSpeechSession`, `Endpointer`, `OrukeetEngine`) or falls back to the phone's recognizer; `SherpaVoice` plays speech from sherpa-onnx while it's synthesized, with `KokoroVoice` for English and `SupertonicVoice` for Dutch (`DutchText` writes out numbers first, `SupertonicFiles` converts the downloaded voice files); `Speaker` picks one of them or the Android voice per reply
 - `ui/`: Compose screens and the Gemini-style components
 - `assets/`: the aight icon and wordmark as SVG and PNG. The launcher icon (`res/drawable/ic_launcher_*.xml`, `ic_notification.xml`) and the in-app mark (`AightMark` in `ui/components/Brand.kt`) are redrawn from `aight-icon.svg`, so update them together when the artwork changes
 
@@ -96,10 +96,11 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 - Hermes' Runs API takes text only, so turns with images use the session chat stream. Those turns stop if the connection drops mid-run.
 - Hermes accepts images but no other files, so the attach menu offers photos and the camera only.
 - The side-key overlay needs the microphone permission granted once in the app. Without it, the overlay opens the app to ask.
-- Kokoro synthesizes a whole sentence before it plays it, so a long first sentence delays the start of speech. On the x86 emulator one sentence of about 4 seconds took 4 to 5 seconds to synthesize; a phone's arm64 cores are faster, but this hasn't been measured on the Fold 7 yet.
+- Kokoro synthesizes a whole sentence before it plays it, so a long first sentence delays the start of speech. On the x86 emulator a sentence of about 3 seconds starts playing 1.7 to 2.1 seconds after the request once the model is loaded; a phone's arm64 cores are faster, but this hasn't been measured on the Fold 7 yet.
 - Orukeet transcribes after you stop talking (1.1 s of silence ends a question), with previews of the text so far. Voice typing in other apps still goes to the phone's recognizer.
-- Orukeet and Kokoro together take about 1 GB of memory while loaded. Each is released after a few idle minutes.
-- If Kokoro's native library ever crashes the app while loading, the next start notices, switches replies to the Android voice and shows a Retry link under Settings > Voice.
+- Supertonic synthesizes a sentence before it plays it. On the x86 emulator the first word of a Dutch reply comes 1.4 seconds after the request once the model is loaded; this hasn't been measured on the Fold 7 yet. When a very short first sentence ("Goede vraag.") is followed by a long one, a pause can fall between them while the long one is synthesized.
+- Kokoro and Supertonic loaded together take about 1.1 GB of memory, and Orukeet adds its own while listening. Each is released after a few idle minutes.
+- If Kokoro's or Supertonic's native library ever crashes the app while loading, the next start notices, switches those replies to the Android voice and shows a Retry link in its Settings section.
 
 ## Model credits
 
@@ -107,4 +108,5 @@ The app downloads these models at first use; they are not part of this repositor
 
 - Orukeet v0.1.0 by Oruk AI, weights under CC BY-SA 4.0, adapted from NVIDIA Parakeet TDT 0.6B v3 (CC BY 4.0).
 - Kokoro-82M by hexgrad, Apache 2.0, in the sherpa-onnx packaging.
+- Supertonic 3 by Supertone, OpenRAIL-M (with use restrictions), from Supertone's archived Hugging Face release.
 - Silero VAD, MIT.

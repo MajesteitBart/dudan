@@ -20,6 +20,9 @@ enum class ModelProfile { Chats, Assistant }
 /** How replies are read aloud. Kokoro runs on the phone; System is Android's text-to-speech. */
 enum class TtsEngine { Kokoro, System }
 
+/** How Dutch replies are read aloud. Supertonic runs on the phone; System is Android's text-to-speech. */
+enum class DutchTtsEngine { Supertonic, System }
+
 /** Who turns speech into text. Orukeet runs on the phone; System is Android's speech recognizer. */
 enum class SttEngine { Orukeet, System }
 
@@ -46,6 +49,8 @@ data class AppSettings(
     val fastModel: ModelChoice = ModelChoice(reasoning = ReasoningMode.Fast),
     val ttsEngine: TtsEngine = TtsEngine.Kokoro,
     val kokoroVoice: String = DEFAULT_KOKORO_VOICE,
+    val dutchTtsEngine: DutchTtsEngine = DutchTtsEngine.Supertonic,
+    val supertonicVoice: String = DEFAULT_SUPERTONIC_VOICE,
     val sttEngine: SttEngine = SttEngine.Orukeet,
 ) {
     val isConfigured: Boolean get() = serverUrl.isNotBlank() && apiKey.isNotBlank()
@@ -59,6 +64,7 @@ data class AppSettings(
     companion object {
         const val DEFAULT_ASSISTANT_NAME = "aight"
         const val DEFAULT_KOKORO_VOICE = "af_heart"
+        const val DEFAULT_SUPERTONIC_VOICE = "M2"
     }
 }
 
@@ -85,6 +91,8 @@ class SettingsRepository(private val context: Context) {
         val assistantModel = ModelKeys("fast_")
         val ttsEngine = stringPreferencesKey("tts_engine")
         val kokoroVoice = stringPreferencesKey("kokoro_voice")
+        val dutchTtsEngine = stringPreferencesKey("dutch_tts_engine")
+        val supertonicVoice = stringPreferencesKey("supertonic_voice")
         val sttEngine = stringPreferencesKey("stt_engine")
     }
 
@@ -117,6 +125,8 @@ class SettingsRepository(private val context: Context) {
         fastModel = readModel(Keys.assistantModel, ReasoningMode.Fast),
         ttsEngine = this[Keys.ttsEngine]?.let { runCatching { TtsEngine.valueOf(it) }.getOrNull() } ?: TtsEngine.Kokoro,
         kokoroVoice = this[Keys.kokoroVoice]?.takeIf { it.isNotBlank() } ?: AppSettings.DEFAULT_KOKORO_VOICE,
+        dutchTtsEngine = this[Keys.dutchTtsEngine]?.let { runCatching { DutchTtsEngine.valueOf(it) }.getOrNull() } ?: DutchTtsEngine.Supertonic,
+        supertonicVoice = this[Keys.supertonicVoice]?.takeIf { it.isNotBlank() } ?: AppSettings.DEFAULT_SUPERTONIC_VOICE,
         sttEngine = this[Keys.sttEngine]?.let { runCatching { SttEngine.valueOf(it) }.getOrNull() } ?: SttEngine.Orukeet,
     )
 
@@ -151,6 +161,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setSpeechLanguage(value: String) = context.dataStore.edit { it[Keys.speechLanguage] = value.trim() }
     suspend fun setTtsEngine(value: TtsEngine) = context.dataStore.edit { it[Keys.ttsEngine] = value.name }
     suspend fun setKokoroVoice(value: String) = context.dataStore.edit { it[Keys.kokoroVoice] = value }
+    suspend fun setDutchTtsEngine(value: DutchTtsEngine) = context.dataStore.edit { it[Keys.dutchTtsEngine] = value.name }
+    suspend fun setSupertonicVoice(value: String) = context.dataStore.edit { it[Keys.supertonicVoice] = value }
     suspend fun setSttEngine(value: SttEngine) = context.dataStore.edit { it[Keys.sttEngine] = value.name }
 
     suspend fun setModel(profile: ModelProfile, choice: ModelChoice) {

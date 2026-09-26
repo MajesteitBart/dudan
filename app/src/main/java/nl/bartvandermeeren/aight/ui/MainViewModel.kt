@@ -205,6 +205,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     val kokoroModel get() = container.kokoroModel
     val orukeetModel get() = container.orukeetModel
+    val supertonicModel get() = container.supertonicModel
 
     fun deleteSession(id: String) {
         engine.deleteSession(id) { if (_currentId.value == id) newChat() }

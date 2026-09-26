@@ -34,25 +34,92 @@ object SpeechText {
         .replace(Regex("\\n{3,}"), "\n\n")
         .trim()
 
+    /**
+     * Ends every line with punctuation. Voices read line breaks as spaces, so a heading or list item
+     * without a full stop would run straight into the next line without a pause.
+     */
+    fun withPauses(text: String): String = text.lines().joinToString("\n") { line ->
+        val trimmed = line.trimEnd()
+        val last = trimmed.trimEnd('"', '\'', ')', ']', '”', '’').lastOrNull()
+        if (last == null || last in ".!?:;,…") trimmed else "$trimmed."
+    }
+
+    // Function words, plus the greetings and one-word answers that make up short replies. Words both
+    // languages use ("is", "in", "of", "was", "we", "sorry") stay out, so they don't tip a short reply.
     private val dutch = setOf(
-        "de", "het", "een", "en", "is", "niet", "je", "ik", "van", "dat", "die", "voor", "op", "met", "zijn", "er",
+        "de", "het", "een", "en", "niet", "je", "ik", "van", "dat", "die", "voor", "op", "met", "zijn", "er",
         "maar", "ook", "wat", "kan", "naar", "als", "dit", "jij", "wij", "heb", "wordt", "nog", "bij", "uit",
+        "goedemorgen", "goedemiddag", "goedenavond", "welterusten", "hoi", "hallo", "doei", "dag", "bedankt", "dank",
+        "graag", "prima", "oké", "gedaan", "klopt", "zeker", "natuurlijk", "nee", "ja", "goed", "geen", "wel", "veel",
+        "vandaag", "morgen", "gisteren", "straks", "misschien", "alleen", "altijd", "komt", "staat",
     )
     private val english = setOf(
-        "the", "and", "is", "not", "you", "to", "of", "that", "for", "on", "with", "are", "this", "it", "be",
-        "but", "also", "what", "can", "as", "have", "was", "will", "from", "your", "an", "or", "by", "at", "in",
+        "the", "and", "not", "you", "to", "that", "for", "on", "with", "are", "this", "it", "be",
+        "but", "also", "what", "can", "as", "have", "will", "from", "your", "an", "or", "by", "at",
+        "hello", "hi", "thanks", "thank", "yes", "no", "sure", "okay", "great", "good", "morning", "evening", "night",
+        "today", "tomorrow", "yesterday", "done", "please", "just", "all", "there", "here", "would", "could", "should",
     )
 
-    /** Rough language guess from function words; good enough to pick a TTS voice. */
-    fun guessLanguage(text: String): String {
+    /** Rough language guess from common words; good enough to pick a TTS voice. Null when it's a tie. */
+    fun guessLanguage(text: String): String? {
         var nl = 0
         var en = 0
         text.lowercase().split(Regex("[^\\p{L}]+")).take(400).forEach { word ->
             if (word in dutch) nl++
             if (word in english) en++
         }
-        return if (nl > en) "nl-NL" else "en-US"
+        return when {
+            nl > en -> "nl-NL"
+            en > nl -> "en-US"
+            else -> null
+        }
     }
+
+    /**
+     * Splits text for a voice that synthesizes a whole piece before playing it: a sentence per piece, so
+     * the first starts quickly and each next one is ready before the one before it ends. A sentence
+     * shorter than [MIN_CHUNK] joins the next, since a word or two on its own sounds flat, unless that
+     * makes the first piece long. Sentences over [maxLength] are cut, after a comma if possible.
+     */
+    fun streamingChunks(text: String, maxLength: Int): List<String> {
+        val sentences = text.split(Regex("(?<=[.!?…])\\s+|\\n+"))
+            .map { it.trim() }
+            .filter { it.isNotEmpty() }
+            .flatMap { splitLong(it, maxLength) }
+        val chunks = mutableListOf<String>()
+        val current = StringBuilder()
+        sentences.forEach { sentence ->
+            val limit = if (chunks.isEmpty()) minOf(maxLength, MAX_FIRST_CHUNK) else maxLength
+            val full = current.length >= MIN_CHUNK || current.length + 1 + sentence.length > limit
+            if (current.isNotEmpty() && full) {
+                chunks += current.toString()
+                current.setLength(0)
+            }
+            if (current.isNotEmpty()) current.append(' ')
+            current.append(sentence)
+        }
+        if (current.isNotEmpty()) chunks += current.toString()
+        return chunks
+    }
+
+    /** Cuts a sentence longer than [maxLength] after a comma if there is one far enough in, else at a space. */
+    private fun splitLong(sentence: String, maxLength: Int): List<String> {
+        val parts = mutableListOf<String>()
+        var rest = sentence
+        while (rest.length > maxLength) {
+            val window = rest.substring(0, maxLength)
+            val cut = window.lastIndexOf(", ").takeIf { it > maxLength / 3 }?.plus(1)
+                ?: window.lastIndexOf(' ').takeIf { it > 0 }
+                ?: maxLength
+            parts += rest.substring(0, cut).trim()
+            rest = rest.substring(cut).trim()
+        }
+        if (rest.isNotEmpty()) parts += rest
+        return parts
+    }
+
+    private const val MIN_CHUNK = 25
+    private const val MAX_FIRST_CHUNK = 100
 
     /** Splits text into TTS-sized pieces on paragraph or sentence boundaries. */
     fun chunk(text: String, maxLength: Int): List<String> {
