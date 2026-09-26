@@ -45,7 +45,6 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -62,6 +61,7 @@ import nl.bartvandermeeren.aight.chat.ChatEngine
 import nl.bartvandermeeren.aight.chat.MessageState
 import nl.bartvandermeeren.aight.chat.Role
 import nl.bartvandermeeren.aight.ui.components.AightMark
+import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.Speaker
 import nl.bartvandermeeren.aight.voice.SpeechInput
@@ -202,7 +202,7 @@ fun LiveScreen(
     Box(
         Modifier
             .fillMaxSize()
-            .background(Color.Black)
+            .background(Palette.BackdropEdge)
             .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { controller.interrupt() },
     ) {
         LiveGlow(controller.phase, level)
@@ -257,17 +257,20 @@ fun LiveScreen(
                     stringResource(if (paused) R.string.live_resume else R.string.live_pause),
                     Palette.Card,
                 ) { if (paused) controller.resume() else controller.pause() }
-                RoundButton(Icons.Rounded.Close, stringResource(R.string.live_end), Color(0xFFB3261E)) { onClose() }
+                RoundButton(Icons.Rounded.Close, stringResource(R.string.live_end), EndGlass) { onClose() }
             }
         }
     }
 }
 
+/** Red glass for ending Live, so it reads as the way out without shouting over the glow. */
+private val EndGlass = Color(0x99E5484D)
+
 @Composable
 private fun RoundButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, color: Color, onClick: () -> Unit) {
     Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(8.dp)) {
         Box(
-            Modifier.size(68.dp).clip(CircleShape).background(color).clickable(onClick = onClick),
+            Modifier.size(68.dp).glass(CircleShape, color).clickable(onClick = onClick),
             contentAlignment = Alignment.Center,
         ) {
             Icon(icon, contentDescription = label, tint = Color.White, modifier = Modifier.size(30.dp))

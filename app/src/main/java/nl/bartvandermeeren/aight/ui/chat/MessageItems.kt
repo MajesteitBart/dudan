@@ -8,7 +8,6 @@ import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.Image
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -45,7 +44,6 @@ import androidx.compose.material.icons.rounded.Refresh
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -74,13 +72,18 @@ import nl.bartvandermeeren.aight.chat.Step
 import nl.bartvandermeeren.aight.chat.StepKind
 import nl.bartvandermeeren.aight.chat.UiMessage
 import nl.bartvandermeeren.aight.data.ApprovalRequest
+import nl.bartvandermeeren.aight.ui.components.GlassSurface
 import nl.bartvandermeeren.aight.ui.components.Markdown
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.copyToClipboard
+import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.components.rememberImageBitmap
 import nl.bartvandermeeren.aight.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.aight.ui.theme.Palette
+
+/** A bubble of violet glass, its tail corner toward the edge the user writes from. */
+private val UserBubbleShape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp, bottomEnd = 8.dp, bottomStart = 26.dp)
 
 @Composable
 fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
@@ -99,7 +102,7 @@ fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
         if (message.text.isNotBlank()) {
             var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
             val long = message.text.length > 420 || message.text.count { it == '\n' } > 6
-            Surface(color = Palette.Surface, shape = RoundedCornerShape(26.dp)) {
+            Box(Modifier.glass(UserBubbleShape, Palette.UserBubble)) {
                 Box(Modifier.animateContentSize()) {
                     SelectionContainer {
                         Text(
@@ -119,8 +122,7 @@ fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
                                 .align(Alignment.BottomEnd)
                                 .padding(8.dp)
                                 .size(36.dp)
-                                .clip(CircleShape)
-                                .background(Palette.Card)
+                                .glass(CircleShape, Palette.Card)
                                 .clickable { expanded = !expanded },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -144,8 +146,7 @@ private fun MessageImage(ref: ImageRef) {
         Modifier
             .sizeIn(maxWidth = 200.dp, maxHeight = 200.dp)
             .size(168.dp)
-            .clip(RoundedCornerShape(24.dp))
-            .background(Palette.Card),
+            .glass(RoundedCornerShape(24.dp), Palette.Card),
     ) {
         image?.let { Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(168.dp)) }
     }
@@ -268,14 +269,15 @@ private fun WorkPanel(message: UiMessage) {
     Column(
         Modifier
             .fillMaxWidth()
-            .clip(RoundedCornerShape(20.dp))
             .animateContentSize(),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
+        // A glass capsule with the status; tapping it opens the steps on a pane below.
         Row(
             Modifier
-                .clip(RoundedCornerShape(20.dp))
+                .glass(CircleShape, Palette.Surface)
                 .clickable { expanded = !expanded }
-                .padding(vertical = 6.dp, horizontal = 2.dp),
+                .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
@@ -304,7 +306,10 @@ private fun WorkPanel(message: UiMessage) {
         }
         AnimatedVisibility(expanded, enter = fadeIn() + expandVertically(), exit = fadeOut() + shrinkVertically()) {
             Column(
-                Modifier.padding(start = 8.dp, top = 6.dp, bottom = 4.dp),
+                Modifier
+                    .fillMaxWidth()
+                    .glass(RoundedCornerShape(22.dp), Palette.Surface)
+                    .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 if (message.reasoning.isNotBlank()) {
@@ -378,7 +383,7 @@ private fun StepRow(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
-    Surface(color = Palette.Card, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp), Palette.WarningGlass) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Outlined.Shield, contentDescription = null, tint = Palette.SparkAmber, modifier = Modifier.size(22.dp))
@@ -388,7 +393,7 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
             }
             request.command?.takeIf { it.isNotBlank() }?.let {
-                Surface(color = Palette.Surface, shape = RoundedCornerShape(14.dp), modifier = Modifier.fillMaxWidth()) {
+                GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), Palette.Code) {
                     Text(
                         it,
                         fontFamily = GoogleSansCode,
@@ -405,11 +410,9 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                 request.choices.forEach { choice ->
                     val pending = request.pendingChoice == choice
                     val deny = choice == "deny"
-                    Surface(
-                        color = if (deny) Palette.Surface else Palette.Button,
-                        shape = RoundedCornerShape(50),
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(50))
+                    Box(
+                        Modifier
+                            .glass(CircleShape, if (deny) Palette.Surface else Palette.Button)
                             .clickable(enabled = request.pendingChoice == null) { onChoice(choice) },
                     ) {
                         Row(
@@ -442,7 +445,7 @@ private fun approvalLabel(choice: String) = when (choice) {
 
 @Composable
 private fun ErrorRow(message: String, onRetry: (() -> Unit)?) {
-    Surface(color = Color(0xFF2A1B1B), shape = RoundedCornerShape(18.dp), modifier = Modifier.fillMaxWidth()) {
+    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), Palette.DangerGlass) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

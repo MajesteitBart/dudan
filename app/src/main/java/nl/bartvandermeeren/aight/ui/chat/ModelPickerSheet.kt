@@ -1,12 +1,13 @@
 package nl.bartvandermeeren.aight.ui.chat
 
-import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
@@ -14,9 +15,11 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
@@ -32,7 +35,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -43,6 +45,9 @@ import nl.bartvandermeeren.aight.data.ModelChoice
 import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.data.ReasoningMode
 import nl.bartvandermeeren.aight.ui.MainViewModel
+import nl.bartvandermeeren.aight.ui.components.BlurBehindWindow
+import nl.bartvandermeeren.aight.ui.components.GlassDefaults
+import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -52,12 +57,21 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
     val error by vm.modelCatalogError.collectAsStateWithLifecycle()
     var profile by remember { mutableStateOf(initialProfile) }
     val selected = settings.modelFor(profile)
+    val shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
-        containerColor = Palette.Menu,
+        shape = shape,
+        containerColor = Palette.Sheet,
+        scrimColor = Palette.BackdropEdge.copy(alpha = 0.45f),
+        // The content draws the lit edge, so it also takes the handle and the navigation bar inset;
+        // otherwise the edge would stop short of both.
+        dragHandle = null,
+        contentWindowInsets = { WindowInsets(0) },
     ) {
-        Column(Modifier.navigationBarsPadding().padding(bottom = 12.dp)) {
+        BlurBehindWindow()
+        Column(Modifier.border(GlassDefaults.Border, shape).navigationBarsPadding().padding(bottom = 12.dp)) {
+            BottomSheetDefaults.DragHandle(Modifier.align(Alignment.CenterHorizontally))
             // Two defaults: regular chats, and quick chats started from the assistant.
             Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 ModelProfile.entries.forEach { option ->
@@ -144,12 +158,12 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
     }
 }
 
+/** A glass toggle chip; the active one takes the orb's violet. */
 @Composable
 fun Pill(label: String, active: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .clip(RoundedCornerShape(50))
-            .background(if (active) Palette.Button else Palette.Surface)
+            .glass(CircleShape, if (active) Palette.Button else Palette.Surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 10.dp),
     ) {
@@ -163,8 +177,7 @@ private fun ModelRow(title: String, subtitle: String?, selected: Boolean, onClic
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .clip(RoundedCornerShape(20.dp))
-            .background(if (selected) Palette.Surface else Color.Transparent)
+            .then(if (selected) Modifier.glass(RoundedCornerShape(20.dp), Palette.Surface) else Modifier.clip(RoundedCornerShape(20.dp)))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

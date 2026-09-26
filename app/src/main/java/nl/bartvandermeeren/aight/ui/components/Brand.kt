@@ -9,6 +9,7 @@ import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
@@ -123,7 +124,10 @@ private fun Offset.rotatedAround(pivot: Offset, degrees: Float): Offset {
     return Offset(pivot.x + d.x * c - d.y * s, pivot.y + d.x * s + d.y * c)
 }
 
-/** User avatar: initial on a dark disc inside a multicolor ring, like the Google account ring. */
+private val RingColors = listOf(Palette.OrbViolet, Palette.OrbIndigo, Palette.GlowBlue, Palette.SparkRose, Palette.OrbViolet)
+private val AvatarGlass = Brush.linearGradient(listOf(Color(0x807A6CFF), Color(0x402A5BFF)))
+
+/** User avatar: initial on a violet glass disc, optionally inside a ring in the orb's colors. */
 @Composable
 fun Avatar(name: String, size: Dp, modifier: Modifier = Modifier, ring: Boolean = true) {
     val initial = name.trim().firstOrNull()?.uppercaseChar()?.toString() ?: "?"
@@ -132,10 +136,7 @@ fun Avatar(name: String, size: Dp, modifier: Modifier = Modifier, ring: Boolean 
             Canvas(Modifier.fillMaxSize()) {
                 val stroke = this.size.minDimension * 0.07f
                 drawCircle(
-                    brush = Brush.sweepGradient(
-                        listOf(Color(0xFF4285F4), Color(0xFFEA4335), Color(0xFFFBBC04), Color(0xFF34A853), Color(0xFF4285F4)),
-                        center,
-                    ),
+                    brush = Brush.sweepGradient(RingColors, center),
                     radius = this.size.minDimension / 2f - stroke / 2f,
                     style = Stroke(stroke),
                 )
@@ -146,7 +147,9 @@ fun Avatar(name: String, size: Dp, modifier: Modifier = Modifier, ring: Boolean 
                 .padding(if (ring) size * 0.12f else 0.dp)
                 .fillMaxSize()
                 .clip(CircleShape)
-                .background(Brush.linearGradient(listOf(Color(0xFF2B3A55), Color(0xFF1B2233)))),
+                .background(AvatarGlass)
+                .background(GlassDefaults.Sheen)
+                .border(GlassDefaults.Border, CircleShape),
             contentAlignment = Alignment.Center,
         ) {
             Text(
@@ -157,32 +160,5 @@ fun Avatar(name: String, size: Dp, modifier: Modifier = Modifier, ring: Boolean 
                 fontSize = (size.value * 0.36f).sp,
             )
         }
-    }
-}
-
-/** The navy glow that rises from the bottom of an empty chat. */
-@Composable
-fun BottomGlow(visible: Boolean, modifier: Modifier = Modifier) {
-    val alpha by animateFloatAsState(if (visible) 1f else 0f, tween(700), label = "glow")
-    if (alpha == 0f) return
-    Canvas(modifier.fillMaxSize()) {
-        drawRect(
-            Brush.verticalGradient(
-                0.0f to Color.Transparent,
-                0.58f to Color.Transparent,
-                0.72f to Color(0xFF020307),
-                0.84f to Palette.GlowMid,
-                1.0f to Palette.GlowBottom,
-            ),
-            alpha = alpha,
-        )
-        drawRect(
-            Brush.radialGradient(
-                listOf(Palette.GlowBottom.copy(alpha = 0.55f), Color.Transparent),
-                center = Offset(size.width * 0.85f, size.height * 1.02f),
-                radius = size.width * 0.8f,
-            ),
-            alpha = alpha,
-        )
     }
 }

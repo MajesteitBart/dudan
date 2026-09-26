@@ -71,6 +71,10 @@ class AightSession(context: Context) :
             w.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
             w.isNavigationBarContrastEnforced = false
+            // Frost the app underneath so the overlay's glass panels float over it. Phones without
+            // cross-window blur ignore this, and the panels' darker tint carries them alone.
+            w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            w.attributes = w.attributes.apply { blurBehindRadius = (OVERLAY_BLUR_DP * context.resources.displayMetrics.density).toInt() }
             w.decorView.let { decor ->
                 decor.setViewTreeLifecycleOwner(this)
                 decor.setViewTreeSavedStateRegistryOwner(this)
@@ -117,6 +121,11 @@ class AightSession(context: Context) :
         store.clear()
         scope.cancel()
         super.onDestroy()
+    }
+
+    private companion object {
+        /** Enough to frost the app behind the overlay while its layout stays recognizable. */
+        const val OVERLAY_BLUR_DP = 12
     }
 
     private fun openInApp(sessionId: String?, mode: OpenMode) {

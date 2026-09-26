@@ -42,7 +42,6 @@ import androidx.compose.material.icons.outlined.ScreenshotMonitor
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -71,8 +70,10 @@ import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.ui.chat.AssistantMessageItem
 import nl.bartvandermeeren.aight.ui.chat.UserMessageItem
 import nl.bartvandermeeren.aight.ui.components.Composer
+import nl.bartvandermeeren.aight.ui.components.GlassSurface
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
+import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.SpeechInput
 
@@ -106,8 +107,8 @@ fun AssistOverlay(state: AssistState) {
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Transparent,
-                        0.45f to Color.Black.copy(alpha = if (hasChat) 0.45f else 0.15f),
-                        1f to Color.Black.copy(alpha = 0.8f),
+                        0.45f to Palette.BackdropEdge.copy(alpha = if (hasChat) 0.45f else 0.15f),
+                        1f to Palette.BackdropEdge.copy(alpha = 0.8f),
                     ),
                 )
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.dismiss() },
@@ -155,7 +156,7 @@ fun AssistOverlay(state: AssistState) {
                 }
                 if (shot != null && state.attachScreenshot) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)).background(Palette.Card)) {
+                        Box(Modifier.size(64.dp).glass(RoundedCornerShape(14.dp), Palette.OverlayGlass)) {
                             Image(shot.asImageBitmap(), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         }
                         Text(stringResource(R.string.screen_attached), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
@@ -188,7 +189,7 @@ fun AssistOverlay(state: AssistState) {
                     },
                     onStop = state::stop,
                     onLiveClick = state::openLive,
-                    containerColor = Color(0xFF151618),
+                    containerColor = Palette.OverlayGlass,
                 )
             }
         }
@@ -203,7 +204,7 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
     LaunchedEffect(conversation.messages.size, last?.text?.length, last?.steps?.size) {
         listState.scrollToItem(conversation.messages.size)
     }
-    Surface(color = Color(0xFF1B1C1E), shape = RoundedCornerShape(30.dp), modifier = Modifier.fillMaxWidth()) {
+    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(30.dp), Palette.OverlayGlass) {
         Column {
             Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 AightMark(size = 18.dp, working = conversation.isBusy)
@@ -246,7 +247,7 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
 
 @Composable
 private fun NotConfiguredCard(onOpen: () -> Unit) {
-    Surface(color = Color(0xFF1B1C1E), shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+    GlassSurface(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).clickable(onClick = onOpen), RoundedCornerShape(26.dp), Palette.OverlayGlass) {
         Text(
             stringResource(R.string.assist_not_configured),
             style = MaterialTheme.typography.bodyLarge,
@@ -261,8 +262,7 @@ private fun Chip(icon: @Composable () -> Unit, label: String, onClick: () -> Uni
     Row(
         Modifier
             .padding(start = 6.dp)
-            .clip(RoundedCornerShape(50))
-            .background(Color(0xF0151618))
+            .glass(CircleShape, Palette.OverlayGlass)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

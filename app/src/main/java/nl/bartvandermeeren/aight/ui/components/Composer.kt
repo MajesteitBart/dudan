@@ -9,6 +9,7 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -34,7 +35,6 @@ import androidx.compose.material.icons.rounded.CropSquare
 import androidx.compose.material.icons.rounded.MicNone
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
@@ -43,6 +43,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.asImageBitmap
@@ -81,6 +82,7 @@ fun Composer(
     onStop: () -> Unit,
     onLiveClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
+    /** The glass tint. It frosts the screen's backdrop where there is one (see [LocalHazeState]). */
     containerColor: Color = Palette.Composer,
     focusRequester: FocusRequester? = null,
     addMenu: @Composable () -> Unit = {},
@@ -92,7 +94,7 @@ fun Composer(
         hasContent -> TrailingMode.Content
         else -> TrailingMode.Idle
     }
-    Surface(color = containerColor, shape = RoundedCornerShape(34.dp), modifier = modifier.fillMaxWidth()) {
+    Box(modifier.fillMaxWidth().glass(RoundedCornerShape(34.dp), containerColor, LocalHazeState.current)) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 10.dp)) {
             if (attachments.isNotEmpty()) {
                 LazyRow(
@@ -171,11 +173,11 @@ fun Composer(
                                 CircleIconButton(Icons.Rounded.CropSquare, stringResource(R.string.action_stop), Palette.Card, onStop)
                             TrailingMode.Listening -> {
                                 CircleIconButton(Icons.Rounded.CropSquare, stringResource(R.string.action_stop_listening), Palette.Surface, onStopListening)
-                                CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), Palette.Send, onSend)
+                                CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), GlassDefaults.Orb, onSend)
                             }
                             TrailingMode.Content -> {
                                 PlainIconButton(Icons.Rounded.MicNone, stringResource(R.string.action_voice), onClick = onMicClick)
-                                CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), Palette.Send, onSend)
+                                CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), GlassDefaults.Orb, onSend)
                             }
                             TrailingMode.Idle -> {
                                 PlainIconButton(Icons.Rounded.MicNone, stringResource(R.string.action_voice), onClick = onMicClick)
@@ -191,11 +193,23 @@ fun Composer(
     }
 }
 
+
 @Composable
 fun CircleIconButton(
     icon: ImageVector,
     description: String,
     background: Color,
+    onClick: () -> Unit,
+    size: Dp = 48.dp,
+    tint: Color = Color.White,
+) = CircleIconButton(icon, description, SolidColor(background), onClick, size, tint)
+
+/** A round glass button with a [background] tint or gradient. */
+@Composable
+fun CircleIconButton(
+    icon: ImageVector,
+    description: String,
+    background: Brush,
     onClick: () -> Unit,
     size: Dp = 48.dp,
     tint: Color = Color.White,
@@ -205,6 +219,8 @@ fun CircleIconButton(
             .size(size)
             .clip(CircleShape)
             .background(background)
+            .background(GlassDefaults.Sheen)
+            .border(GlassDefaults.Border, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -237,7 +253,7 @@ fun PlainIconButton(
 private fun AttachmentThumb(attachment: Attachment, onRemove: () -> Unit) {
     Box(Modifier.size(72.dp)) {
         val shape = RoundedCornerShape(16.dp)
-        val modifier = Modifier.fillMaxSize().clip(shape).background(Palette.Card)
+        val modifier = Modifier.fillMaxSize().glass(shape, Palette.Card)
         when {
             attachment.bitmap != null -> Image(
                 attachment.bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
@@ -254,8 +270,7 @@ private fun AttachmentThumb(attachment: Attachment, onRemove: () -> Unit) {
                 .align(Alignment.TopEnd)
                 .padding(4.dp)
                 .size(22.dp)
-                .clip(CircleShape)
-                .background(Color.Black.copy(alpha = 0.7f))
+                .glass(CircleShape, Palette.Menu)
                 .clickable(onClick = onRemove),
             contentAlignment = Alignment.Center,
         ) {

@@ -12,29 +12,51 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.sp
 import nl.bartvandermeeren.aight.R
 
-/** Colors sampled from Gemini's dark Android UI. */
+/**
+ * Frosted glass over the navy and violet of the aight icon. Surfaces are translucent white, so they
+ * pick up the backdrop behind them; see Glass.kt for the blur, border and sheen.
+ */
 object Palette {
-    val Background = Color(0xFF000000)
-    val Surface = Color(0xFF141414) // pills, bubbles, code blocks
-    val Composer = Color(0xFF1E1E1E)
-    val Card = Color(0xFF292A2C)
-    val Menu = Color(0xFF232426)
-    val Outline = Color(0xFF3C4043)
-    val TextPrimary = Color(0xFFE3E3E3)
-    val TextSecondary = Color(0xFFA8ABAF)
-    val TextTertiary = Color(0xFF7C8085)
-    val Icon = Color(0xFFE0E0E0)
-    val Send = Color(0xFF233C90)
-    val Live = Color(0xFF192967)
-    val Button = Color(0xFF1F3B9C)
-    val ButtonText = Color(0xFFD3E3FD)
-    val Disabled = Color(0xFF343434)
-    val Link = Color(0xFFA8C7FA)
-    val InlineCode = Color(0xFF232323)
-    val GlowMid = Color(0xFF090C1D)
-    val GlowBottom = Color(0xFF131E4B)
-    val Danger = Color(0xFFF2B8B5)
-    val Success = Color(0xFF81C995)
+    // The icon's navy backdrop, from its center outwards.
+    val Background = Color(0xFF050A1C)
+    val BackdropCenter = Color(0xFF0A1433)
+    val BackdropEdge = Color(0xFF02040B)
+
+    val Surface = Color(0x12FFFFFF) // pills, selected rows, fields
+    val Composer = Color(0x1AFFFFFF)
+    val Card = Color(0x1FFFFFFF)
+    val Code = Color(0x42020412) // code blocks: darker glass so code stands out from prose
+    val UserBubble = Color(0x337A6CFF)
+    // Popups, dialogs and sheets live in their own window, where the app's blur can't reach.
+    val Menu = Color(0xF0151A3A)
+    val Sheet = Color(0xE6111633)
+    // The phone's full-screen sidebar: a darker frost so its list reads over the blurred chat.
+    val SidebarGlass = Color(0x990B1030)
+    // The assistant overlay floats over other apps without backdrop blur, so its glass is darker.
+    val OverlayGlass = Color(0xC70B1030)
+    val Outline = Color(0x24FFFFFF)
+    val TextPrimary = Color(0xFFF3F4FF)
+    val TextSecondary = Color(0xFFB5B9D8)
+    val TextTertiary = Color(0xFF8288AD)
+    val Icon = Color(0xFFE6E8FA)
+    val Send = Color(0xFF6A62F2)
+    val Live = Color(0x477A5CFF)
+    val Button = Color(0x597A6CFF)
+    val ButtonText = Color(0xFFF1F0FF)
+    val Disabled = Color(0x0FFFFFFF)
+    val Link = Color(0xFFB9C3FF)
+    val InlineCode = Color(0x1FFFFFFF)
+    val Danger = Color(0xFFFFB4B0)
+    val DangerGlass = Color(0x2EFF5A5A)
+    val WarningGlass = Color(0x1FF5A623)
+    val Success = Color(0xFF8FE0AE)
+
+    // The orb's gradient stops and glows, used for accents and the backdrop.
+    val OrbViolet = Color(0xFFB867F7)
+    val OrbIndigo = Color(0xFF7061F1)
+    val OrbBlue = Color(0xFF4A63EE)
+    val GlowViolet = Color(0xFF7A5CFF)
+    val GlowBlue = Color(0xFF2A5BFF)
 
     // Accent colors for the overlay and Live glows.
     val SparkBlue = Color(0xFF4C8DF6)
@@ -82,7 +104,7 @@ val AightTypography = Typography(
 
 private val AightColors = darkColorScheme(
     primary = Palette.Link,
-    onPrimary = Color(0xFF062E6F),
+    onPrimary = Color(0xFF14195C),
     primaryContainer = Palette.Send,
     onPrimaryContainer = Color.White,
     secondary = Palette.TextSecondary,
@@ -96,17 +118,17 @@ private val AightColors = darkColorScheme(
     surfaceVariant = Palette.Surface,
     onSurfaceVariant = Palette.TextSecondary,
     surfaceContainerLowest = Palette.Background,
-    surfaceContainerLow = Color(0xFF0E0E0E),
-    surfaceContainer = Palette.Surface,
+    surfaceContainerLow = Palette.BackdropCenter,
+    surfaceContainer = Palette.Sheet,
     surfaceContainerHigh = Palette.Menu,
-    surfaceContainerHighest = Palette.Card,
+    surfaceContainerHighest = Palette.Menu,
     inverseSurface = Palette.TextPrimary,
-    inverseOnSurface = Color.Black,
+    inverseOnSurface = Palette.Background,
     outline = Palette.Outline,
-    outlineVariant = Color(0xFF2A2B2D),
+    outlineVariant = Color(0x14FFFFFF),
     error = Palette.Danger,
     onError = Color(0xFF601410),
-    scrim = Color.Black,
+    scrim = Palette.BackdropEdge,
 )
 
 @Composable

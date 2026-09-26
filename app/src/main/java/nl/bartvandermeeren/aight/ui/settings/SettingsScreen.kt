@@ -7,10 +7,12 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +25,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -34,7 +37,6 @@ import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,7 +44,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
@@ -58,6 +59,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.KeyboardType
@@ -85,6 +87,12 @@ import nl.bartvandermeeren.aight.ui.chat.ModelPickerSheet
 import nl.bartvandermeeren.aight.ui.chat.Pill
 import nl.bartvandermeeren.aight.ui.chat.prettyModelName
 import nl.bartvandermeeren.aight.ui.components.AightMark
+import nl.bartvandermeeren.aight.ui.components.GlassBackdrop
+import nl.bartvandermeeren.aight.ui.components.GlassDefaults
+import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
+import nl.bartvandermeeren.aight.ui.components.GlassSurface
+import nl.bartvandermeeren.aight.ui.components.PlainIconButton
+import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.KokoroVoice
@@ -128,7 +136,8 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Palette.Background), contentAlignment = Alignment.TopCenter) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
+        GlassBackdrop(glow = setupMode)
         Column(
             Modifier
                 .widthIn(max = 720.dp)
@@ -137,12 +146,21 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 .navigationBarsPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(56.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(64.dp)) {
                 if (onBack != null) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.action_back), tint = Palette.Icon) }
+                    PlainIconButton(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        stringResource(R.string.action_back),
+                        onClick = onBack,
+                        modifier = Modifier.glass(CircleShape, Palette.Surface),
+                        size = 44.dp,
+                        iconSize = 24.dp,
+                    )
+                    Spacer(Modifier.size(14.dp))
+                } else {
                     Spacer(Modifier.size(4.dp))
                 }
                 Text(
@@ -152,36 +170,44 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 )
             }
             if (setupMode) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    AightMark(size = 36.dp)
+                Row(
+                    Modifier.padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    AightMark(size = 40.dp, halo = true)
                     Text(stringResource(R.string.setup_intro), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
                 }
             }
 
-            SectionTitle(stringResource(R.string.section_connection))
-            Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://clarkbox:8642", keyboard = KeyboardType.Uri)
-            if (isInsecureRemote(url)) Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
-            Field(
-                key, { key = it; test = TestState.Idle }, stringResource(R.string.api_key),
-                keyboard = KeyboardType.Password,
-                visual = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                trailing = {
-                    IconButton(onClick = { showKey = !showKey }) {
-                        Icon(if (showKey) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = Palette.TextSecondary)
-                    }
-                },
-            )
-            Field(name, { name = it }, stringResource(R.string.your_name))
-            Field(assistant, { assistant = it }, stringResource(R.string.assistant_name))
+            Section(stringResource(R.string.section_connection)) {
+                Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://clarkbox:8642", keyboard = KeyboardType.Uri)
+                if (isInsecureRemote(url)) Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
+                Field(
+                    key, { key = it; test = TestState.Idle }, stringResource(R.string.api_key),
+                    keyboard = KeyboardType.Password,
+                    visual = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailing = {
+                        IconButton(onClick = { showKey = !showKey }) {
+                            Icon(if (showKey) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = Palette.TextSecondary)
+                        }
+                    },
+                )
+                Field(name, { name = it }, stringResource(R.string.your_name))
+                Field(assistant, { assistant = it }, stringResource(R.string.assistant_name))
 
-            Surface(
-                color = if (url.isNotBlank() && key.isNotBlank()) Palette.Button else Palette.Disabled,
-                shape = RoundedCornerShape(50),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .clickable(enabled = url.isNotBlank() && key.isNotBlank() && test != TestState.Testing) { connect() },
-            ) {
-                Row(Modifier.padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
+                val canConnect = url.isNotBlank() && key.isNotBlank()
+                Row(
+                    Modifier
+                        .padding(top = 4.dp)
+                        .clip(CircleShape)
+                        .background(if (canConnect) GlassDefaults.Orb else SolidColor(Palette.Disabled))
+                        .background(GlassDefaults.Sheen)
+                        .border(GlassDefaults.Border, CircleShape)
+                        .clickable(enabled = canConnect && test != TestState.Testing) { connect() }
+                        .padding(horizontal = 24.dp, vertical = 14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
                     if (test == TestState.Testing) {
                         CircularProgressIndicator(strokeWidth = 2.dp, color = Color.White, modifier = Modifier.size(16.dp))
                         Spacer(Modifier.size(10.dp))
@@ -189,56 +215,53 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     Text(
                         stringResource(if (setupMode) R.string.connect else R.string.save_and_test),
                         style = MaterialTheme.typography.labelLarge,
-                        color = Palette.ButtonText,
+                        color = if (canConnect) Palette.ButtonText else Palette.TextTertiary,
                     )
                 }
-            }
-            when (val t = test) {
-                is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
-                is TestState.Failed -> Notice(stringResource(R.string.connection_failed, t.message), Palette.Danger, error = true)
-                else -> Unit
+                when (val t = test) {
+                    is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
+                    is TestState.Failed -> Notice(stringResource(R.string.connection_failed, t.message), Palette.Danger, error = true)
+                    else -> Unit
+                }
             }
 
             if (!setupMode) {
-                SectionTitle(stringResource(R.string.section_models))
-                ModelProfile.entries.forEach { profile -> ModelDefaultRow(vm, settings, profile) }
-
-                SectionTitle(stringResource(R.string.section_voice))
-                VoiceSettings(vm, settings)
-
-                SectionTitle(stringResource(R.string.section_dutch_voice))
-                DutchVoiceSettings(vm, settings)
-
-                SectionTitle(stringResource(R.string.section_speech_input))
-                SpeechInputSettings(vm, settings)
-
-                SectionTitle(stringResource(R.string.section_assistant))
-                DefaultAssistantCard()
-                Toggle(stringResource(R.string.listen_on_invoke), stringResource(R.string.listen_on_invoke_detail), settings.listenOnInvoke) {
-                    scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
+                Section(stringResource(R.string.section_models)) {
+                    ModelProfile.entries.forEach { profile -> ModelDefaultRow(vm, settings, profile) }
                 }
-                Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
-                    scope.launch { vm.settingsRepository.setSpeakReplies(it) }
-                }
-                Field(
-                    language,
-                    { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } },
-                    stringResource(R.string.speech_language),
-                    placeholder = stringResource(R.string.speech_language_hint),
-                )
+                Section(stringResource(R.string.section_voice)) { VoiceSettings(vm, settings) }
+                Section(stringResource(R.string.section_dutch_voice)) { DutchVoiceSettings(vm, settings) }
+                Section(stringResource(R.string.section_speech_input)) { SpeechInputSettings(vm, settings) }
 
-                SectionTitle(stringResource(R.string.section_history))
-                Toggle(stringResource(R.string.show_all_channels), stringResource(R.string.show_all_channels_detail), settings.showAllChannels) {
-                    scope.launch {
-                        vm.settingsRepository.setShowAllChannels(it)
-                        vm.refreshSessions()
+                Section(stringResource(R.string.section_assistant)) {
+                    DefaultAssistantCard()
+                    Toggle(stringResource(R.string.listen_on_invoke), stringResource(R.string.listen_on_invoke_detail), settings.listenOnInvoke) {
+                        scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
+                    }
+                    Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
+                        scope.launch { vm.settingsRepository.setSpeakReplies(it) }
+                    }
+                    Field(
+                        language,
+                        { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } },
+                        stringResource(R.string.speech_language),
+                        placeholder = stringResource(R.string.speech_language_hint),
+                    )
+                }
+
+                Section(stringResource(R.string.section_history)) {
+                    Toggle(stringResource(R.string.show_all_channels), stringResource(R.string.show_all_channels_detail), settings.showAllChannels) {
+                        scope.launch {
+                            vm.settingsRepository.setShowAllChannels(it)
+                            vm.refreshSessions()
+                        }
                     }
                 }
                 Text(
                     "aight ${BuildConfig.VERSION_NAME}",
                     style = MaterialTheme.typography.bodySmall,
                     color = Palette.TextTertiary,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
+                    modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 24.dp),
                 )
             }
         }
@@ -365,7 +388,7 @@ private fun VoicePicker(voices: List<Pair<String, String>>, selected: String, on
                     Text(current.second, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
                 }
             }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.Menu) {
+            GlassDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 voices.forEach { (id, label) ->
                     DropdownMenuItem(
                         text = { Text(label) },
@@ -462,8 +485,8 @@ private fun DefaultAssistantCard() {
             isDefault = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
         }
     }
-    Surface(color = Palette.Surface, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), Palette.Surface) {
+        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(
                     if (isDefault) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
@@ -505,9 +528,15 @@ private fun DefaultAssistantCard() {
     }
 }
 
+/** A titled pane of glass holding one group of settings. */
 @Composable
-private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = Palette.Link, modifier = Modifier.padding(top = 12.dp))
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Text(title, style = MaterialTheme.typography.titleSmall, color = Palette.Link, modifier = Modifier.padding(start = 6.dp))
+        GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(26.dp), Palette.Surface) {
+            Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
+        }
+    }
 }
 
 @Composable
@@ -534,6 +563,9 @@ private fun Field(
             focusedBorderColor = Palette.Link,
             unfocusedBorderColor = Palette.Outline,
             focusedLabelColor = Palette.Link,
+            unfocusedLabelColor = Palette.TextSecondary,
+            focusedContainerColor = Palette.Surface,
+            unfocusedContainerColor = Palette.Surface,
             cursorColor = Palette.Link,
         ),
         modifier = Modifier.fillMaxWidth(),
@@ -557,7 +589,14 @@ private fun Toggle(title: String, detail: String, checked: Boolean, onChange: (B
         Switch(
             checked = checked,
             onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(checkedTrackColor = Palette.Button, checkedThumbColor = Palette.ButtonText),
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = Palette.Send,
+                checkedThumbColor = Color.White,
+                checkedBorderColor = Color.Transparent,
+                uncheckedTrackColor = Palette.Surface,
+                uncheckedThumbColor = Palette.TextSecondary,
+                uncheckedBorderColor = Palette.Outline,
+            ),
         )
     }
 }

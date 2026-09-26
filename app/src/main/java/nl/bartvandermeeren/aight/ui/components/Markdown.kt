@@ -4,7 +4,6 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -27,7 +26,6 @@ import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -98,7 +96,7 @@ private val markdownParser: Parser = Parser.builder()
 
 private fun Node.children(): List<Node> = generateSequence(firstChild) { it.next }.toList()
 
-/** Renders agent markdown with Gemini's typography: roomy paragraphs, pill code blocks, plain tables. */
+/** Renders agent markdown with roomy paragraphs, code on dark glass and tables in a glass frame. */
 @Composable
 fun Markdown(text: String, modifier: Modifier = Modifier, style: TextStyle = MaterialTheme.typography.bodyLarge) {
     val document = remember(text) { markdownParser.parse(text) }
@@ -125,7 +123,7 @@ private fun MarkdownBlock(node: Node, style: TextStyle, depth: Int) {
         is FencedCodeBlock -> CodeBlock(node.info?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }, node.literal.trimEnd('\n'))
         is IndentedCodeBlock -> CodeBlock(null, node.literal.trimEnd('\n'))
         is BlockQuote -> Row(Modifier.height(IntrinsicSize.Min)) {
-            Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(Palette.Outline))
+            Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(Palette.OrbIndigo.copy(alpha = 0.7f)))
             Column(Modifier.padding(start = 14.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 node.children().forEach { MarkdownBlock(it, style.copy(color = Palette.TextSecondary), depth) }
             }
@@ -215,7 +213,7 @@ fun CodeBlock(language: String?, code: String) {
             copied = false
         }
     }
-    Surface(color = Palette.Surface, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
+    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp), Palette.Code) {
         Column {
             Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(language ?: "code", style = MaterialTheme.typography.labelLarge, color = Palette.TextPrimary)
@@ -262,8 +260,7 @@ private fun TableView(node: TableBlock, style: TextStyle) {
     Box(
         Modifier
             .horizontalScroll(rememberScrollState())
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, Palette.Outline, RoundedCornerShape(16.dp)),
+            .glass(RoundedCornerShape(16.dp), Palette.Disabled),
     ) {
         Layout(
             content = {

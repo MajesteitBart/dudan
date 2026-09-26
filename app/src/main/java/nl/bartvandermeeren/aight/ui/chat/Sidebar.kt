@@ -1,7 +1,6 @@
 package nl.bartvandermeeren.aight.ui.chat
 
 import androidx.compose.foundation.ExperimentalFoundationApi
-import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
@@ -29,9 +28,7 @@ import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
-import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -47,7 +44,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.RectangleShape
+import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
@@ -60,7 +58,11 @@ import nl.bartvandermeeren.aight.chat.SessionsState
 import nl.bartvandermeeren.aight.data.SessionSummary
 import nl.bartvandermeeren.aight.ui.components.Avatar
 import nl.bartvandermeeren.aight.ui.components.AightIcons
+import nl.bartvandermeeren.aight.ui.components.GlassDialog
+import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
+import nl.bartvandermeeren.aight.ui.components.LocalHazeState
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
+import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 enum class SidebarMode { Docked, Overlay }
@@ -86,15 +88,23 @@ fun Sidebar(
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    Column(
-        modifier
-            .fillMaxHeight()
-            .background(Palette.Background)
+    val haze = LocalHazeState.current
+    val frame = when (mode) {
+        // A floating pane beside the chat on the inner screen.
+        SidebarMode.Docked -> Modifier
             .statusBarsPadding()
-            .navigationBarsPadding(),
-    ) {
+            .navigationBarsPadding()
+            .padding(start = 12.dp, top = 8.dp, bottom = 12.dp)
+            .glass(RoundedCornerShape(28.dp), Palette.Surface, haze)
+        // A sheet of frosted glass over the whole chat on the cover screen.
+        SidebarMode.Overlay -> Modifier
+            .glass(RectangleShape, Palette.SidebarGlass, haze, blurRadius = 40.dp, border = false)
+            .statusBarsPadding()
+            .navigationBarsPadding()
+    }
+    Column(modifier.fillMaxHeight().then(frame)) {
         Row(
-            Modifier.fillMaxWidth().height(64.dp).padding(start = 28.dp, end = 12.dp),
+            Modifier.fillMaxWidth().height(64.dp).padding(start = 24.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             Text(assistantName, style = MaterialTheme.typography.titleLarge.copy(fontSize = 24.sp), color = Palette.TextPrimary)
@@ -166,6 +176,10 @@ fun Sidebar(
     }
 }
 
+/** Selected rows sit on a small pane of glass; the rest are bare text on the sidebar's own glass. */
+private fun Modifier.selectedGlass(selected: Boolean, shape: Shape): Modifier =
+    if (selected) glass(shape, Palette.Card) else clip(shape)
+
 @Composable
 private fun NavItem(icon: ImageVector, label: String, selected: Boolean = false, onClick: () -> Unit) {
     Row(
@@ -173,8 +187,7 @@ private fun NavItem(icon: ImageVector, label: String, selected: Boolean = false,
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .height(56.dp)
-            .clip(RoundedCornerShape(28.dp))
-            .background(if (selected) Palette.Surface else Color.Transparent)
+            .selectedGlass(selected, RoundedCornerShape(28.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -205,8 +218,7 @@ private fun SessionItem(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
                 .height(52.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(if (selected) Palette.Surface else Color.Transparent)
+                .selectedGlass(selected, RoundedCornerShape(26.dp))
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = {
@@ -229,12 +241,7 @@ private fun SessionItem(
                 Icon(Icons.Outlined.PushPin, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(20.dp))
             }
         }
-        DropdownMenu(
-            expanded = menu,
-            onDismissRequest = { menu = false },
-            containerColor = Palette.Menu,
-            shape = RoundedCornerShape(16.dp),
-        ) {
+        GlassDropdownMenu(expanded = menu, onDismissRequest = { menu = false }) {
             DropdownMenuItem(
                 text = { Text(stringResource(if (session.pinned) R.string.unpin else R.string.pin)) },
                 leadingIcon = { Icon(Icons.Outlined.PushPin, null) },
@@ -256,9 +263,8 @@ private fun SessionItem(
         RenameDialog(session.displayTitle, onDismiss = { renaming = false }, onConfirm = { renaming = false; onRename(it) })
     }
     if (confirmDelete) {
-        AlertDialog(
+        GlassDialog(
             onDismissRequest = { confirmDelete = false },
-            containerColor = Palette.Card,
             title = { Text(stringResource(R.string.delete_chat_title)) },
             text = { Text(stringResource(R.string.delete_chat_body, session.displayTitle)) },
             confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text(stringResource(R.string.delete)) } },
@@ -270,16 +276,22 @@ private fun SessionItem(
 @Composable
 fun RenameDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> Unit) {
     var value by remember { mutableStateOf(initial) }
-    AlertDialog(
+    GlassDialog(
         onDismissRequest = onDismiss,
-        containerColor = Palette.Card,
         title = { Text(stringResource(R.string.rename_chat)) },
         text = {
             OutlinedTextField(
                 value = value,
                 onValueChange = { value = it },
                 singleLine = true,
-                colors = OutlinedTextFieldDefaults.colors(focusedBorderColor = Palette.Link),
+                shape = RoundedCornerShape(18.dp),
+                colors = OutlinedTextFieldDefaults.colors(
+                    focusedBorderColor = Palette.Link,
+                    unfocusedBorderColor = Palette.Outline,
+                    focusedContainerColor = Palette.Surface,
+                    unfocusedContainerColor = Palette.Surface,
+                    cursorColor = Palette.Link,
+                ),
             )
         },
         confirmButton = {
