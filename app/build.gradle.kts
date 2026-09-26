@@ -47,8 +47,8 @@ android {
         applicationId = "nl.bartvandermeeren.aight"
         minSdk = 31
         targetSdk = 36
-        versionCode = 8
-        versionName = "0.5.1"
+        versionCode = 9
+        versionName = "0.6.0"
         // Phones are arm64. Debug builds add x86_64 for the emulator.
         ndk { abiFilters += "arm64-v8a" }
     }
