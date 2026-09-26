@@ -58,11 +58,12 @@ import nl.bartvandermeeren.aight.chat.SessionsState
 import nl.bartvandermeeren.aight.data.SessionSummary
 import nl.bartvandermeeren.aight.ui.components.Avatar
 import nl.bartvandermeeren.aight.ui.components.AightIcons
+import nl.bartvandermeeren.aight.ui.components.GlassDefaults
 import nl.bartvandermeeren.aight.ui.components.GlassDialog
 import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
-import nl.bartvandermeeren.aight.ui.components.LocalHazeState
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 enum class SidebarMode { Docked, Overlay }
@@ -88,17 +89,16 @@ fun Sidebar(
     onSettings: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val haze = LocalHazeState.current
     val frame = when (mode) {
         // A floating pane beside the chat on the inner screen.
         SidebarMode.Docked -> Modifier
             .statusBarsPadding()
             .navigationBarsPadding()
             .padding(start = 12.dp, top = 8.dp, bottom = 12.dp)
-            .glass(RoundedCornerShape(28.dp), Palette.Surface, haze)
+            .glass(RoundedCornerShape(28.dp))
         // A sheet of frosted glass over the whole chat on the cover screen.
         SidebarMode.Overlay -> Modifier
-            .glass(RectangleShape, Palette.SidebarGlass, haze, blurRadius = 40.dp, border = false)
+            .glass(RectangleShape, Palette.SidebarGlass, blurRadius = GlassDefaults.SheetBlur, border = false, solid = Palette.SheetSolid)
             .statusBarsPadding()
             .navigationBarsPadding()
     }
@@ -176,9 +176,9 @@ fun Sidebar(
     }
 }
 
-/** Selected rows sit on a small pane of glass; the rest are bare text on the sidebar's own glass. */
-private fun Modifier.selectedGlass(selected: Boolean, shape: Shape): Modifier =
-    if (selected) glass(shape, Palette.Card) else clip(shape)
+/** Selected rows sit on a quiet pane; the rest are bare text on the sidebar's glass. */
+private fun Modifier.selectedPane(selected: Boolean, shape: Shape): Modifier =
+    if (selected) pane(shape, Palette.Card) else clip(shape)
 
 @Composable
 private fun NavItem(icon: ImageVector, label: String, selected: Boolean = false, onClick: () -> Unit) {
@@ -187,7 +187,7 @@ private fun NavItem(icon: ImageVector, label: String, selected: Boolean = false,
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
             .height(56.dp)
-            .selectedGlass(selected, RoundedCornerShape(28.dp))
+            .selectedPane(selected, RoundedCornerShape(28.dp))
             .clickable(onClick = onClick)
             .padding(horizontal = 20.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -218,7 +218,7 @@ private fun SessionItem(
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
                 .height(52.dp)
-                .selectedGlass(selected, RoundedCornerShape(26.dp))
+                .selectedPane(selected, RoundedCornerShape(26.dp))
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = {

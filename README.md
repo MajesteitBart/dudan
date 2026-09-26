@@ -8,7 +8,8 @@ Everything the agent does happens on the Hermes server. The app talks to the Her
 
 ## What it does
 
-- Gemini's layout in glass: the chat scrolls under a floating glass composer and top controls, which blur what passes behind them, all over the navy and violet light of the aight icon. Sidebar with recent chats, a greeting under the aight orb, streaming markdown with code on dark glass and tables in a glass frame. The Fold 7 inner screen gets a floating sidebar pane; the cover screen gets a full-screen frosted sheet.
+- Gemini's layout in glass, used sparingly: only what floats is glass. The chat scrolls under a frosted composer and top controls, which blur what passes behind them, over the navy and violet light of the aight icon. Messages, code, tables and cards sit on quiet flat panes. Dialogs, sheets and the side-key overlay blur the screen behind them. The Fold 7 inner screen gets a floating sidebar pane; the cover screen gets a full-screen frosted sheet.
+- Settings > Appearance > Reduce transparency swaps the glass for solid panels. It also switches on by itself when the phone's color contrast (Accessibility > Color and motion) is set to medium or high.
 - Agent turns go through Hermes' Runs API. If the phone loses the connection mid-task, the run keeps going on the server and the app polls until the result is in.
 - A collapsible "Worked for 1m 10s" panel shows tool calls, commentary and reasoning. Dangerous commands surface as an approval card with Hermes' choices (once, this chat, always, deny).
 - Voice input with a live waveform, read-aloud per reply, and a hands-free Live mode. Speech is transcribed on the phone by [Orukeet](https://github.com/Oruk-AI/orukeet), Oruk's multilingual fine-tune of NVIDIA Parakeet TDT 0.6B v3, which handles Dutch and English without a language setting. English replies are read by Kokoro-82M and Dutch replies by Supertonic 3, both on the phone. Before Supertonic reads a Dutch reply, the app writes out numbers, times, amounts and dates, because it misreads digits.
@@ -88,7 +89,7 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 - `chat/`: `ChatEngine` owns every conversation and run for the whole process, shared by the app, the overlay and Live mode; `TurnReducer` folds stream events into a message; `HistoryMapper` turns a Hermes transcript into bubbles
 - `assist/`: voice interaction service, the overlay session (Compose inside a `VoiceInteractionSession`) and the proxy recognition service
 - `voice/`: `ModelPackage` downloads and verifies the on-device models; `SpeechInput` records with Orukeet (`LocalSpeechSession`, `Endpointer`, `OrukeetEngine`) or falls back to the phone's recognizer; `SherpaVoice` plays speech from sherpa-onnx while it's synthesized, with `KokoroVoice` for English and `SupertonicVoice` for Dutch (`DutchText` writes out numbers first, `SupertonicFiles` converts the downloaded voice files); `Speaker` picks one of them or the Android voice per reply
-- `ui/`: Compose screens and components. `ui/components/Glass.kt` has the backdrop, the glass surface every pane uses, and the window blur for dialogs and sheets; the in-app blur comes from the [Haze](https://github.com/chrisbanes/haze) library
+- `ui/`: Compose screens and components. `ui/components/Glass.kt` has the backdrop and the three materials: `pane` for content, `glass` for chrome that floats over the chat, and window glass with system blur for dialogs, sheets and the overlay. The in-app blur comes from the [Haze](https://github.com/chrisbanes/haze) library. `Theme.kt` decides when Reduce transparency applies
 - `assets/`: the aight icon and wordmark as SVG and PNG. The launcher icon (`res/drawable/ic_launcher_*.xml`, `ic_notification.xml`) and the in-app mark (`AightMark` in `ui/components/Brand.kt`) are redrawn from `aight-icon.svg`, so update them together when the artwork changes
 
 ## Known limits
@@ -101,7 +102,7 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 - Supertonic synthesizes a sentence before it plays it. On the x86 emulator the first word of a Dutch reply comes 1.4 seconds after the request once the model is loaded; this hasn't been measured on the Fold 7 yet. When a very short first sentence ("Goede vraag.") is followed by a long one, a pause can fall between them while the long one is synthesized.
 - Kokoro and Supertonic loaded together take about 1.1 GB of memory, and Orukeet adds its own while listening. Each is released after a few idle minutes.
 - If Kokoro's or Supertonic's native library ever crashes the app while loading, the next start notices, switches those replies to the Android voice and shows a Retry link in its Settings section.
-- Dialogs, the model sheet and the side-key overlay frost the screen behind them with Android's cross-window blur. When a phone turns that off (some battery savers do), they show a darker tint over a sharp background instead. Menus are popups, which can't blur what's behind them, so they always use the darker tint.
+- Dialogs, the model sheet and the side-key overlay frost the screen behind them with Android's cross-window blur. When a phone turns that off (some battery savers do), they switch to solid panels over the sharp background. Menus are popups, which can't blur what's behind them, so they are nearly opaque.
 
 ## Model credits
 

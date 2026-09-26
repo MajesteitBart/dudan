@@ -55,6 +55,7 @@ class AightSession(context: Context) :
         scope = scope,
         openInApp = ::openInApp,
         dismiss = { hide() },
+        setBackdropBlur = ::setBackdropBlur,
     )
 
     init {
@@ -71,10 +72,6 @@ class AightSession(context: Context) :
             w.setBackgroundDrawable(ColorDrawable(Color.TRANSPARENT))
             w.setLayout(WindowManager.LayoutParams.MATCH_PARENT, WindowManager.LayoutParams.MATCH_PARENT)
             w.isNavigationBarContrastEnforced = false
-            // Frost the app underneath so the overlay's glass panels float over it. Phones without
-            // cross-window blur ignore this, and the panels' darker tint carries them alone.
-            w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-            w.attributes = w.attributes.apply { blurBehindRadius = (OVERLAY_BLUR_DP * context.resources.displayMetrics.density).toInt() }
             w.decorView.let { decor ->
                 decor.setViewTreeLifecycleOwner(this)
                 decor.setViewTreeSavedStateRegistryOwner(this)
@@ -89,7 +86,7 @@ class AightSession(context: Context) :
         setViewTreeViewModelStoreOwner(this@AightSession)
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this@AightSession))
         setContent {
-            AightTheme {
+            AightTheme(reduceTransparency = state.settings?.reduceTransparency == true) {
                 AssistOverlay(state)
             }
         }
@@ -123,9 +120,25 @@ class AightSession(context: Context) :
         super.onDestroy()
     }
 
+    /**
+     * Frosts the app underneath so the overlay's panels float over it, or turns that off for Reduce
+     * transparency. Phones without cross-window blur ignore the flag; the overlay then draws its
+     * panels solid (see windowGlass).
+     */
+    private fun setBackdropBlur(on: Boolean) {
+        val w = window.window ?: return
+        if (on) w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND) else w.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        w.attributes = w.attributes.apply {
+            blurBehindRadius = if (on) (OVERLAY_BLUR_DP * context.resources.displayMetrics.density).toInt() else 0
+        }
+    }
+
     private companion object {
-        /** Enough to frost the app behind the overlay while its layout stays recognizable. */
-        const val OVERLAY_BLUR_DP = 12
+        /**
+         * Any app can sit behind the overlay: photos, video, dense text. NN/g's glassmorphism guidance
+         * asks for enough blur that the background stays visible but not identifiable.
+         */
+        const val OVERLAY_BLUR_DP = 28
     }
 
     private fun openInApp(sessionId: String?, mode: OpenMode) {

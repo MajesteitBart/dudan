@@ -29,6 +29,8 @@ class AssistState(
     private val scope: CoroutineScope,
     private val openInApp: (sessionId: String?, mode: OpenMode) -> Unit,
     val dismiss: () -> Unit,
+    /** Blurs (true) or stops blurring the app behind the overlay window. */
+    val setBackdropBlur: (Boolean) -> Unit,
 ) {
     val engine: ChatEngine = container.engine
     val speaker = container.speaker

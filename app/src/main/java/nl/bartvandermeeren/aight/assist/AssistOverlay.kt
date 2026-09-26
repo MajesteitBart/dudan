@@ -50,7 +50,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -70,10 +69,12 @@ import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.ui.chat.AssistantMessageItem
 import nl.bartvandermeeren.aight.ui.chat.UserMessageItem
 import nl.bartvandermeeren.aight.ui.components.Composer
-import nl.bartvandermeeren.aight.ui.components.GlassSurface
+import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.windowGlass
+import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.SpeechInput
 
@@ -98,6 +99,11 @@ fun AssistOverlay(state: AssistState) {
     val view = LocalView.current
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     LaunchedEffect(imeBottom) { view.requestLayout() }
+
+    // Any app can sit behind the overlay, so its panels are glass only while the system blurs that app.
+    val reduced = LocalReduceTransparency.current
+    LaunchedEffect(reduced) { state.setBackdropBlur(!reduced) }
+    val panel = windowGlass(Palette.OverlayGlass, Palette.OverlaySolid)
 
     Box(Modifier.fillMaxSize()) {
         // Scrim: tap anywhere outside the panel to dismiss, like Gemini's overlay.
@@ -135,17 +141,18 @@ fun AssistOverlay(state: AssistState) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (!settings.isConfigured && state.settings != null) {
-                    NotConfiguredCard(onOpen = state::openFullChat)
+                    NotConfiguredCard(panel, onOpen = state::openFullChat)
                 }
                 if (hasChat) {
                     // Weighted so the composer below always keeps its room when space runs out.
                     Box(Modifier.weight(1f, fill = false)) {
-                        ResponsePanel(state, conversation, settings, speakingId)
+                        ResponsePanel(state, conversation, settings, speakingId, panel)
                     }
                 }
                 val shot = state.screenshot
                 if (shot != null && !state.attachScreenshot && !conversation.isBusy) {
                     Chip(
+                        panel,
                         icon = { Icon(Icons.Outlined.ScreenshotMonitor, null, tint = Palette.Icon, modifier = Modifier.size(20.dp)) },
                         label = stringResource(R.string.ask_about_screen),
                         onClick = {
@@ -156,7 +163,7 @@ fun AssistOverlay(state: AssistState) {
                 }
                 if (shot != null && state.attachScreenshot) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(64.dp).glass(RoundedCornerShape(14.dp), Palette.OverlayGlass)) {
+                        Box(Modifier.size(64.dp).pane(RoundedCornerShape(14.dp), Palette.OverlaySolid, outline = Palette.Hairline)) {
                             Image(shot.asImageBitmap(), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         }
                         Text(stringResource(R.string.screen_attached), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
@@ -189,7 +196,8 @@ fun AssistOverlay(state: AssistState) {
                     },
                     onStop = state::stop,
                     onLiveClick = state::openLive,
-                    containerColor = Palette.OverlayGlass,
+                    containerColor = panel,
+                    solidColor = Palette.OverlaySolid,
                 )
             }
         }
@@ -197,14 +205,14 @@ fun AssistOverlay(state: AssistState) {
 }
 
 @Composable
-private fun ResponsePanel(state: AssistState, conversation: Conversation, settings: AppSettings, speakingId: String?) {
+private fun ResponsePanel(state: AssistState, conversation: Conversation, settings: AppSettings, speakingId: String?, panel: Color) {
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.58f).dp
     val listState = rememberLazyListState()
     val last = conversation.messages.lastOrNull()
     LaunchedEffect(conversation.messages.size, last?.text?.length, last?.steps?.size) {
         listState.scrollToItem(conversation.messages.size)
     }
-    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(30.dp), Palette.OverlayGlass) {
+    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(30.dp), panel, solid = Palette.OverlaySolid)) {
         Column {
             Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 AightMark(size = 18.dp, working = conversation.isBusy)
@@ -246,8 +254,8 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
 }
 
 @Composable
-private fun NotConfiguredCard(onOpen: () -> Unit) {
-    GlassSurface(Modifier.fillMaxWidth().clip(RoundedCornerShape(26.dp)).clickable(onClick = onOpen), RoundedCornerShape(26.dp), Palette.OverlayGlass) {
+private fun NotConfiguredCard(panel: Color, onOpen: () -> Unit) {
+    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(26.dp), panel, solid = Palette.OverlaySolid).clickable(onClick = onOpen)) {
         Text(
             stringResource(R.string.assist_not_configured),
             style = MaterialTheme.typography.bodyLarge,
@@ -258,11 +266,11 @@ private fun NotConfiguredCard(onOpen: () -> Unit) {
 }
 
 @Composable
-private fun Chip(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
+private fun Chip(panel: Color, icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
     Row(
         Modifier
             .padding(start = 6.dp)
-            .glass(CircleShape, Palette.OverlayGlass)
+            .glass(CircleShape, panel, solid = Palette.OverlaySolid)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

@@ -9,7 +9,6 @@ import androidx.compose.animation.scaleIn
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -84,6 +83,8 @@ fun Composer(
     modifier: Modifier = Modifier,
     /** The glass tint. It frosts the screen's backdrop where there is one (see [LocalHazeState]). */
     containerColor: Color = Palette.Composer,
+    /** What the glass turns into with Reduce transparency. */
+    solidColor: Color = Palette.ChromeSolid,
     focusRequester: FocusRequester? = null,
     addMenu: @Composable () -> Unit = {},
 ) {
@@ -94,7 +95,7 @@ fun Composer(
         hasContent -> TrailingMode.Content
         else -> TrailingMode.Idle
     }
-    Box(modifier.fillMaxWidth().glass(RoundedCornerShape(34.dp), containerColor, LocalHazeState.current)) {
+    Box(modifier.fillMaxWidth().glass(RoundedCornerShape(34.dp), containerColor, solid = solidColor)) {
         Column(Modifier.padding(horizontal = 10.dp, vertical = 10.dp)) {
             if (attachments.isNotEmpty()) {
                 LazyRow(
@@ -204,7 +205,7 @@ fun CircleIconButton(
     tint: Color = Color.White,
 ) = CircleIconButton(icon, description, SolidColor(background), onClick, size, tint)
 
-/** A round glass button with a [background] tint or gradient. */
+/** A round button with a [background] tint or gradient. It sits inside the composer's glass, so it stays flat. */
 @Composable
 fun CircleIconButton(
     icon: ImageVector,
@@ -219,8 +220,6 @@ fun CircleIconButton(
             .size(size)
             .clip(CircleShape)
             .background(background)
-            .background(GlassDefaults.Sheen)
-            .border(GlassDefaults.Border, CircleShape)
             .clickable(onClick = onClick),
         contentAlignment = Alignment.Center,
     ) {
@@ -253,7 +252,7 @@ fun PlainIconButton(
 private fun AttachmentThumb(attachment: Attachment, onRemove: () -> Unit) {
     Box(Modifier.size(72.dp)) {
         val shape = RoundedCornerShape(16.dp)
-        val modifier = Modifier.fillMaxSize().glass(shape, Palette.Card)
+        val modifier = Modifier.fillMaxSize().pane(shape, Palette.Card)
         when {
             attachment.bitmap != null -> Image(
                 attachment.bitmap.asImageBitmap(), contentDescription = null, contentScale = ContentScale.Crop, modifier = modifier,
@@ -270,7 +269,7 @@ private fun AttachmentThumb(attachment: Attachment, onRemove: () -> Unit) {
                 .align(Alignment.TopEnd)
                 .padding(4.dp)
                 .size(22.dp)
-                .glass(CircleShape, Palette.Menu)
+                .pane(CircleShape, Palette.MenuSolid)
                 .clickable(onClick = onRemove),
             contentAlignment = Alignment.Center,
         ) {

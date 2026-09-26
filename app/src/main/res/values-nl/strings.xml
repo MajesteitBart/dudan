@@ -116,6 +116,7 @@
     <string name="section_connection">Verbinding</string>
     <string name="section_assistant">Assistent</string>
     <string name="section_history">Geschiedenis</string>
+    <string name="section_appearance">Weergave</string>
     <string name="section_models">Standaardmodellen</string>
     <string name="section_voice">Engelse stem</string>
     <string name="tts_kokoro">Kokoro</string>
@@ -168,4 +169,6 @@
     <string name="speech_language_hint">Systeemstandaard, of bijvoorbeeld nl-NL</string>
     <string name="show_all_channels">Gesprekken van alle kanalen tonen</string>
     <string name="show_all_channels_detail">Ook Telegram-, CLI- en andere Hermes-sessies tonen onder Recent</string>
+    <string name="reduce_transparency">Transparantie verminderen</string>
+    <string name="reduce_transparency_detail">Effen panelen in plaats van matglas. Staat ook aan als het kleurcontrast van je telefoon op gemiddeld of hoog staat.</string>
 </resources>

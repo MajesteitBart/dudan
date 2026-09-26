@@ -8,8 +8,6 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -18,15 +16,19 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.composed
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.compositeOver
 import androidx.compose.ui.graphics.drawscope.scale
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalView
 import androidx.compose.ui.unit.Dp
@@ -36,6 +38,8 @@ import dev.chrisbanes.haze.HazeState
 import dev.chrisbanes.haze.HazeStyle
 import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
+import java.util.function.Consumer
+import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 /** The state behind the current screen's glass, so floating chrome can frost what scrolls under it. Null where nothing is blurred. */
@@ -50,59 +54,98 @@ object GlassDefaults {
         1f to Color.White.copy(alpha = 0.15f),
     )
     val Border = BorderStroke(1.dp, BorderBrush)
+    /** Solid panels get an even, brighter edge instead, so their outline still reads without the glass. */
+    val SolidBorder = BorderStroke(1.dp, Color.White.copy(alpha = 0.22f))
     val Sheen = Brush.verticalGradient(0f to Color.White.copy(alpha = 0.07f), 0.5f to Color.Transparent)
-    // Soft enough that text behind small controls turns into shapes of light rather than vanishing.
-    val BlurRadius = 18.dp
-    /** The orb's violet-to-blue, for the one primary action on a screen (send, connect). */
-    val Orb = Brush.linearGradient(listOf(Palette.OrbViolet, Palette.OrbIndigo, Palette.OrbBlue))
+
+    // NN/g: more blur is better over busy backgrounds, and scrolling text is one. Behind chrome the
+    // chat should read as light and shape, not as words.
+    val ChromeBlur = 32.dp
+    val SheetBlur = 48.dp
+    val WindowBlur = 32.dp
+
+    /**
+     * The orb's violet-to-blue for the one primary action on a screen (send, connect). Deeper than the
+     * orb itself so white text on it stays above 4.5:1; the orb's #B867F7 measured 3.4:1.
+     */
+    val Orb = Brush.linearGradient(listOf(Color(0xFF7450E0), Color(0xFF5A55E0), Color(0xFF3F55D6)))
 }
 
 /**
- * A glass pane: [tint] over a blur of whatever [hazeState] marks as backdrop, with a sheen and a lit edge.
- * Without a state (inside scrolling content, over other apps) the tint alone fills the pane.
+ * A quiet content surface: a flat fill, optionally with a hairline. Content sits on the backdrop with
+ * nothing moving behind it, so it gets no blur, sheen or lit edge; those mark what floats.
+ */
+fun Modifier.pane(shape: Shape, color: Color = Palette.Surface, outline: Color? = null): Modifier {
+    val filled = clip(shape).background(color)
+    return if (outline != null) filled.border(1.dp, outline, shape) else filled
+}
+
+/**
+ * A pane of glass for chrome that floats over the chat: [tint] over a blur of the screen's backdrop
+ * (see [LocalHazeState]), with a sheen and a lit edge. A navy wash under the tint dims bright content
+ * passing behind, so text on the glass keeps its contrast. With Reduce transparency the pane turns
+ * solid [Palette.ChromeSolid] (or [solid]) with an even edge.
  */
 fun Modifier.glass(
     shape: Shape,
-    tint: Color = Palette.Surface,
-    hazeState: HazeState? = null,
-    blurRadius: Dp = GlassDefaults.BlurRadius,
+    tint: Color = Palette.Chrome,
+    blur: Boolean = true,
+    blurRadius: Dp = GlassDefaults.ChromeBlur,
     border: Boolean = true,
-): Modifier {
+    solid: Color = Palette.ChromeSolid,
+): Modifier = composed {
     val clipped = clip(shape)
+    if (LocalReduceTransparency.current) {
+        val filled = clipped.background(solid)
+        return@composed if (border) filled.border(GlassDefaults.SolidBorder, shape) else filled
+    }
+    val hazeState = LocalHazeState.current.takeIf { blur }
     val filled = if (hazeState != null) {
         clipped.hazeEffect(
             hazeState,
             HazeStyle(
                 backgroundColor = Palette.Background,
-                tints = listOf(HazeTint(tint)),
+                tints = listOf(HazeTint(Palette.Background.copy(alpha = 0.3f)), HazeTint(tint)),
                 blurRadius = blurRadius,
                 noiseFactor = 0.06f,
-                // Where blur is off (battery saver on some phones), a denser tint keeps text readable.
-                fallbackTint = HazeTint(tint.compositeOver(Palette.Background).copy(alpha = 0.94f)),
+                // Where blur is off (battery saver on some phones), the solid color keeps text readable.
+                fallbackTint = HazeTint(solid),
             ),
         )
     } else {
         clipped.background(tint)
     }
     val lit = filled.background(GlassDefaults.Sheen)
-    return if (border) lit.border(GlassDefaults.Border, shape) else lit
+    if (border) lit.border(GlassDefaults.Border, shape) else lit
 }
 
-/** A [glass] container that frosts the screen's backdrop when [blur] is on. */
+/**
+ * The container color for a surface in its own window (dialog, sheet, overlay panel). Translucent
+ * [glass] only while the system blurs what's behind the window; over a sharp background, or with
+ * Reduce transparency, the [solid] version keeps text off whatever app or chat shows through.
+ */
 @Composable
-fun GlassSurface(
-    modifier: Modifier = Modifier,
-    shape: Shape = RoundedCornerShape(24.dp),
-    tint: Color = Palette.Surface,
-    blur: Boolean = false,
-    content: @Composable BoxScope.() -> Unit,
-) {
-    Box(modifier.glass(shape, tint, if (blur) LocalHazeState.current else null), content = content)
+fun windowGlass(glass: Color, solid: Color): Color =
+    if (LocalReduceTransparency.current || !rememberCrossWindowBlurEnabled()) solid else glass
+
+/** Whether the system currently blurs behind windows; battery saver and a developer option can turn it off. */
+@Composable
+fun rememberCrossWindowBlurEnabled(): Boolean {
+    val context = LocalContext.current
+    val windowManager = remember(context) { context.getSystemService(WindowManager::class.java) } ?: return false
+    var enabled by remember(windowManager) { mutableStateOf(windowManager.isCrossWindowBlurEnabled) }
+    DisposableEffect(windowManager) {
+        val listener = Consumer<Boolean> { enabled = it }
+        windowManager.addCrossWindowBlurEnabledListener(context.mainExecutor, listener)
+        onDispose { windowManager.removeCrossWindowBlurEnabledListener(listener) }
+    }
+    return enabled
 }
 
 /**
  * The navy of the aight icon lit by soft violet and blue light, for the glass to frost. [glow] raises
- * the floor light under the composer, as on the empty chat.
+ * the floor light under the composer, as on the empty chat. It stays still and simple: the chat's
+ * text sits on it directly.
  */
 @Composable
 fun GlassBackdrop(modifier: Modifier = Modifier, glow: Boolean = false) {
@@ -120,23 +163,16 @@ fun GlassBackdrop(modifier: Modifier = Modifier, glow: Boolean = false) {
         )
         drawRect(
             Brush.radialGradient(
-                listOf(Palette.GlowViolet.copy(alpha = 0.36f), Palette.GlowViolet.copy(alpha = 0.1f), Color.Transparent),
+                listOf(Palette.GlowViolet.copy(alpha = 0.34f), Palette.GlowViolet.copy(alpha = 0.09f), Color.Transparent),
                 center = Offset(w * 0.06f, h * 0.08f),
                 radius = unit * 0.95f,
             ),
         )
         drawRect(
             Brush.radialGradient(
-                listOf(Palette.GlowBlue.copy(alpha = 0.26f), Color.Transparent),
+                listOf(Palette.GlowBlue.copy(alpha = 0.22f), Color.Transparent),
                 center = Offset(w * 1.02f, h * 0.5f),
                 radius = unit * 0.8f,
-            ),
-        )
-        drawRect(
-            Brush.radialGradient(
-                listOf(Palette.OrbViolet.copy(alpha = 0.16f), Color.Transparent),
-                center = Offset(0f, h * 0.86f),
-                radius = unit * 0.7f,
             ),
         )
         // The icon's floor glow: a wide, flat ellipse of blue light along the bottom edge.
@@ -161,19 +197,20 @@ fun GlassBackdrop(modifier: Modifier = Modifier, glow: Boolean = false) {
 
 /**
  * Blurs everything behind the dialog or sheet window this is composed in. The app's own blur stops at
- * its window, so popups get their frost from the system compositor. Phones without cross-window blur
- * ignore the flag, and the dense [Palette.Sheet] tint carries the dialog on its own.
+ * its window, so these get their frost from the system compositor. Off with Reduce transparency.
  */
 @Composable
-fun BlurBehindWindow(radius: Dp = 24.dp) {
+fun BlurBehindWindow(radius: Dp = GlassDefaults.WindowBlur) {
     val view = LocalView.current
     val px = with(LocalDensity.current) { radius.roundToPx() }
-    DisposableEffect(view, px) {
+    val enabled = !LocalReduceTransparency.current
+    DisposableEffect(view, px, enabled) {
         val window = generateSequence<View>(view) { it.parent as? View }
             .firstNotNullOfOrNull { (it as? DialogWindowProvider)?.window }
         if (window != null) {
-            window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
-            window.attributes = window.attributes.apply { blurBehindRadius = px }
+            if (enabled) window.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            else window.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+            window.attributes = window.attributes.apply { blurBehindRadius = if (enabled) px else 0 }
         }
         onDispose { }
     }
@@ -189,6 +226,7 @@ fun GlassDialog(
     dismissButton: @Composable () -> Unit,
 ) {
     val shape = RoundedCornerShape(28.dp)
+    val reduced = LocalReduceTransparency.current
     AlertDialog(
         onDismissRequest = onDismissRequest,
         title = {
@@ -199,24 +237,28 @@ fun GlassDialog(
         confirmButton = confirmButton,
         dismissButton = dismissButton,
         shape = shape,
-        containerColor = Palette.Sheet,
-        modifier = Modifier.border(GlassDefaults.Border, shape),
+        containerColor = windowGlass(Palette.Sheet, Palette.SheetSolid),
+        modifier = Modifier.border(if (reduced) GlassDefaults.SolidBorder else GlassDefaults.Border, shape),
     )
 }
 
-/** A [DropdownMenu] in dark glass with a lit edge. */
+/**
+ * A [DropdownMenu] in dark glass with a lit edge. Menus are popups, which can't blur what's behind
+ * them, so their glass is nearly opaque; with Reduce transparency it is.
+ */
 @Composable
 fun GlassDropdownMenu(
     expanded: Boolean,
     onDismissRequest: () -> Unit,
     content: @Composable ColumnScope.() -> Unit,
 ) {
+    val reduced = LocalReduceTransparency.current
     DropdownMenu(
         expanded = expanded,
         onDismissRequest = onDismissRequest,
         shape = RoundedCornerShape(20.dp),
-        containerColor = Palette.Menu,
-        border = GlassDefaults.Border,
+        containerColor = if (reduced) Palette.MenuSolid else Palette.Menu,
+        border = if (reduced) GlassDefaults.SolidBorder else GlassDefaults.Border,
         content = content,
     )
 }

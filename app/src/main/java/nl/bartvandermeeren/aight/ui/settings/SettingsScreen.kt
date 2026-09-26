@@ -7,7 +7,6 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -90,9 +89,8 @@ import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.GlassBackdrop
 import nl.bartvandermeeren.aight.ui.components.GlassDefaults
 import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
-import nl.bartvandermeeren.aight.ui.components.GlassSurface
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
-import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.KokoroVoice
@@ -155,7 +153,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                         Icons.AutoMirrored.Rounded.ArrowBack,
                         stringResource(R.string.action_back),
                         onClick = onBack,
-                        modifier = Modifier.glass(CircleShape, Palette.Surface),
+                        modifier = Modifier.pane(CircleShape, Palette.Surface),
                         size = 44.dp,
                         iconSize = 24.dp,
                     )
@@ -202,8 +200,6 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                         .padding(top = 4.dp)
                         .clip(CircleShape)
                         .background(if (canConnect) GlassDefaults.Orb else SolidColor(Palette.Disabled))
-                        .background(GlassDefaults.Sheen)
-                        .border(GlassDefaults.Border, CircleShape)
                         .clickable(enabled = canConnect && test != TestState.Testing) { connect() }
                         .padding(horizontal = 24.dp, vertical = 14.dp),
                     verticalAlignment = Alignment.CenterVertically,
@@ -215,7 +211,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     Text(
                         stringResource(if (setupMode) R.string.connect else R.string.save_and_test),
                         style = MaterialTheme.typography.labelLarge,
-                        color = if (canConnect) Palette.ButtonText else Palette.TextTertiary,
+                        color = if (canConnect) Color.White else Palette.TextTertiary,
                     )
                 }
                 when (val t = test) {
@@ -234,7 +230,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 Section(stringResource(R.string.section_speech_input)) { SpeechInputSettings(vm, settings) }
 
                 Section(stringResource(R.string.section_assistant)) {
-                    DefaultAssistantCard()
+                    DefaultAssistantStatus()
                     Toggle(stringResource(R.string.listen_on_invoke), stringResource(R.string.listen_on_invoke_detail), settings.listenOnInvoke) {
                         scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
                     }
@@ -247,6 +243,12 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                         stringResource(R.string.speech_language),
                         placeholder = stringResource(R.string.speech_language_hint),
                     )
+                }
+
+                Section(stringResource(R.string.section_appearance)) {
+                    Toggle(stringResource(R.string.reduce_transparency), stringResource(R.string.reduce_transparency_detail), settings.reduceTransparency) {
+                        scope.launch { vm.settingsRepository.setReduceTransparency(it) }
+                    }
                 }
 
                 Section(stringResource(R.string.section_history)) {
@@ -476,7 +478,7 @@ private fun LinkAction(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun DefaultAssistantCard() {
+private fun DefaultAssistantStatus() {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var isDefault by remember { mutableStateOf(false) }
@@ -485,57 +487,62 @@ private fun DefaultAssistantCard() {
             isDefault = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
         }
     }
-    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(20.dp), Palette.Surface) {
-        Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(
-                    if (isDefault) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
-                    null,
-                    tint = if (isDefault) Palette.Success else Palette.TextSecondary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Text(
-                    stringResource(if (isDefault) R.string.default_assistant_on else R.string.default_assistant_off),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Palette.TextPrimary,
-                )
-            }
-            Text(stringResource(R.string.default_assistant_detail), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+    // Plain content in the Assistant section: a card inside the section's pane stacked two tints
+    // under this text and brought it down to 4.5:1.
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(
+                if (isDefault) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
+                null,
+                tint = if (isDefault) Palette.Success else Palette.TextSecondary,
+                modifier = Modifier.size(22.dp),
+            )
             Text(
-                stringResource(R.string.open_assistant_settings),
-                style = MaterialTheme.typography.labelLarge,
-                color = Palette.Link,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable {
-                        val intents = listOf(
-                            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
-                            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
-                            Intent(Settings.ACTION_SETTINGS),
-                        )
-                        for (intent in intents) {
-                            try {
-                                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                break
-                            } catch (_: ActivityNotFoundException) {
-                                continue
-                            }
-                        }
-                    }
-                    .padding(vertical = 6.dp),
+                stringResource(if (isDefault) R.string.default_assistant_on else R.string.default_assistant_off),
+                style = MaterialTheme.typography.titleMedium,
+                color = Palette.TextPrimary,
             )
         }
+        Text(stringResource(R.string.default_assistant_detail), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+        Text(
+            stringResource(R.string.open_assistant_settings),
+            style = MaterialTheme.typography.labelLarge,
+            color = Palette.Link,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    val intents = listOf(
+                        Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+                        Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+                        Intent(Settings.ACTION_SETTINGS),
+                    )
+                    for (intent in intents) {
+                        try {
+                            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                            break
+                        } catch (_: ActivityNotFoundException) {
+                            continue
+                        }
+                    }
+                }
+                .padding(vertical = 6.dp),
+        )
     }
 }
 
-/** A titled pane of glass holding one group of settings. */
+/** A titled pane holding one group of settings. Nothing moves behind it, so it's a quiet fill, not glass. */
 @Composable
 private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
     Column(Modifier.padding(top = 6.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Text(title, style = MaterialTheme.typography.titleSmall, color = Palette.Link, modifier = Modifier.padding(start = 6.dp))
-        GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(26.dp), Palette.Surface) {
-            Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(12.dp), content = content)
-        }
+        Column(
+            Modifier
+                .fillMaxWidth()
+                .pane(RoundedCornerShape(26.dp), Palette.Surface, outline = Palette.Hairline)
+                .padding(horizontal = 18.dp, vertical = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+            content = content,
+        )
     }
 }
 

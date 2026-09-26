@@ -42,6 +42,8 @@ data class AppSettings(
     val listenOnInvoke: Boolean = true,
     val speakReplies: Boolean = true,
     val showAllChannels: Boolean = false,
+    /** Solid panels instead of frosted glass (see LocalReduceTransparency). */
+    val reduceTransparency: Boolean = false,
     val speechLanguage: String = "",
     /** Default for chats started in the app. */
     val model: ModelChoice = ModelChoice(),
@@ -86,6 +88,7 @@ class SettingsRepository(private val context: Context) {
         val listenOnInvoke = booleanPreferencesKey("listen_on_invoke")
         val speakReplies = booleanPreferencesKey("speak_replies")
         val showAllChannels = booleanPreferencesKey("show_all_channels")
+        val reduceTransparency = booleanPreferencesKey("reduce_transparency")
         val speechLanguage = stringPreferencesKey("speech_language")
         val chatsModel = ModelKeys("")
         val assistantModel = ModelKeys("fast_")
@@ -120,6 +123,7 @@ class SettingsRepository(private val context: Context) {
         listenOnInvoke = this[Keys.listenOnInvoke] ?: true,
         speakReplies = this[Keys.speakReplies] ?: true,
         showAllChannels = this[Keys.showAllChannels] ?: false,
+        reduceTransparency = this[Keys.reduceTransparency] ?: false,
         speechLanguage = this[Keys.speechLanguage].orEmpty(),
         model = readModel(Keys.chatsModel, ReasoningMode.Default),
         fastModel = readModel(Keys.assistantModel, ReasoningMode.Fast),
@@ -158,6 +162,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setListenOnInvoke(value: Boolean) = context.dataStore.edit { it[Keys.listenOnInvoke] = value }
     suspend fun setSpeakReplies(value: Boolean) = context.dataStore.edit { it[Keys.speakReplies] = value }
     suspend fun setShowAllChannels(value: Boolean) = context.dataStore.edit { it[Keys.showAllChannels] = value }
+    suspend fun setReduceTransparency(value: Boolean) = context.dataStore.edit { it[Keys.reduceTransparency] = value }
     suspend fun setSpeechLanguage(value: String) = context.dataStore.edit { it[Keys.speechLanguage] = value.trim() }
     suspend fun setTtsEngine(value: TtsEngine) = context.dataStore.edit { it[Keys.ttsEngine] = value.name }
     suspend fun setKokoroVoice(value: String) = context.dataStore.edit { it[Keys.kokoroVoice] = value }

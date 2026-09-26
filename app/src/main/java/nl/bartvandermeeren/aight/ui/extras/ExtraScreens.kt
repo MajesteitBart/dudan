@@ -58,9 +58,8 @@ import nl.bartvandermeeren.aight.data.JobInfo
 import nl.bartvandermeeren.aight.data.SkillInfo
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.components.GlassBackdrop
-import nl.bartvandermeeren.aight.ui.components.GlassSurface
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
-import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 @Composable
@@ -78,7 +77,7 @@ private fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable 
                     Icons.AutoMirrored.Rounded.ArrowBack,
                     stringResource(R.string.action_back),
                     onClick = onBack,
-                    modifier = Modifier.glass(CircleShape, Palette.Surface),
+                    modifier = Modifier.pane(CircleShape, Palette.Surface),
                     size = 44.dp,
                     iconSize = 24.dp,
                 )
@@ -93,10 +92,10 @@ private fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable 
     }
 }
 
-/** A pane of glass in a list, inset from the screen edges. */
+/** A quiet pane in a list, inset from the screen edges. */
 private fun Modifier.listCard(shape: Shape = RoundedCornerShape(22.dp)) = fillMaxWidth()
     .padding(horizontal = 16.dp)
-    .glass(shape, Palette.Surface)
+    .pane(shape, Palette.Surface)
 
 @Composable
 fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
@@ -113,7 +112,7 @@ fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
         title = null,
         onBack = onBack,
         header = {
-            GlassSurface(Modifier.fillMaxWidth(), CircleShape, Palette.Surface) {
+            Box(Modifier.fillMaxWidth().pane(CircleShape, Palette.Surface, outline = Palette.Hairline)) {
                 Row(Modifier.padding(horizontal = 18.dp, vertical = 12.dp), verticalAlignment = Alignment.CenterVertically) {
                     Icon(Icons.Rounded.Search, null, tint = Palette.TextSecondary, modifier = Modifier.size(22.dp))
                     Spacer(Modifier.size(12.dp))
@@ -197,7 +196,7 @@ fun SkillsScreen(vm: MainViewModel, onBack: () -> Unit) {
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
                     )
                 }
-                // One pane of glass per category, its skills separated by hairlines.
+                // One pane per category, its skills separated by hairlines.
                 grouped.forEach { (category, list) ->
                     item(key = "c_$category") {
                         Text(
@@ -303,7 +302,7 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
 private fun JobButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Row(
         Modifier
-            .glass(CircleShape, Palette.Card)
+            .pane(CircleShape, Palette.Card)
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,

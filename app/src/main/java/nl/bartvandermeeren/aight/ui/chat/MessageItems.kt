@@ -72,17 +72,16 @@ import nl.bartvandermeeren.aight.chat.Step
 import nl.bartvandermeeren.aight.chat.StepKind
 import nl.bartvandermeeren.aight.chat.UiMessage
 import nl.bartvandermeeren.aight.data.ApprovalRequest
-import nl.bartvandermeeren.aight.ui.components.GlassSurface
 import nl.bartvandermeeren.aight.ui.components.Markdown
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.copyToClipboard
-import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.components.rememberImageBitmap
 import nl.bartvandermeeren.aight.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
-/** A bubble of violet glass, its tail corner toward the edge the user writes from. */
+/** A violet bubble, its tail corner toward the edge the user writes from. */
 private val UserBubbleShape = RoundedCornerShape(topStart = 26.dp, topEnd = 26.dp, bottomEnd = 8.dp, bottomStart = 26.dp)
 
 @Composable
@@ -102,7 +101,7 @@ fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
         if (message.text.isNotBlank()) {
             var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
             val long = message.text.length > 420 || message.text.count { it == '\n' } > 6
-            Box(Modifier.glass(UserBubbleShape, Palette.UserBubble)) {
+            Box(Modifier.pane(UserBubbleShape, Palette.UserBubble)) {
                 Box(Modifier.animateContentSize()) {
                     SelectionContainer {
                         Text(
@@ -122,7 +121,7 @@ fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
                                 .align(Alignment.BottomEnd)
                                 .padding(8.dp)
                                 .size(36.dp)
-                                .glass(CircleShape, Palette.Card)
+                                .pane(CircleShape, Palette.Card)
                                 .clickable { expanded = !expanded },
                             contentAlignment = Alignment.Center,
                         ) {
@@ -146,7 +145,7 @@ private fun MessageImage(ref: ImageRef) {
         Modifier
             .sizeIn(maxWidth = 200.dp, maxHeight = 200.dp)
             .size(168.dp)
-            .glass(RoundedCornerShape(24.dp), Palette.Card),
+            .pane(RoundedCornerShape(24.dp), Palette.Card),
     ) {
         image?.let { Image(it, contentDescription = null, contentScale = ContentScale.Crop, modifier = Modifier.size(168.dp)) }
     }
@@ -272,10 +271,10 @@ private fun WorkPanel(message: UiMessage) {
             .animateContentSize(),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        // A glass capsule with the status; tapping it opens the steps on a pane below.
+        // A capsule with the status; tapping it opens the steps on a pane below.
         Row(
             Modifier
-                .glass(CircleShape, Palette.Surface)
+                .pane(CircleShape, Palette.Surface)
                 .clickable { expanded = !expanded }
                 .padding(start = 12.dp, end = 10.dp, top = 8.dp, bottom = 8.dp),
             verticalAlignment = Alignment.CenterVertically,
@@ -308,7 +307,7 @@ private fun WorkPanel(message: UiMessage) {
             Column(
                 Modifier
                     .fillMaxWidth()
-                    .glass(RoundedCornerShape(22.dp), Palette.Surface)
+                    .pane(RoundedCornerShape(22.dp), Palette.Surface)
                     .padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(12.dp),
             ) {
@@ -383,7 +382,9 @@ private fun StepRow(
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
-    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp), Palette.WarningGlass) {
+    // Content, not chrome: a flat amber pane with an amber hairline, so it stands out from the reply.
+    val shape = RoundedCornerShape(24.dp)
+    Box(Modifier.fillMaxWidth().pane(shape, Palette.WarningPane, outline = Palette.SparkAmber.copy(alpha = 0.35f))) {
         Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
                 Icon(Icons.Outlined.Shield, contentDescription = null, tint = Palette.SparkAmber, modifier = Modifier.size(22.dp))
@@ -393,7 +394,7 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                 Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
             }
             request.command?.takeIf { it.isNotBlank() }?.let {
-                GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(14.dp), Palette.Code) {
+                Box(Modifier.fillMaxWidth().pane(RoundedCornerShape(14.dp), Palette.Code)) {
                     Text(
                         it,
                         fontFamily = GoogleSansCode,
@@ -412,7 +413,7 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                     val deny = choice == "deny"
                     Box(
                         Modifier
-                            .glass(CircleShape, if (deny) Palette.Surface else Palette.Button)
+                            .pane(CircleShape, if (deny) Palette.Surface else Palette.Button)
                             .clickable(enabled = request.pendingChoice == null) { onChoice(choice) },
                     ) {
                         Row(
@@ -445,7 +446,7 @@ private fun approvalLabel(choice: String) = when (choice) {
 
 @Composable
 private fun ErrorRow(message: String, onRetry: (() -> Unit)?) {
-    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(18.dp), Palette.DangerGlass) {
+    Box(Modifier.fillMaxWidth().pane(RoundedCornerShape(18.dp), Palette.DangerPane, outline = Palette.Danger.copy(alpha = 0.3f))) {
         Row(
             Modifier.padding(horizontal = 16.dp, vertical = 12.dp),
             verticalAlignment = Alignment.CenterVertically,

@@ -47,7 +47,9 @@ import nl.bartvandermeeren.aight.data.ReasoningMode
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.components.BlurBehindWindow
 import nl.bartvandermeeren.aight.ui.components.GlassDefaults
-import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.pane
+import nl.bartvandermeeren.aight.ui.components.windowGlass
+import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -58,11 +60,12 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
     var profile by remember { mutableStateOf(initialProfile) }
     val selected = settings.modelFor(profile)
     val shape = RoundedCornerShape(topStart = 32.dp, topEnd = 32.dp)
+    val edge = if (LocalReduceTransparency.current) GlassDefaults.SolidBorder else GlassDefaults.Border
     ModalBottomSheet(
         onDismissRequest = onDismiss,
         sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true),
         shape = shape,
-        containerColor = Palette.Sheet,
+        containerColor = windowGlass(Palette.Sheet, Palette.SheetSolid),
         scrimColor = Palette.BackdropEdge.copy(alpha = 0.45f),
         // The content draws the lit edge, so it also takes the handle and the navigation bar inset;
         // otherwise the edge would stop short of both.
@@ -70,7 +73,7 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
         contentWindowInsets = { WindowInsets(0) },
     ) {
         BlurBehindWindow()
-        Column(Modifier.border(GlassDefaults.Border, shape).navigationBarsPadding().padding(bottom = 12.dp)) {
+        Column(Modifier.border(edge, shape).navigationBarsPadding().padding(bottom = 12.dp)) {
             BottomSheetDefaults.DragHandle(Modifier.align(Alignment.CenterHorizontally))
             // Two defaults: regular chats, and quick chats started from the assistant.
             Row(Modifier.padding(horizontal = 20.dp), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -158,12 +161,12 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
     }
 }
 
-/** A glass toggle chip; the active one takes the orb's violet. */
+/** A toggle chip; the active one takes the orb's violet. */
 @Composable
 fun Pill(label: String, active: Boolean, onClick: () -> Unit) {
     Box(
         Modifier
-            .glass(CircleShape, if (active) Palette.Button else Palette.Surface)
+            .pane(CircleShape, if (active) Palette.Button else Palette.Surface)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 10.dp),
     ) {
@@ -177,7 +180,7 @@ private fun ModelRow(title: String, subtitle: String?, selected: Boolean, onClic
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 12.dp)
-            .then(if (selected) Modifier.glass(RoundedCornerShape(20.dp), Palette.Surface) else Modifier.clip(RoundedCornerShape(20.dp)))
+            .then(if (selected) Modifier.pane(RoundedCornerShape(20.dp), Palette.Surface) else Modifier.clip(RoundedCornerShape(20.dp)))
             .clickable(onClick = onClick)
             .padding(horizontal = 16.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,

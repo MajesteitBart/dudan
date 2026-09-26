@@ -96,7 +96,7 @@ private val markdownParser: Parser = Parser.builder()
 
 private fun Node.children(): List<Node> = generateSequence(firstChild) { it.next }.toList()
 
-/** Renders agent markdown with roomy paragraphs, code on dark glass and tables in a glass frame. */
+/** Renders agent markdown with roomy paragraphs, code on a dark pane and tables in a hairline frame. */
 @Composable
 fun Markdown(text: String, modifier: Modifier = Modifier, style: TextStyle = MaterialTheme.typography.bodyLarge) {
     val document = remember(text) { markdownParser.parse(text) }
@@ -213,7 +213,7 @@ fun CodeBlock(language: String?, code: String) {
             copied = false
         }
     }
-    GlassSurface(Modifier.fillMaxWidth(), RoundedCornerShape(24.dp), Palette.Code) {
+    Box(Modifier.fillMaxWidth().pane(RoundedCornerShape(24.dp), Palette.Code, outline = Palette.Hairline)) {
         Column {
             Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 Text(language ?: "code", style = MaterialTheme.typography.labelLarge, color = Palette.TextPrimary)
@@ -260,7 +260,7 @@ private fun TableView(node: TableBlock, style: TextStyle) {
     Box(
         Modifier
             .horizontalScroll(rememberScrollState())
-            .glass(RoundedCornerShape(16.dp), Palette.Disabled),
+            .pane(RoundedCornerShape(16.dp), Color.Transparent, outline = Palette.Outline),
     ) {
         Layout(
             content = {

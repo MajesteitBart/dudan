@@ -175,7 +175,7 @@ fun ChatPane(
                     Avatar(settings.userName.ifBlank { "?" }, size = 44.dp, ring = false)
                 }
             } else {
-                Row(Modifier.glass(CircleShape, Palette.Surface, LocalHazeState.current)) {
+                Row(Modifier.glass(CircleShape)) {
                     PlainIconButton(AightIcons.NewChat, stringResource(R.string.new_chat), onClick = vm::newChat, size = 44.dp, iconSize = 24.dp)
                     ConversationMenu(vm, sessions.items.firstOrNull { it.id == conversation.sessionId })
                 }
@@ -253,7 +253,7 @@ private fun TopBar(
                 AightIcons.Menu,
                 stringResource(R.string.action_open_sidebar),
                 onClick = onMenu,
-                modifier = Modifier.glass(CircleShape, Palette.Surface, haze),
+                modifier = Modifier.glass(CircleShape),
                 size = 44.dp,
                 iconSize = 24.dp,
             )
@@ -263,7 +263,7 @@ private fun TopBar(
             Row(
                 Modifier
                     .height(44.dp)
-                    .glass(CircleShape, Palette.Surface, haze)
+                    .glass(CircleShape)
                     .clickable(onClick = onModelClick)
                     .padding(start = 18.dp, end = 12.dp),
                 verticalAlignment = Alignment.CenterVertically,
@@ -391,7 +391,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
             Box(
                 Modifier
                     .size(44.dp)
-                    .glass(CircleShape, Palette.Card, haze)
+                    .glass(CircleShape)
                     .clickable { follow = true },
                 contentAlignment = Alignment.Center,
             ) {
