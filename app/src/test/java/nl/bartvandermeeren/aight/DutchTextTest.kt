@@ -60,6 +60,10 @@ class DutchTextTest {
     fun aLeadingMinusIsSpoken() {
         assertEquals("Vannacht wordt het min vijf graden.", DutchText.normalize("Vannacht wordt het -5°C."))
         assertEquals("Een daling van min twee komma vijf procent.", DutchText.normalize("Een daling van -2,5%."))
+        assertEquals(
+            "Saldo min twaalf euro vijftig, of min drie euro.",
+            DutchText.normalize("Saldo -€12,50, of €-3."),
+        )
         // Hyphens between digits or after a letter are ranges, dates and names, not signs.
         assertEquals("Tien tot twaalf, of COVID-negentien.", DutchText.normalize("10-12, of COVID-19.").replaceFirstChar { it.uppercase() })
     }

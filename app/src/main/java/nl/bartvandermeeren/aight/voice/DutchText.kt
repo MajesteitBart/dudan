@@ -9,6 +9,9 @@ object DutchText {
     fun normalize(text: String): String {
         var s = abbreviations(text)
         // A sign before a number ("-5°C"); a hyphen after a digit or letter is a range, date or name.
+        // With money the sign can sit on either side of the currency ("-€12,50", "€-12,50").
+        s = s.replace(minusBeforeCurrency, "min $1")
+        s = s.replace(minusAfterCurrency, "min $1")
         s = s.replace(minus, "min ")
         s = s.replace(phone) { m -> m.value.filter { it.isDigit() || it == '+' }.map { if (it == '+') "plus" else number(it.digitToInt().toLong()) }.joinToString(" ") }
         s = s.replace(isoDate) { date(it.groupValues[3], it.groupValues[2], it.groupValues[1]) ?: it.value }
@@ -117,6 +120,8 @@ object DutchText {
     private const val AMOUNT = "(\\d{1,3}(?:\\.\\d{3})+|\\d+)"
 
     private val minus = Regex("(?<![\\p{L}\\p{N}])[-−](?=\\d)")
+    private val minusBeforeCurrency = Regex("(?<![\\p{L}\\p{N}])[-−] ?([€$])(?= ?\\d)")
+    private val minusAfterCurrency = Regex("([€$]) ?[-−](?=\\d)")
     private val phone = Regex("(?<![\\d\\p{L}])(?:\\+31[ -]?\\d{1,3}|0\\d{1,3})[ -]?\\d{6,8}(?!\\d)")
     private val isoDate = Regex("(?<!\\d)(\\d{4})-(\\d{2})-(\\d{2})(?!\\d)")
     private val date = Regex("(?<!\\d)(\\d{1,2})[-/](\\d{1,2})[-/](\\d{4})(?!\\d)")
