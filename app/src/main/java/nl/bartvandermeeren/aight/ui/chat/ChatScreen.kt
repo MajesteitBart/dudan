@@ -114,7 +114,7 @@ fun ChatPane(
     val speakingId by vm.speaker.speakingId.collectAsStateWithLifecycle()
     val catalog by vm.modelCatalog.collectAsStateWithLifecycle()
     val messages = conversation.messages
-    val empty = messages.isEmpty() && !conversation.loading
+    val empty = conversation.showGreeting
     var showModelPicker by remember { mutableStateOf(false) }
     var showAddMenu by remember { mutableStateOf(false) }
     val profile = ChatEngine.profileOf(conversation.sessionId)

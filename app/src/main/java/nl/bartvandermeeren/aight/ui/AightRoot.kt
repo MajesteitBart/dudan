@@ -61,7 +61,7 @@ fun AightRoot(vm: MainViewModel) {
     val settingsState by vm.settings.collectAsStateWithLifecycle()
     val conversation by vm.conversation.collectAsStateWithLifecycle()
     val haze = rememberHazeState()
-    val emptyChat = vm.screen == Screen.Chat && conversation.messages.isEmpty() && !conversation.loading
+    val emptyChat = vm.screen == Screen.Chat && conversation.showGreeting
     Box(Modifier.fillMaxSize()) {
         GlassBackdrop(
             Modifier.hazeSource(haze),

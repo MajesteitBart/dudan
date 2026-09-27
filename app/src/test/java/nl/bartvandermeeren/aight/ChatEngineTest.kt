@@ -28,6 +28,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -87,6 +88,30 @@ class ChatEngineTest {
             val flow = withContext(dispatcher) { engine.conversation(id) }
             flow.first { c: Conversation -> c.messages.lastOrNull()?.let { !it.isStreaming } == true }.messages.last()
         }
+    }
+
+    @Test
+    fun failedHistoryLoadKeepsTheErrorVisibleUntilRetrySucceeds() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(500).setBody("""{"error":{"message":"History unavailable"}}"""))
+        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+
+        val flow = withContext(dispatcher) {
+            engine.load("existing_session")
+            engine.conversation("existing_session").also { assertFalse(it.value.showGreeting) }
+        }
+        val failed = withTimeout(5_000) { flow.first { it.loadError != null } }
+        assertFalse(failed.loading)
+        assertTrue(failed.messages.isEmpty())
+        assertFalse(failed.showGreeting)
+
+        withContext(dispatcher) {
+            engine.load("existing_session", force = true)
+            assertFalse(flow.value.showGreeting)
+        }
+        val recovered = withTimeout(5_000) { flow.first { it.loaded } }
+        assertEquals(null, recovered.loadError)
+        assertTrue(recovered.showGreeting)
+        assertEquals(2, server.requestCount)
     }
 
     @Test
