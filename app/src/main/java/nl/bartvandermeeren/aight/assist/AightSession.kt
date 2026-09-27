@@ -28,7 +28,9 @@ import kotlinx.coroutines.cancel
 import nl.bartvandermeeren.aight.MainActivity
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.appContainer
+import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.AightTheme
+import nl.bartvandermeeren.aight.ui.theme.Sky
 
 /**
  * The overlay Android shows when the user invokes the assistant (long-press power or home, corner
@@ -55,6 +57,7 @@ class AightSession(context: Context) :
         scope = scope,
         openInApp = ::openInApp,
         dismiss = { hide() },
+        setBackdropBlur = ::setBackdropBlur,
     )
 
     init {
@@ -85,7 +88,11 @@ class AightSession(context: Context) :
         setViewTreeViewModelStoreOwner(this@AightSession)
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this@AightSession))
         setContent {
-            AightTheme {
+            AightTheme(
+                reduceTransparency = state.settings?.reduceTransparency == true,
+                accent = Accent.from(state.settings?.accent),
+                sky = Sky.from(state.settings?.sky),
+            ) {
                 AssistOverlay(state)
             }
         }
@@ -117,6 +124,27 @@ class AightSession(context: Context) :
         store.clear()
         scope.cancel()
         super.onDestroy()
+    }
+
+    /**
+     * Frosts the app underneath so the overlay's panels float over it, or turns that off for Reduce
+     * transparency. Phones without cross-window blur ignore the flag; the overlay then draws its
+     * panels solid (see windowGlass).
+     */
+    private fun setBackdropBlur(on: Boolean) {
+        val w = window.window ?: return
+        if (on) w.addFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND) else w.clearFlags(WindowManager.LayoutParams.FLAG_BLUR_BEHIND)
+        w.attributes = w.attributes.apply {
+            blurBehindRadius = if (on) (OVERLAY_BLUR_DP * context.resources.displayMetrics.density).toInt() else 0
+        }
+    }
+
+    private companion object {
+        /**
+         * Any app can sit behind the overlay: photos, video, dense text. NN/g's glassmorphism guidance
+         * asks for enough blur that the background stays visible but not identifiable.
+         */
+        const val OVERLAY_BLUR_DP = 28
     }
 
     private fun openInApp(sessionId: String?, mode: OpenMode) {

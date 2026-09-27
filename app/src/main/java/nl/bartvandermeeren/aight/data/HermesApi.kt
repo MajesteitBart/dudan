@@ -188,11 +188,12 @@ class HermesApi(
             put("model", model.model)
             if (!model.provider.isNullOrBlank()) put("provider", model.provider)
         }
-        when (model.reasoning) {
-            ReasoningMode.Default -> Unit
-            ReasoningMode.Fast -> put("model_options", buildJsonObject { put("reasoning_effort", "low") })
-            ReasoningMode.Extended -> put("model_options", buildJsonObject { put("reasoning_effort", "high") })
+        // Two separate Hermes options: how long the model thinks, and priority processing.
+        val options = buildJsonObject {
+            model.effort?.let { put("reasoning_effort", it.wire) }
+            if (model.fast) put("fast", true)
         }
+        if (options.isNotEmpty()) put("model_options", options)
     }
 
     private suspend fun request(vararg segments: String, query: Map<String, String?> = emptyMap()): Request.Builder {
@@ -313,6 +314,8 @@ internal object ModelCatalogParser {
             if (!usable) continue
             val name = p.str("name") ?: p.str("label") ?: slug
             val models = p["models"].asArray() ?: continue
+            // {"gpt-6-luna": {"fast": true, "reasoning": true}, ...}
+            val capabilities = p["capabilities"].asObject()
             for (m in models) {
                 val (id, label) = when (m) {
                     is JsonPrimitive -> (m.contentOrNull ?: continue).let { it to it }
@@ -323,7 +326,8 @@ internal object ModelCatalogParser {
                     else -> continue
                 }
                 val isCurrent = slug.equals(currentProvider, ignoreCase = true) && id == currentModel
-                options += ModelOption(slug, name, id, label, isCurrent)
+                val caps = capabilities?.get(id).asObject()
+                options += ModelOption(slug, name, id, label, isCurrent, reasoning = caps?.bool("reasoning"), fast = caps?.bool("fast"))
             }
         }
         return ModelCatalog(currentProvider, currentModel, options)

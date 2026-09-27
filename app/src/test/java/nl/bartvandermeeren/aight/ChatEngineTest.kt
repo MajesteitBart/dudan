@@ -20,7 +20,7 @@ import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.ModelChoice
 import nl.bartvandermeeren.aight.data.ModelProfile
-import nl.bartvandermeeren.aight.data.ReasoningMode
+import nl.bartvandermeeren.aight.data.ReasoningEffort
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -28,6 +28,7 @@ import okhttp3.mockwebserver.MockWebServer
 import okhttp3.mockwebserver.RecordedRequest
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
@@ -90,10 +91,34 @@ class ChatEngineTest {
     }
 
     @Test
+    fun failedHistoryLoadKeepsTheErrorVisibleUntilRetrySucceeds() = runBlocking {
+        server.enqueue(MockResponse().setResponseCode(500).setBody("""{"error":{"message":"History unavailable"}}"""))
+        server.enqueue(MockResponse().setBody("""{"data":[]}"""))
+
+        val flow = withContext(dispatcher) {
+            engine.load("existing_session")
+            engine.conversation("existing_session").also { assertFalse(it.value.showGreeting) }
+        }
+        val failed = withTimeout(5_000) { flow.first { it.loadError != null } }
+        assertFalse(failed.loading)
+        assertTrue(failed.messages.isEmpty())
+        assertFalse(failed.showGreeting)
+
+        withContext(dispatcher) {
+            engine.load("existing_session", force = true)
+            assertFalse(flow.value.showGreeting)
+        }
+        val recovered = withTimeout(5_000) { flow.first { it.loaded } }
+        assertEquals(null, recovered.loadError)
+        assertTrue(recovered.showGreeting)
+        assertEquals(2, server.requestCount)
+    }
+
+    @Test
     fun assistantChatsRunOnTheFastModelAndOtherChatsOnTheNormalOne() {
         settings = settings.copy(
             model = ModelChoice("anthropic", "big-model"),
-            fastModel = ModelChoice("openrouter", "small-model", reasoning = ReasoningMode.Fast),
+            assistantModel = ModelChoice("openrouter", "small-model", effort = ReasoningEffort.Low),
         )
         val runs = CopyOnWriteArrayList<String>()
         script { request ->
@@ -108,8 +133,8 @@ class ChatEngineTest {
         }
         sendAndSettle("Wat staat er vandaag in mijn agenda?", ModelProfile.Assistant)
         sendAndSettle("Help me met een langer plan")
-        assertTrue(runs[0], runs[0].contains(""""model":"small-model"""") && runs[0].contains(""""reasoning_effort":"low""""))
-        assertTrue(runs[1], runs[1].contains(""""model":"big-model"""") && !runs[1].contains("reasoning_effort"))
+        assertTrue(runs[0], runs[0].contains(""""model":"small-model"""") && runs[0].contains(""""reasoning_effort":"low"""") && !runs[0].contains("fast"))
+        assertTrue(runs[1], runs[1].contains(""""model":"big-model"""") && !runs[1].contains("model_options"))
         assertEquals(ModelProfile.Assistant, ChatEngine.profileOf(runs[0].substringAfter(""""session_id":"""").substringBefore('"')))
     }
 

@@ -12,6 +12,8 @@ okhttp = "4.12.0"
 commonmark = "0.24.0"
 junit = "4.13.2"
 commons-compress = "1.28.0"
+# 1.7.2 is the last Haze on Compose 1.10; 1.7.3 and 2.x pull in Compose 1.12.
+haze = "1.7.2"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
@@ -39,6 +41,7 @@ commonmark-ext-gfm-strikethrough = { module = "org.commonmark:commonmark-ext-gfm
 commonmark-ext-autolink = { module = "org.commonmark:commonmark-ext-autolink", version.ref = "commonmark" }
 junit = { module = "junit:junit", version.ref = "junit" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
+haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

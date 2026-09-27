@@ -192,7 +192,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch {
             modelCatalogError.value = null
             try {
-                modelCatalog.value = api.modelOptions()
+                val catalog = api.modelOptions()
+                modelCatalog.value = catalog
+                // Drop a thinking level or fast mode the model doesn't take, for instance after Hermes'
+                // default model changed, so what the app shows is what it sends.
+                val current = settings.value ?: return@launch
+                ModelProfile.entries.forEach { profile ->
+                    val choice = current.modelFor(profile)
+                    val supported = catalog.supported(choice)
+                    if (supported != choice) container.settings.setModel(profile, supported)
+                }
             } catch (e: Exception) {
                 modelCatalogError.value = e.userMessage()
             }

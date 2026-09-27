@@ -7,10 +7,14 @@ import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +27,9 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
@@ -31,10 +38,10 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
-import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
@@ -42,9 +49,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Surface
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -57,9 +61,14 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -76,16 +85,25 @@ import nl.bartvandermeeren.aight.chat.userMessage
 import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.ModelProfile
-import nl.bartvandermeeren.aight.data.ReasoningMode
 import nl.bartvandermeeren.aight.data.DutchTtsEngine
 import nl.bartvandermeeren.aight.data.SttEngine
 import nl.bartvandermeeren.aight.data.TtsEngine
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.chat.ModelPickerSheet
-import nl.bartvandermeeren.aight.ui.chat.Pill
+import nl.bartvandermeeren.aight.ui.chat.modelModeLabel
 import nl.bartvandermeeren.aight.ui.chat.prettyModelName
 import nl.bartvandermeeren.aight.ui.components.AightMark
+import nl.bartvandermeeren.aight.ui.components.CtaButton
+import nl.bartvandermeeren.aight.ui.components.Segmented
+import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
+import nl.bartvandermeeren.aight.ui.components.PlainIconButton
+import nl.bartvandermeeren.aight.ui.components.Toggle
+import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.outlined
+import nl.bartvandermeeren.aight.ui.theme.Accent
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
+import nl.bartvandermeeren.aight.ui.theme.Sky
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.KokoroVoice
 import nl.bartvandermeeren.aight.voice.SupertonicVoice
@@ -128,7 +146,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
         }
     }
 
-    Box(Modifier.fillMaxSize().background(Palette.Background), contentAlignment = Alignment.TopCenter) {
+    Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(
             Modifier
                 .widthIn(max = 720.dp)
@@ -137,12 +155,21 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 .navigationBarsPadding()
                 .imePadding()
                 .verticalScroll(rememberScrollState())
-                .padding(horizontal = 20.dp, vertical = 8.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             verticalArrangement = Arrangement.spacedBy(14.dp),
         ) {
-            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(56.dp)) {
+            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.height(64.dp)) {
                 if (onBack != null) {
-                    IconButton(onClick = onBack) { Icon(Icons.AutoMirrored.Rounded.ArrowBack, stringResource(R.string.action_back), tint = Palette.Icon) }
+                    PlainIconButton(
+                        Icons.AutoMirrored.Rounded.ArrowBack,
+                        stringResource(R.string.action_back),
+                        onClick = onBack,
+                        modifier = Modifier.outlined(CircleShape),
+                        size = 44.dp,
+                        iconSize = 24.dp,
+                    )
+                    Spacer(Modifier.size(14.dp))
+                } else {
                     Spacer(Modifier.size(4.dp))
                 }
                 Text(
@@ -152,94 +179,94 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 )
             }
             if (setupMode) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-                    AightMark(size = 36.dp)
+                Row(
+                    Modifier.padding(horizontal = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(14.dp),
+                ) {
+                    AightMark(size = 40.dp, halo = true)
                     Text(stringResource(R.string.setup_intro), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
                 }
             }
 
-            SectionTitle(stringResource(R.string.section_connection))
-            Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://clarkbox:8642", keyboard = KeyboardType.Uri)
-            if (isInsecureRemote(url)) Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
-            Field(
-                key, { key = it; test = TestState.Idle }, stringResource(R.string.api_key),
-                keyboard = KeyboardType.Password,
-                visual = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
-                trailing = {
-                    IconButton(onClick = { showKey = !showKey }) {
-                        Icon(if (showKey) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = Palette.TextSecondary)
-                    }
-                },
-            )
-            Field(name, { name = it }, stringResource(R.string.your_name))
-            Field(assistant, { assistant = it }, stringResource(R.string.assistant_name))
+            Section(stringResource(R.string.section_connection)) {
+                Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://clarkbox:8642", keyboard = KeyboardType.Uri)
+                if (isInsecureRemote(url)) Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
+                Field(
+                    key, { key = it; test = TestState.Idle }, stringResource(R.string.api_key),
+                    keyboard = KeyboardType.Password,
+                    visual = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
+                    trailing = {
+                        IconButton(onClick = { showKey = !showKey }) {
+                            Icon(if (showKey) Icons.Rounded.VisibilityOff else Icons.Rounded.Visibility, null, tint = Palette.TextSecondary)
+                        }
+                    },
+                )
+                Field(name, { name = it }, stringResource(R.string.your_name))
+                Field(assistant, { assistant = it }, stringResource(R.string.assistant_name))
 
-            Surface(
-                color = if (url.isNotBlank() && key.isNotBlank()) Palette.Button else Palette.Disabled,
-                shape = RoundedCornerShape(50),
-                modifier = Modifier
-                    .clip(RoundedCornerShape(50))
-                    .clickable(enabled = url.isNotBlank() && key.isNotBlank() && test != TestState.Testing) { connect() },
-            ) {
-                Row(Modifier.padding(horizontal = 24.dp, vertical = 14.dp), verticalAlignment = Alignment.CenterVertically) {
-                    if (test == TestState.Testing) {
-                        CircularProgressIndicator(strokeWidth = 2.dp, color = Color.White, modifier = Modifier.size(16.dp))
-                        Spacer(Modifier.size(10.dp))
-                    }
-                    Text(
-                        stringResource(if (setupMode) R.string.connect else R.string.save_and_test),
-                        style = MaterialTheme.typography.labelLarge,
-                        color = Palette.ButtonText,
-                    )
+                val canConnect = url.isNotBlank() && key.isNotBlank()
+                CtaButton(
+                    stringResource(if (setupMode) R.string.connect else R.string.save_and_test),
+                    onClick = ::connect,
+                    enabled = canConnect && test != TestState.Testing,
+                    modifier = Modifier.padding(top = 4.dp),
+                    busy = if (test == TestState.Testing) {
+                        { CircularProgressIndicator(strokeWidth = 2.dp, color = Color.White, modifier = Modifier.size(16.dp)) }
+                    } else {
+                        null
+                    },
+                )
+                when (val t = test) {
+                    is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
+                    is TestState.Failed -> Notice(stringResource(R.string.connection_failed, t.message), Palette.Danger, error = true)
+                    else -> Unit
                 }
-            }
-            when (val t = test) {
-                is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
-                is TestState.Failed -> Notice(stringResource(R.string.connection_failed, t.message), Palette.Danger, error = true)
-                else -> Unit
             }
 
             if (!setupMode) {
-                SectionTitle(stringResource(R.string.section_models))
-                ModelProfile.entries.forEach { profile -> ModelDefaultRow(vm, settings, profile) }
-
-                SectionTitle(stringResource(R.string.section_voice))
-                VoiceSettings(vm, settings)
-
-                SectionTitle(stringResource(R.string.section_dutch_voice))
-                DutchVoiceSettings(vm, settings)
-
-                SectionTitle(stringResource(R.string.section_speech_input))
-                SpeechInputSettings(vm, settings)
-
-                SectionTitle(stringResource(R.string.section_assistant))
-                DefaultAssistantCard()
-                Toggle(stringResource(R.string.listen_on_invoke), stringResource(R.string.listen_on_invoke_detail), settings.listenOnInvoke) {
-                    scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
+                Section(stringResource(R.string.section_models)) {
+                    ModelProfile.entries.forEach { profile -> ModelDefaultRow(vm, settings, profile) }
                 }
-                Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
-                    scope.launch { vm.settingsRepository.setSpeakReplies(it) }
-                }
-                Field(
-                    language,
-                    { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } },
-                    stringResource(R.string.speech_language),
-                    placeholder = stringResource(R.string.speech_language_hint),
-                )
+                Section(stringResource(R.string.section_voice)) { VoiceSettings(vm, settings) }
+                Section(stringResource(R.string.section_dutch_voice)) { DutchVoiceSettings(vm, settings) }
+                Section(stringResource(R.string.section_speech_input)) { SpeechInputSettings(vm, settings) }
 
-                SectionTitle(stringResource(R.string.section_history))
-                Toggle(stringResource(R.string.show_all_channels), stringResource(R.string.show_all_channels_detail), settings.showAllChannels) {
-                    scope.launch {
-                        vm.settingsRepository.setShowAllChannels(it)
-                        vm.refreshSessions()
+                Section(stringResource(R.string.section_assistant)) {
+                    DefaultAssistantStatus()
+                    Toggle(stringResource(R.string.listen_on_invoke), stringResource(R.string.listen_on_invoke_detail), settings.listenOnInvoke) {
+                        scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
+                    }
+                    Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
+                        scope.launch { vm.settingsRepository.setSpeakReplies(it) }
+                    }
+                    Field(
+                        language,
+                        { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } },
+                        stringResource(R.string.speech_language),
+                        placeholder = stringResource(R.string.speech_language_hint),
+                    )
+                }
+
+                Section(stringResource(R.string.section_appearance)) {
+                    SkyPicker(Sky.from(settings.sky)) { scope.launch { vm.settingsRepository.setSky(it.name) } }
+                    AccentPicker(Accent.from(settings.accent)) { scope.launch { vm.settingsRepository.setAccent(it.name) } }
+                    Toggle(stringResource(R.string.reduce_transparency), stringResource(R.string.reduce_transparency_detail), settings.reduceTransparency) {
+                        scope.launch { vm.settingsRepository.setReduceTransparency(it) }
                     }
                 }
-                Text(
-                    "aight ${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Palette.TextTertiary,
-                    modifier = Modifier.padding(top = 12.dp, bottom = 24.dp),
-                )
+
+                Section(stringResource(R.string.section_history)) {
+                    Toggle(stringResource(R.string.show_all_channels), stringResource(R.string.show_all_channels_detail), settings.showAllChannels) {
+                        scope.launch {
+                            vm.settingsRepository.setShowAllChannels(it)
+                            vm.refreshSessions()
+                        }
+                    }
+                    // Inside the card: on the bare lower sky this small print measured 1.7:1.
+                    Text("aight ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall, color = Palette.TextTertiary)
+                }
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -255,11 +282,7 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
         ?: choice.model?.let(::prettyModelName)
         ?: catalog?.currentModel?.let { stringResource(R.string.model_server_default_named, prettyModelName(it)) }
         ?: stringResource(R.string.model_default)
-    val mode = when (choice.reasoning) {
-        ReasoningMode.Default -> stringResource(R.string.reasoning_default)
-        ReasoningMode.Fast -> stringResource(R.string.reasoning_fast)
-        ReasoningMode.Extended -> stringResource(R.string.reasoning_extended)
-    }
+    val mode = modelModeLabel(choice)
     Row(
         Modifier
             .fillMaxWidth()
@@ -283,7 +306,7 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
                 color = Palette.TextSecondary,
             )
         }
-        Text("$name · $mode", style = MaterialTheme.typography.labelLarge, color = Palette.Link)
+        Text(if (mode.isEmpty()) name else "$name · $mode", style = MaterialTheme.typography.labelLarge, color = LocalAccent.current.soft)
     }
     if (picking) ModelPickerSheet(vm, settings, initialProfile = profile, onDismiss = { picking = false })
 }
@@ -293,14 +316,11 @@ private fun VoiceSettings(vm: MainViewModel, settings: AppSettings) {
     val scope = rememberCoroutineScope()
     val model = vm.kokoroModel
     val modelState by model.state.collectAsStateWithLifecycle()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.tts_kokoro), settings.ttsEngine == TtsEngine.Kokoro) {
-            scope.launch { vm.settingsRepository.setTtsEngine(TtsEngine.Kokoro) }
-        }
-        Pill(stringResource(R.string.tts_system), settings.ttsEngine == TtsEngine.System) {
-            scope.launch { vm.settingsRepository.setTtsEngine(TtsEngine.System) }
-        }
-    }
+    Segmented(
+        options = listOf(TtsEngine.Kokoro to stringResource(R.string.tts_kokoro), TtsEngine.System to stringResource(R.string.tts_system)),
+        selected = settings.ttsEngine,
+        onSelect = { scope.launch { vm.settingsRepository.setTtsEngine(it) } },
+    )
     if (settings.ttsEngine != TtsEngine.Kokoro) return
     Text(stringResource(R.string.tts_kokoro_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     ModelStatus(
@@ -321,14 +341,11 @@ private fun DutchVoiceSettings(vm: MainViewModel, settings: AppSettings) {
     val scope = rememberCoroutineScope()
     val model = vm.supertonicModel
     val modelState by model.state.collectAsStateWithLifecycle()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.tts_supertonic), settings.dutchTtsEngine == DutchTtsEngine.Supertonic) {
-            scope.launch { vm.settingsRepository.setDutchTtsEngine(DutchTtsEngine.Supertonic) }
-        }
-        Pill(stringResource(R.string.tts_system), settings.dutchTtsEngine == DutchTtsEngine.System) {
-            scope.launch { vm.settingsRepository.setDutchTtsEngine(DutchTtsEngine.System) }
-        }
-    }
+    Segmented(
+        options = listOf(DutchTtsEngine.Supertonic to stringResource(R.string.tts_supertonic), DutchTtsEngine.System to stringResource(R.string.tts_system)),
+        selected = settings.dutchTtsEngine,
+        onSelect = { scope.launch { vm.settingsRepository.setDutchTtsEngine(it) } },
+    )
     if (settings.dutchTtsEngine != DutchTtsEngine.Supertonic) return
     Text(stringResource(R.string.tts_supertonic_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     ModelStatus(
@@ -365,7 +382,7 @@ private fun VoicePicker(voices: List<Pair<String, String>>, selected: String, on
                     Text(current.second, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
                 }
             }
-            DropdownMenu(expanded = open, onDismissRequest = { open = false }, containerColor = Palette.Menu) {
+            GlassDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
                 voices.forEach { (id, label) ->
                     DropdownMenuItem(
                         text = { Text(label) },
@@ -384,14 +401,11 @@ private fun VoicePicker(voices: List<Pair<String, String>>, selected: String, on
 @Composable
 private fun SpeechInputSettings(vm: MainViewModel, settings: AppSettings) {
     val scope = rememberCoroutineScope()
-    Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-        Pill(stringResource(R.string.stt_orukeet), settings.sttEngine == SttEngine.Orukeet) {
-            scope.launch { vm.settingsRepository.setSttEngine(SttEngine.Orukeet) }
-        }
-        Pill(stringResource(R.string.stt_system), settings.sttEngine == SttEngine.System) {
-            scope.launch { vm.settingsRepository.setSttEngine(SttEngine.System) }
-        }
-    }
+    Segmented(
+        options = listOf(SttEngine.Orukeet to stringResource(R.string.stt_orukeet), SttEngine.System to stringResource(R.string.stt_system)),
+        selected = settings.sttEngine,
+        onSelect = { scope.launch { vm.settingsRepository.setSttEngine(it) } },
+    )
     if (settings.sttEngine != SttEngine.Orukeet) return
     Text(stringResource(R.string.stt_orukeet_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     ModelStatus(
@@ -422,7 +436,7 @@ private fun ModelStatus(model: ModelPackage, texts: ModelTexts) {
             )
             LinearProgressIndicator(
                 progress = { state.fraction },
-                color = Palette.Link,
+                color = LocalAccent.current.soft,
                 trackColor = Palette.Surface,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -444,7 +458,7 @@ private fun LinkAction(text: String, onClick: () -> Unit) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
-        color = Palette.Link,
+        color = LocalAccent.current.soft,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
@@ -453,7 +467,7 @@ private fun LinkAction(text: String, onClick: () -> Unit) {
 }
 
 @Composable
-private fun DefaultAssistantCard() {
+private fun DefaultAssistantStatus() {
     val context = LocalContext.current
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var isDefault by remember { mutableStateOf(false) }
@@ -462,52 +476,147 @@ private fun DefaultAssistantCard() {
             isDefault = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
         }
     }
-    Surface(color = Palette.Surface, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-        Column(Modifier.padding(20.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                Icon(
-                    if (isDefault) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
-                    null,
-                    tint = if (isDefault) Palette.Success else Palette.TextSecondary,
-                    modifier = Modifier.size(22.dp),
-                )
-                Text(
-                    stringResource(if (isDefault) R.string.default_assistant_on else R.string.default_assistant_off),
-                    style = MaterialTheme.typography.titleMedium,
-                    color = Palette.TextPrimary,
-                )
-            }
-            Text(stringResource(R.string.default_assistant_detail), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+    // Plain content in the Assistant section: a card inside the section's pane stacked two tints
+    // under this text and brought it down to 4.5:1.
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+            Icon(
+                if (isDefault) Icons.Outlined.CheckCircle else Icons.Outlined.Info,
+                null,
+                tint = if (isDefault) Palette.Success else Palette.TextSecondary,
+                modifier = Modifier.size(22.dp),
+            )
             Text(
-                stringResource(R.string.open_assistant_settings),
-                style = MaterialTheme.typography.labelLarge,
-                color = Palette.Link,
-                modifier = Modifier
-                    .clip(RoundedCornerShape(8.dp))
-                    .clickable {
-                        val intents = listOf(
-                            Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
-                            Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
-                            Intent(Settings.ACTION_SETTINGS),
-                        )
-                        for (intent in intents) {
-                            try {
-                                context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
-                                break
-                            } catch (_: ActivityNotFoundException) {
-                                continue
-                            }
+                stringResource(if (isDefault) R.string.default_assistant_on else R.string.default_assistant_off),
+                style = MaterialTheme.typography.titleMedium,
+                color = Palette.TextPrimary,
+            )
+        }
+        Text(stringResource(R.string.default_assistant_detail), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+        Text(
+            stringResource(R.string.open_assistant_settings),
+            style = MaterialTheme.typography.labelLarge,
+            color = LocalAccent.current.soft,
+            modifier = Modifier
+                .clip(RoundedCornerShape(8.dp))
+                .clickable {
+                    val intents = listOf(
+                        Intent(Settings.ACTION_VOICE_INPUT_SETTINGS),
+                        Intent(Settings.ACTION_MANAGE_DEFAULT_APPS_SETTINGS),
+                        Intent(Settings.ACTION_SETTINGS),
+                    )
+                    for (intent in intents) {
+                        try {
+                            context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK))
+                            break
+                        } catch (_: ActivityNotFoundException) {
+                            continue
                         }
                     }
-                    .padding(vertical = 6.dp),
-            )
+                }
+                .padding(vertical = 6.dp),
+        )
+    }
+}
+
+/** A setting's label with the chosen value's name beside it. */
+@Composable
+private fun PickerLabel(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+    }
+}
+
+/**
+ * A small sky per background, like a wallpaper picker, as a radio group of two rows of three. The
+ * chosen one wears a ring and a check.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SkyPicker(selected: Sky, onSelect: (Sky) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        PickerLabel(stringResource(R.string.background), stringResource(selected.label))
+        FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), maxItemsInEachRow = 3) {
+            Sky.entries.forEach { sky ->
+                val chosen = sky == selected
+                val name = stringResource(sky.label)
+                val shape = RoundedCornerShape(16.dp)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(18.dp))
+                        .selectable(selected = chosen, role = Role.RadioButton) { onSelect(sky) }
+                        .semantics(mergeDescendants = true) {},
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .then(if (chosen) Modifier.border(2.dp, Palette.TextPrimary, RoundedCornerShape(18.dp)) else Modifier)
+                            .padding(4.dp)
+                            .clip(shape)
+                            .background(Brush.verticalGradient(0f to sky.top, 0.45f to sky.mid, 1f to sky.horizon))
+                            .background(Brush.radialGradient(listOf(sky.glow.copy(alpha = 0.45f), Color.Transparent), center = Offset(0f, Float.POSITIVE_INFINITY)))
+                            .border(1.dp, Palette.Hairline, shape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (chosen) Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
+                    Text(name, style = MaterialTheme.typography.bodySmall, color = if (chosen) Palette.TextPrimary else Palette.TextSecondary, maxLines = 1)
+                }
+            }
         }
     }
 }
 
+/** A swatch per accent, as a radio group: the chosen one wears a ring and a check, and its name shows beside the label. */
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun SectionTitle(text: String) {
-    Text(text, style = MaterialTheme.typography.titleSmall, color = Palette.Link, modifier = Modifier.padding(top = 12.dp))
+private fun AccentPicker(selected: Accent, onSelect: (Accent) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        PickerLabel(stringResource(R.string.accent_color), stringResource(selected.label))
+        // Two rows of four, so the eight swatches never break unevenly on the narrow cover screen.
+        FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp), maxItemsInEachRow = 4) {
+            Accent.entries.forEach { accent ->
+                val chosen = accent == selected
+                val name = stringResource(accent.label)
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .selectable(selected = chosen, role = Role.RadioButton) { onSelect(accent) }
+                        .semantics { contentDescription = name }
+                        .then(if (chosen) Modifier.border(2.dp, accent.color, CircleShape) else Modifier)
+                        .padding(5.dp)
+                        .clip(CircleShape)
+                        .background(accent.color),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (chosen) Icon(Icons.Rounded.Check, contentDescription = null, tint = accent.on, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
+    }
+}
+
+/** A glass card on the sky holding one group of settings. */
+@Composable
+private fun Section(title: String, content: @Composable ColumnScope.() -> Unit) {
+    Column(
+        Modifier
+            .padding(top = 4.dp)
+            .fillMaxWidth()
+            .glass(RoundedCornerShape(24.dp))
+            .padding(horizontal = 18.dp, vertical = 16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp),
+    ) {
+        // The title sits inside the card, like "Team workspace" on Superhuman's document panel.
+        Text(title, style = MaterialTheme.typography.titleSmall, color = Palette.TextPrimary)
+        content()
+    }
 }
 
 @Composable
@@ -531,35 +640,16 @@ private fun Field(
         trailingIcon = trailing,
         shape = RoundedCornerShape(18.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Palette.Link,
+            focusedBorderColor = LocalAccent.current.color,
             unfocusedBorderColor = Palette.Outline,
-            focusedLabelColor = Palette.Link,
-            cursorColor = Palette.Link,
+            focusedLabelColor = Palette.TextPrimary,
+            unfocusedLabelColor = Palette.TextSecondary,
+            focusedContainerColor = Palette.Surface,
+            unfocusedContainerColor = Palette.Surface,
+            cursorColor = LocalAccent.current.soft,
         ),
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-@Composable
-private fun Toggle(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onChange(!checked) }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(checkedTrackColor = Palette.Button, checkedThumbColor = Palette.ButtonText),
-        )
-    }
 }
 
 @Composable

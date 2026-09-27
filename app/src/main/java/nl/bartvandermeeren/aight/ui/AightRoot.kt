@@ -15,13 +15,13 @@ import androidx.compose.animation.fadeOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
-import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -31,11 +31,14 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import dev.chrisbanes.haze.hazeSource
+import dev.chrisbanes.haze.rememberHazeState
 import java.io.File
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.data.HermesApi
@@ -43,28 +46,46 @@ import nl.bartvandermeeren.aight.ui.chat.ChatHostActions
 import nl.bartvandermeeren.aight.ui.chat.ChatPane
 import nl.bartvandermeeren.aight.ui.chat.Sidebar
 import nl.bartvandermeeren.aight.ui.chat.SidebarMode
+import nl.bartvandermeeren.aight.ui.components.GlassBackdrop
+import nl.bartvandermeeren.aight.ui.components.LocalHazeState
 import nl.bartvandermeeren.aight.ui.extras.JobsScreen
 import nl.bartvandermeeren.aight.ui.extras.SearchScreen
 import nl.bartvandermeeren.aight.ui.extras.SkillsScreen
 import nl.bartvandermeeren.aight.ui.live.LiveScreen
 import nl.bartvandermeeren.aight.ui.settings.SettingsScreen
-import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.SpeechInput
 
+/** One dusk sky behind every screen; the glass cards on each of them frost it. */
 @Composable
 fun AightRoot(vm: MainViewModel) {
     val settingsState by vm.settings.collectAsStateWithLifecycle()
-    val settings = settingsState
-    if (settings == null) {
-        Box(Modifier.fillMaxSize().background(Palette.Background))
-        return
+    val conversation by vm.conversation.collectAsStateWithLifecycle()
+    val haze = rememberHazeState()
+    val emptyChat = vm.screen == Screen.Chat && conversation.showGreeting
+    Box(Modifier.fillMaxSize()) {
+        GlassBackdrop(
+            Modifier.hazeSource(haze),
+            glow = emptyChat || settingsState?.isConfigured == false,
+            // Replies sit on the sky itself, so it deepens while a conversation is open.
+            dim = vm.screen == Screen.Chat && !emptyChat,
+        )
+        CompositionLocalProvider(LocalHazeState provides haze) {
+            AightScreens(vm)
+        }
     }
+}
+
+@Composable
+private fun AightScreens(vm: MainViewModel) {
+    val settingsState by vm.settings.collectAsStateWithLifecycle()
+    val settings = settingsState ?: return
     if (!settings.isConfigured) {
         SettingsScreen(vm, settings, setupMode = true, onBack = null)
         return
     }
 
     val context = LocalContext.current
+    val resources = LocalResources.current
     val speech = remember { SpeechInput(context.applicationContext) }
     DisposableEffect(Unit) { onDispose { speech.cancel() } }
     val phase by speech.phase.collectAsStateWithLifecycle()
@@ -131,8 +152,8 @@ fun AightRoot(vm: MainViewModel) {
         }
     }
     LaunchedEffect(Unit) { vm.loadModels() }
-    LaunchedEffect(Unit) {
-        vm.notices.collect { Toast.makeText(context, context.getString(it), Toast.LENGTH_LONG).show() }
+    LaunchedEffect(vm, context, resources) {
+        vm.notices.collect { Toast.makeText(context, resources.getString(it), Toast.LENGTH_LONG).show() }
     }
 
     // Replies to long agent runs arrive as notifications when aight isn't on screen.
@@ -200,7 +221,7 @@ private fun ChatLayout(
         HermesApi.normalizeBaseUrl(settings.serverUrl).substringAfter("://").substringBefore('/').substringBefore(':')
     }
 
-    BoxWithConstraints(Modifier.fillMaxSize().background(Palette.Background)) {
+    BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
 
         @Composable

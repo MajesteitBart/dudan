@@ -3,6 +3,7 @@
     <!-- Chat -->
     <string name="greeting_named">Vraag maar, %1$s</string>
     <string name="greeting_anonymous">Ik ben er klaar voor</string>
+    <string name="greeting_subtitle">Waar gaan we aan werken?</string>
     <string name="composer_hint">Vraag het %1$s</string>
     <string name="disclaimer">%1$s is een AI-agent en kan fouten maken.</string>
     <string name="new_chat">Nieuw gesprek</string>
@@ -57,6 +58,8 @@
     <string name="action_scroll_down">Naar beneden</string>
     <string name="attach_photos">Foto\'s</string>
     <string name="attach_camera">Camera</string>
+    <string name="attach_photos_detail">Kies uit je galerij</string>
+    <string name="attach_camera_detail">Maak een foto</string>
 
     <!-- Agent work -->
     <string name="status_thinking">Aan het nadenken</string>
@@ -82,9 +85,16 @@
     <string name="model_default">Hermes</string>
     <string name="model_default_detail">Standaard op de server: %1$s</string>
     <string name="reasoning_title">Denkniveau</string>
-    <string name="reasoning_default">Auto</string>
-    <string name="reasoning_fast">Snel</string>
-    <string name="reasoning_extended">Uitgebreid</string>
+    <string name="reasoning_default">Hermes-standaard</string>
+    <string name="effort_off">Uit</string>
+    <string name="effort_low">Laag</string>
+    <string name="effort_medium">Gemiddeld</string>
+    <string name="effort_high">Hoog</string>
+    <string name="effort_xhigh">Extra hoog</string>
+    <string name="effort_max">Max</string>
+    <string name="fast_mode">Snelle modus</string>
+    <string name="fast_mode_detail">Voorrang bij de provider: sneller antwoord, hogere kosten</string>
+    <string name="fast_short">Snel</string>
     <string name="model_server_default_named">Standaard op de server (%1$s)</string>
     <string name="profile_chats">Chats</string>
     <string name="profile_assistant">Assistent</string>
@@ -116,6 +126,7 @@
     <string name="section_connection">Verbinding</string>
     <string name="section_assistant">Assistent</string>
     <string name="section_history">Geschiedenis</string>
+    <string name="section_appearance">Weergave</string>
     <string name="section_models">Standaardmodellen</string>
     <string name="section_voice">Engelse stem</string>
     <string name="tts_kokoro">Kokoro</string>
@@ -168,4 +179,22 @@
     <string name="speech_language_hint">Systeemstandaard, of bijvoorbeeld nl-NL</string>
     <string name="show_all_channels">Gesprekken van alle kanalen tonen</string>
     <string name="show_all_channels_detail">Ook Telegram-, CLI- en andere Hermes-sessies tonen onder Recent</string>
+    <string name="accent_color">Accentkleur</string>
+    <string name="accent_moon">Maan</string>
+    <string name="accent_lavender">Lavendel</string>
+    <string name="accent_blue">Blauw</string>
+    <string name="accent_teal">Turkoois</string>
+    <string name="accent_green">Groen</string>
+    <string name="accent_amber">Amber</string>
+    <string name="accent_coral">Koraal</string>
+    <string name="accent_pink">Roze</string>
+    <string name="background">Achtergrond</string>
+    <string name="sky_dusk">Schemering</string>
+    <string name="sky_ocean">Oceaan</string>
+    <string name="sky_forest">Bos</string>
+    <string name="sky_sunset">Zonsondergang</string>
+    <string name="sky_graphite">Grafiet</string>
+    <string name="sky_midnight">Middernacht</string>
+    <string name="reduce_transparency">Transparantie verminderen</string>
+    <string name="reduce_transparency_detail">Effen panelen in plaats van matglas. Staat ook aan als het kleurcontrast van je telefoon op gemiddeld of hoog staat.</string>
 </resources>

@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">aight</string>
+    <string name="app_name" translatable="false">aight</string>
 
     <!-- Chat -->
     <string name="greeting_named">Hello, %1$s</string>
     <string name="greeting_anonymous">Ready when you are</string>
+    <string name="greeting_subtitle">What should we work on?</string>
     <string name="composer_hint">Ask %1$s</string>
     <string name="disclaimer">%1$s is an AI agent and can make mistakes.</string>
     <string name="new_chat">New chat</string>
@@ -59,6 +60,8 @@
     <string name="action_scroll_down">Scroll to bottom</string>
     <string name="attach_photos">Photos</string>
     <string name="attach_camera">Camera</string>
+    <string name="attach_photos_detail">Pick from your gallery</string>
+    <string name="attach_camera_detail">Take a photo</string>
 
     <!-- Agent work -->
     <string name="status_thinking">Thinking</string>
@@ -83,10 +86,17 @@
     <string name="model_picker_title">Model</string>
     <string name="model_default">Hermes</string>
     <string name="model_default_detail">Server default: %1$s</string>
-    <string name="reasoning_title">Thinking</string>
-    <string name="reasoning_default">Auto</string>
-    <string name="reasoning_fast">Fast</string>
-    <string name="reasoning_extended">Extended</string>
+    <string name="reasoning_title">Thinking level</string>
+    <string name="reasoning_default">Hermes default</string>
+    <string name="effort_off">Off</string>
+    <string name="effort_low">Low</string>
+    <string name="effort_medium">Medium</string>
+    <string name="effort_high">High</string>
+    <string name="effort_xhigh">Extra high</string>
+    <string name="effort_max">Max</string>
+    <string name="fast_mode">Fast mode</string>
+    <string name="fast_mode_detail">Priority processing: quicker replies, higher cost</string>
+    <string name="fast_short">Fast</string>
     <string name="model_server_default_named">Server default (%1$s)</string>
     <string name="profile_chats">Chats</string>
     <string name="profile_assistant">Assistant</string>
@@ -118,6 +128,7 @@
     <string name="section_connection">Connection</string>
     <string name="section_assistant">Assistant</string>
     <string name="section_history">History</string>
+    <string name="section_appearance">Appearance</string>
     <string name="section_models">Default models</string>
     <string name="section_voice">English voice</string>
     <string name="tts_kokoro">Kokoro</string>
@@ -170,4 +181,22 @@
     <string name="speech_language_hint">System default, or e.g. nl-NL</string>
     <string name="show_all_channels">Show chats from all channels</string>
     <string name="show_all_channels_detail">Include Telegram, CLI and other Hermes sessions in Recent</string>
+    <string name="accent_color">Accent color</string>
+    <string name="accent_moon">Moon</string>
+    <string name="accent_lavender">Lavender</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_teal">Teal</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_amber">Amber</string>
+    <string name="accent_coral">Coral</string>
+    <string name="accent_pink">Pink</string>
+    <string name="background">Background</string>
+    <string name="sky_dusk">Dusk</string>
+    <string name="sky_ocean">Ocean</string>
+    <string name="sky_forest">Forest</string>
+    <string name="sky_sunset">Sunset</string>
+    <string name="sky_graphite">Graphite</string>
+    <string name="sky_midnight">Midnight</string>
+    <string name="reduce_transparency">Reduce transparency</string>
+    <string name="reduce_transparency_detail">Solid panels instead of frosted glass. Also on when the phone\'s color contrast is set to medium or high.</string>
 </resources>

@@ -4,7 +4,7 @@ import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Context
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -23,11 +23,10 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.Code as CodeIcon
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -52,6 +51,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.text.withLink
 import androidx.compose.ui.text.withStyle
@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.ui.theme.GoogleSansCode
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import org.commonmark.ext.autolink.AutolinkExtension
 import org.commonmark.ext.gfm.strikethrough.Strikethrough
@@ -98,7 +99,7 @@ private val markdownParser: Parser = Parser.builder()
 
 private fun Node.children(): List<Node> = generateSequence(firstChild) { it.next }.toList()
 
-/** Renders agent markdown with Gemini's typography: roomy paragraphs, pill code blocks, plain tables. */
+/** Renders agent markdown with roomy paragraphs, code on a dark pane and tables in a hairline frame. */
 @Composable
 fun Markdown(text: String, modifier: Modifier = Modifier, style: TextStyle = MaterialTheme.typography.bodyLarge) {
     val document = remember(text) { markdownParser.parse(text) }
@@ -130,7 +131,7 @@ private fun MarkdownBlock(node: Node, style: TextStyle, depth: Int) {
                 node.children().forEach { MarkdownBlock(it, style.copy(color = Palette.TextSecondary), depth) }
             }
         }
-        is ThematicBreak -> HorizontalDivider(color = Palette.Outline, modifier = Modifier.padding(vertical = 4.dp))
+        is ThematicBreak -> HorizontalDivider(color = Palette.Hairline, modifier = Modifier.padding(vertical = 4.dp))
         is TableBlock -> TableView(node, style)
         is HtmlBlock -> Text(node.literal.trim(), style = style)
         else -> node.children().forEach { MarkdownBlock(it, style, depth) }
@@ -139,7 +140,8 @@ private fun MarkdownBlock(node: Node, style: TextStyle, depth: Int) {
 
 @Composable
 private fun InlineText(node: Node, style: TextStyle, modifier: Modifier = Modifier) {
-    val annotated = remember(node) { inlineString(node) }
+    val link = LocalAccent.current.soft
+    val annotated = remember(node, link) { inlineString(node, link) }
     Text(annotated, style = style, color = style.color.takeIf { it != Color.Unspecified } ?: Palette.TextPrimary, modifier = modifier)
 }
 
@@ -167,37 +169,37 @@ private fun ListBlock(node: Node, ordered: Boolean, start: Int, style: TextStyle
     }
 }
 
-private fun inlineString(node: Node): AnnotatedString = buildAnnotatedString { appendChildren(node) }
+private fun inlineString(node: Node, link: Color): AnnotatedString = buildAnnotatedString { appendChildren(node, link) }
 
-private fun AnnotatedString.Builder.appendChildren(parent: Node) {
+private fun AnnotatedString.Builder.appendChildren(parent: Node, link: Color) {
     var child = parent.firstChild
     while (child != null) {
-        appendInline(child)
+        appendInline(child, link)
         child = child.next
     }
 }
 
-private fun AnnotatedString.Builder.appendInline(node: Node) {
+private fun AnnotatedString.Builder.appendInline(node: Node, link: Color) {
     when (node) {
         is MdText -> append(node.literal)
-        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { appendChildren(node) }
-        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { appendChildren(node) }
-        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { appendChildren(node) }
+        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { appendChildren(node, link) }
+        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { appendChildren(node, link) }
+        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { appendChildren(node, link) }
         is Code -> withStyle(SpanStyle(fontFamily = GoogleSansCode, fontSize = 0.88.em, background = Palette.InlineCode)) {
             append(" ")
             append(node.literal)
             append(" ")
         }
         is Link -> withLink(
-            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = Palette.Link, textDecoration = TextDecoration.Underline))),
-        ) { if (node.firstChild != null) appendChildren(node) else append(node.destination) }
+            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = link, textDecoration = TextDecoration.Underline))),
+        ) { if (node.firstChild != null) appendChildren(node, link) else append(node.destination) }
         is Image -> withLink(
-            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = Palette.Link, textDecoration = TextDecoration.Underline))),
-        ) { if (node.firstChild != null) appendChildren(node) else append(node.destination) }
+            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = link, textDecoration = TextDecoration.Underline))),
+        ) { if (node.firstChild != null) appendChildren(node, link) else append(node.destination) }
         is SoftLineBreak -> append(" ")
         is HardLineBreak -> append("\n")
         is HtmlInline -> append(node.literal)
-        else -> appendChildren(node)
+        else -> appendChildren(node, link)
     }
 }
 
@@ -215,30 +217,43 @@ fun CodeBlock(language: String?, code: String) {
             copied = false
         }
     }
-    Surface(color = Palette.Surface, shape = RoundedCornerShape(24.dp), modifier = Modifier.fillMaxWidth()) {
-        Column {
-            Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
-                Text(language ?: "code", style = MaterialTheme.typography.labelLarge, color = Palette.TextPrimary)
-                Spacer(Modifier.weight(1f))
-                IconButton(onClick = { copyToClipboard(context, code); copied = true }) {
-                    Icon(
-                        if (copied) Icons.Rounded.Check else Icons.Outlined.ContentCopy,
-                        contentDescription = stringResource(R.string.action_copy),
-                        tint = Palette.Icon,
-                        modifier = Modifier.size(20.dp),
-                    )
-                }
+    // beautifului.dev's code block: a header with the language and a Copy button, then numbered lines.
+    val lines = remember(code) { code.lines() }
+    val codeStyle = TextStyle(fontFamily = GoogleSansCode, fontSize = 13.5.sp, lineHeight = 21.sp)
+    Column(Modifier.fillMaxWidth().pane(RoundedCornerShape(16.dp), Palette.Code, outline = Palette.Hairline)) {
+        Row(Modifier.padding(start = 14.dp, end = 4.dp, top = 4.dp, bottom = 4.dp), verticalAlignment = Alignment.CenterVertically) {
+            Icon(Icons.Rounded.CodeIcon, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(16.dp))
+            Spacer(Modifier.width(8.dp))
+            Text(language ?: "code", style = codeStyle.copy(fontWeight = FontWeight.Medium), color = Palette.TextPrimary)
+            Spacer(Modifier.weight(1f))
+            Row(
+                Modifier
+                    .clip(RoundedCornerShape(10.dp))
+                    .clickable { copyToClipboard(context, code); copied = true }
+                    .padding(horizontal = 10.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+            ) {
+                Icon(if (copied) Icons.Rounded.Check else Icons.Outlined.ContentCopy, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(15.dp))
+                Text(stringResource(R.string.action_copy), style = MaterialTheme.typography.labelMedium, color = Palette.TextSecondary)
             }
+        }
+        HorizontalDivider(color = Palette.Hairline)
+        Row(Modifier.padding(top = 10.dp, bottom = 14.dp)) {
+            Text(
+                lines.indices.joinToString("\n") { "${it + 1}" },
+                style = codeStyle.copy(textAlign = TextAlign.End),
+                color = Palette.TextTertiary,
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp),
+            )
             Text(
                 code,
-                fontFamily = GoogleSansCode,
-                fontSize = 14.sp,
-                lineHeight = 21.sp,
+                style = codeStyle,
                 color = Palette.TextPrimary,
                 softWrap = false,
                 modifier = Modifier
                     .horizontalScroll(rememberScrollState())
-                    .padding(start = 20.dp, end = 20.dp, bottom = 20.dp, top = 2.dp),
+                    .padding(end = 16.dp),
             )
         }
     }
@@ -248,10 +263,11 @@ private class TableRowData(val header: Boolean, val cells: List<AnnotatedString>
 
 @Composable
 private fun TableView(node: TableBlock, style: TextStyle) {
-    val rows = remember(node) {
+    val link = LocalAccent.current.soft
+    val rows = remember(node, link) {
         node.children().flatMap { section ->
             section.children().map { row ->
-                TableRowData(section is TableHead, row.children().filterIsInstance<TableCell>().map { inlineString(it) })
+                TableRowData(section is TableHead, row.children().filterIsInstance<TableCell>().map { inlineString(it, link) })
             }
         }
     }
@@ -262,8 +278,7 @@ private fun TableView(node: TableBlock, style: TextStyle) {
     Box(
         Modifier
             .horizontalScroll(rememberScrollState())
-            .clip(RoundedCornerShape(16.dp))
-            .border(1.dp, Palette.Outline, RoundedCornerShape(16.dp)),
+            .pane(RoundedCornerShape(16.dp), Color.Transparent, outline = Palette.Hairline),
     ) {
         Layout(
             content = {
@@ -284,7 +299,7 @@ private fun TableView(node: TableBlock, style: TextStyle) {
                 drawContent()
                 val stroke = 1.dp.toPx()
                 rowBottoms.dropLast(1).forEach { y ->
-                    drawLine(Palette.Outline, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), stroke)
+                    drawLine(Palette.Hairline, Offset(0f, y.toFloat()), Offset(size.width, y.toFloat()), stroke)
                 }
             },
         ) { measurables, _ ->

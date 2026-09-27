@@ -173,8 +173,16 @@ const server = http.createServer(async (req, res) => {
       current_provider: "openrouter",
       current_model: "anthropic/claude-opus-4.6",
       providers: [
-        { slug: "openrouter", name: "OpenRouter", authenticated: true, models: ["anthropic/claude-opus-4.6", "google/gemini-3-flash", "openai/gpt-5.5"] },
-        { slug: "nous", name: "Nous Portal", authenticated: true, models: [{ id: "hermes-4-405b", label: "Hermes 4 405B" }] },
+        {
+          slug: "openrouter", name: "OpenRouter", authenticated: true, models: ["anthropic/claude-opus-4.6", "google/gemini-3-flash", "openai/gpt-5.5"],
+          // Real Hermes reports per model whether it takes a thinking level and fast mode (priority processing).
+          capabilities: {
+            "anthropic/claude-opus-4.6": { fast: true, reasoning: true },
+            "google/gemini-3-flash": { fast: false, reasoning: true },
+            "openai/gpt-5.5": { fast: true, reasoning: true },
+          },
+        },
+        { slug: "nous", name: "Nous Portal", authenticated: true, models: [{ id: "hermes-4-405b", label: "Hermes 4 405B" }], capabilities: { "hermes-4-405b": { fast: false, reasoning: false } } },
         { slug: "anthropic", name: "Anthropic", authenticated: false, models: ["claude-haiku"] },
       ],
     });

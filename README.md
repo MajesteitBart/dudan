@@ -2,18 +2,21 @@
 
 ![aight](assets/aight-wordmark.png)
 
-An Android app that looks and works like the Gemini app, with a Hermes Agent as its brain. It runs as a normal chat app and as the phone's digital assistant, so a long press on the side key opens aight's overlay instead of Gemini.
+An Android app that works like the Gemini app, dressed in frosted glass, with a Hermes Agent as its brain. It runs as a normal chat app and as the phone's digital assistant, so a long press on the side key opens aight's overlay instead of Gemini.
 
 Everything the agent does happens on the Hermes server. The app talks to the Hermes API server over Tailscale, shows the agent's tool steps while it works, and keeps the conversation history in Hermes, so chats also show up in the Hermes dashboard and CLI.
 
 ## What it does
 
-- Gemini's layout and styling: sidebar with recent chats, a greeting under the aight orb, pill composer with the navy glow, streaming markdown with code blocks and tables. The Fold 7 inner screen gets a docked sidebar; the cover screen gets a full-screen drawer.
+- Frosted glass cards on a dusk sky, after Superhuman's panels, with components after [beautifului.dev](https://www.beautifului.dev/). Messages sit straight on the sky, which darkens while a chat is open so the text keeps its contrast; the prompt bar is the only glass card on the chat screen. An empty chat shows a large greeting and the prompt bar. The prompt bar holds the message, the attach menu, the model picker, the mic and the send button. Work steps are tool chips, code blocks have a header and line numbers, and approvals have one filled primary choice. Dialogs, sheets and the side-key overlay blur the screen behind them. The Fold 7 inner screen shows the sidebar as a second card; the cover screen gets a full-screen frosted sheet.
+- Settings > Appearance > Background picks the sky: Dusk (the default indigo and lavender), Ocean, Forest, Sunset, Graphite or Midnight. The glass, menus, sheets and the overlay take their tint from it.
+- Settings > Appearance > Accent color picks one of eight colors (moon white, lavender, blue, teal, green, amber, coral, pink) for the send button, your chat bubbles, links, switches and the glow in the sky.
+- Settings > Appearance > Reduce transparency swaps the glass for solid panels. It also switches on by itself when the phone's color contrast (Accessibility > Color and motion) is set to medium or high.
 - Agent turns go through Hermes' Runs API. If the phone loses the connection mid-task, the run keeps going on the server and the app polls until the result is in.
 - A collapsible "Worked for 1m 10s" panel shows tool calls, commentary and reasoning. Dangerous commands surface as an approval card with Hermes' choices (once, this chat, always, deny).
 - Voice input with a live waveform, read-aloud per reply, and a hands-free Live mode. Speech is transcribed on the phone by [Orukeet](https://github.com/Oruk-AI/orukeet), Oruk's multilingual fine-tune of NVIDIA Parakeet TDT 0.6B v3, which handles Dutch and English without a language setting. English replies are read by Kokoro-82M and Dutch replies by Supertonic 3, both on the phone. Before Supertonic reads a Dutch reply, the app writes out numbers, times, amounts and dates, because it misreads digits.
 - Assistant overlay on the side key: starts listening right away, can attach the current screen ("Ask about screen"), reads spoken questions' answers aloud, and hands off to the full app.
-- Model picker backed by Hermes' model inventory, with Auto, Fast and Extended thinking. There are two defaults: one for chats started in the app, and a quick one for chats started from the assistant overlay or the assist gesture. A chat keeps the model of the place it started, also when you continue it in the app.
+- Model picker backed by Hermes' model inventory. Each default also sets the thinking level (Hermes' own setting, or off up to max) and, for models that support it, fast mode, which asks the provider for priority processing at a higher price. There are two defaults: one for chats started in the app, and a quick one for chats started from the assistant overlay or the assist gesture. A chat keeps the model of the place it started, also when you continue it in the app.
 - Search, pin, rename and delete chats; browse Hermes skills; run, pause or resume scheduled tasks.
 - English and Dutch UI.
 
@@ -88,7 +91,7 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 - `chat/`: `ChatEngine` owns every conversation and run for the whole process, shared by the app, the overlay and Live mode; `TurnReducer` folds stream events into a message; `HistoryMapper` turns a Hermes transcript into bubbles
 - `assist/`: voice interaction service, the overlay session (Compose inside a `VoiceInteractionSession`) and the proxy recognition service
 - `voice/`: `ModelPackage` downloads and verifies the on-device models; `SpeechInput` records with Orukeet (`LocalSpeechSession`, `Endpointer`, `OrukeetEngine`) or falls back to the phone's recognizer; `SherpaVoice` plays speech from sherpa-onnx while it's synthesized, with `KokoroVoice` for English and `SupertonicVoice` for Dutch (`DutchText` writes out numbers first, `SupertonicFiles` converts the downloaded voice files); `Speaker` picks one of them or the Android voice per reply
-- `ui/`: Compose screens and the Gemini-style components
+- `ui/`: Compose screens and components. `ui/components/Glass.kt` has the sky, the glass card (`glass`), the outlined and flat surfaces used inside cards (`outlined`, `pane`), window glass with system blur for dialogs, sheets and the overlay, and the shared pieces: segmented control, menu rows and the primary button. The in-app blur comes from the [Haze](https://github.com/chrisbanes/haze) library. `Theme.kt` decides when Reduce transparency applies, `Sky.kt` holds the backgrounds and `Accent.kt` the accent colors.
 - `assets/`: the aight icon and wordmark as SVG and PNG. The launcher icon (`res/drawable/ic_launcher_*.xml`, `ic_notification.xml`) and the in-app mark (`AightMark` in `ui/components/Brand.kt`) are redrawn from `aight-icon.svg`, so update them together when the artwork changes
 
 ## Known limits
@@ -101,6 +104,7 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 - Supertonic synthesizes a sentence before it plays it. On the x86 emulator the first word of a Dutch reply comes 1.4 seconds after the request once the model is loaded; this hasn't been measured on the Fold 7 yet. When a very short first sentence ("Goede vraag.") is followed by a long one, a pause can fall between them while the long one is synthesized.
 - Kokoro and Supertonic loaded together take about 1.1 GB of memory, and Orukeet adds its own while listening. Each is released after a few idle minutes.
 - If Kokoro's or Supertonic's native library ever crashes the app while loading, the next start notices, switches those replies to the Android voice and shows a Retry link in its Settings section.
+- Dialogs, the model sheet and the side-key overlay frost the screen behind them with Android's cross-window blur. When a phone turns that off (some battery savers do), they switch to solid panels over the sharp background. Menus are popups, which can't blur what's behind them, so they are nearly opaque.
 
 ## Model credits
 

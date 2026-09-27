@@ -42,7 +42,6 @@ import androidx.compose.material.icons.outlined.ScreenshotMonitor
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -51,7 +50,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -71,8 +69,12 @@ import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.ui.chat.AssistantMessageItem
 import nl.bartvandermeeren.aight.ui.chat.UserMessageItem
 import nl.bartvandermeeren.aight.ui.components.Composer
+import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
+import nl.bartvandermeeren.aight.ui.components.glass
+import nl.bartvandermeeren.aight.ui.components.windowGlass
+import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.SpeechInput
 
@@ -98,6 +100,11 @@ fun AssistOverlay(state: AssistState) {
     val imeBottom = WindowInsets.ime.getBottom(LocalDensity.current)
     LaunchedEffect(imeBottom) { view.requestLayout() }
 
+    // Any app can sit behind the overlay, so its panels are glass only while the system blurs that app.
+    val reduced = LocalReduceTransparency.current
+    LaunchedEffect(reduced) { state.setBackdropBlur(!reduced) }
+    val panel = windowGlass(Palette.OverlayGlass, Palette.OverlaySolid)
+
     Box(Modifier.fillMaxSize()) {
         // Scrim: tap anywhere outside the panel to dismiss, like Gemini's overlay.
         Box(
@@ -106,8 +113,8 @@ fun AssistOverlay(state: AssistState) {
                 .background(
                     Brush.verticalGradient(
                         0f to Color.Transparent,
-                        0.45f to Color.Black.copy(alpha = if (hasChat) 0.45f else 0.15f),
-                        1f to Color.Black.copy(alpha = 0.8f),
+                        0.45f to Palette.BackdropEdge.copy(alpha = if (hasChat) 0.45f else 0.15f),
+                        1f to Palette.BackdropEdge.copy(alpha = 0.8f),
                     ),
                 )
                 .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) { state.dismiss() },
@@ -134,17 +141,18 @@ fun AssistOverlay(state: AssistState) {
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
                 if (!settings.isConfigured && state.settings != null) {
-                    NotConfiguredCard(onOpen = state::openFullChat)
+                    NotConfiguredCard(panel, onOpen = state::openFullChat)
                 }
                 if (hasChat) {
                     // Weighted so the composer below always keeps its room when space runs out.
                     Box(Modifier.weight(1f, fill = false)) {
-                        ResponsePanel(state, conversation, settings, speakingId)
+                        ResponsePanel(state, conversation, settings, speakingId, panel)
                     }
                 }
                 val shot = state.screenshot
                 if (shot != null && !state.attachScreenshot && !conversation.isBusy) {
                     Chip(
+                        panel,
                         icon = { Icon(Icons.Outlined.ScreenshotMonitor, null, tint = Palette.Icon, modifier = Modifier.size(20.dp)) },
                         label = stringResource(R.string.ask_about_screen),
                         onClick = {
@@ -155,7 +163,7 @@ fun AssistOverlay(state: AssistState) {
                 }
                 if (shot != null && state.attachScreenshot) {
                     Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Box(Modifier.size(64.dp).clip(RoundedCornerShape(14.dp)).background(Palette.Card)) {
+                        Box(Modifier.size(64.dp).pane(RoundedCornerShape(14.dp), Palette.OverlaySolid, outline = Palette.Hairline)) {
                             Image(shot.asImageBitmap(), null, contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
                         }
                         Text(stringResource(R.string.screen_attached), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
@@ -188,7 +196,9 @@ fun AssistOverlay(state: AssistState) {
                     },
                     onStop = state::stop,
                     onLiveClick = state::openLive,
-                    containerColor = Color(0xFF151618),
+                    containerColor = panel,
+                    solidColor = Palette.OverlaySolid,
+                    containerWash = Color.Transparent,
                 )
             }
         }
@@ -196,14 +206,14 @@ fun AssistOverlay(state: AssistState) {
 }
 
 @Composable
-private fun ResponsePanel(state: AssistState, conversation: Conversation, settings: AppSettings, speakingId: String?) {
+private fun ResponsePanel(state: AssistState, conversation: Conversation, settings: AppSettings, speakingId: String?, panel: Color) {
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.58f).dp
     val listState = rememberLazyListState()
     val last = conversation.messages.lastOrNull()
     LaunchedEffect(conversation.messages.size, last?.text?.length, last?.steps?.size) {
         listState.scrollToItem(conversation.messages.size)
     }
-    Surface(color = Color(0xFF1B1C1E), shape = RoundedCornerShape(30.dp), modifier = Modifier.fillMaxWidth()) {
+    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(28.dp), panel, solid = Palette.OverlaySolid, wash = Color.Transparent)) {
         Column {
             Row(Modifier.padding(start = 20.dp, end = 6.dp, top = 6.dp), verticalAlignment = Alignment.CenterVertically) {
                 AightMark(size = 18.dp, working = conversation.isBusy)
@@ -245,8 +255,8 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
 }
 
 @Composable
-private fun NotConfiguredCard(onOpen: () -> Unit) {
-    Surface(color = Color(0xFF1B1C1E), shape = RoundedCornerShape(26.dp), modifier = Modifier.fillMaxWidth().clickable(onClick = onOpen)) {
+private fun NotConfiguredCard(panel: Color, onOpen: () -> Unit) {
+    Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(26.dp), panel, solid = Palette.OverlaySolid, wash = Color.Transparent).clickable(onClick = onOpen)) {
         Text(
             stringResource(R.string.assist_not_configured),
             style = MaterialTheme.typography.bodyLarge,
@@ -257,12 +267,11 @@ private fun NotConfiguredCard(onOpen: () -> Unit) {
 }
 
 @Composable
-private fun Chip(icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
+private fun Chip(panel: Color, icon: @Composable () -> Unit, label: String, onClick: () -> Unit) {
     Row(
         Modifier
             .padding(start = 6.dp)
-            .clip(RoundedCornerShape(50))
-            .background(Color(0xF0151618))
+            .glass(CircleShape, panel, solid = Palette.OverlaySolid, wash = Color.Transparent)
             .clickable(onClick = onClick)
             .padding(horizontal = 18.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -284,7 +293,7 @@ private fun EdgeGlow(intensity: Float) {
         val h = size.height
         drawRect(
             Brush.radialGradient(
-                listOf(Palette.SparkViolet.copy(alpha = 0.55f * strength), Palette.Live.copy(alpha = 0.3f * strength), Color.Transparent),
+                listOf(Palette.SparkViolet.copy(alpha = 0.55f * strength), Palette.GlowViolet.copy(alpha = 0.3f * strength), Color.Transparent),
                 center = Offset(w * (0.1f + 0.15f * drift), h * 1.02f),
                 radius = w * 0.75f,
             ),

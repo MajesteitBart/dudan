@@ -54,6 +54,7 @@ data class Conversation(
     val loadError: String? = null,
 ) {
     val isBusy: Boolean get() = messages.lastOrNull()?.isStreaming == true
+    val showGreeting: Boolean get() = messages.isEmpty() && !loading && loadError == null
 }
 
 data class SessionsState(

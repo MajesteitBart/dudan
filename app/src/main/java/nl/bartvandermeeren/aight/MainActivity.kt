@@ -9,12 +9,16 @@ import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
+import androidx.compose.runtime.getValue
 import androidx.core.content.IntentCompat
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nl.bartvandermeeren.aight.data.AppVisibility
 import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.ui.AightRoot
 import nl.bartvandermeeren.aight.ui.MainViewModel
+import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.AightTheme
+import nl.bartvandermeeren.aight.ui.theme.Sky
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -27,7 +31,12 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
-            AightTheme {
+            val settings by vm.settings.collectAsStateWithLifecycle()
+            AightTheme(
+                reduceTransparency = settings?.reduceTransparency == true,
+                accent = Accent.from(settings?.accent),
+                sky = Sky.from(settings?.sky),
+            ) {
                 AightRoot(vm)
             }
         }
