@@ -143,7 +143,7 @@ class OpenUiParserTest {
     }
 }
 
-/** Replies a model wrote from OpenUiPrompt, kept in the mock server's samples. */
+/** Replies models wrote from OpenUiPrompt, including one from a real Hermes run (hermes-quote.md), kept in the mock server's samples. */
 class OpenUiModelSamplesTest {
     private val samples = java.io.File("../tools/mock-hermes/samples").listFiles { f -> f.extension == "md" }.orEmpty().sortedBy { it.name }
 
@@ -160,7 +160,7 @@ class OpenUiModelSamplesTest {
 
     @Test
     fun everySampleRendersWithKnownComponentsOnly() {
-        assertEquals(3, samples.size)
+        assertTrue(samples.size >= 4)
         samples.forEach { file ->
             val block = Regex("```openui-lang\\n([\\s\\S]*?)```").find(file.readText())?.groupValues?.get(1)
                 ?: error("${file.name} has no openui-lang block")

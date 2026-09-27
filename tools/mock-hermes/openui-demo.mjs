@@ -75,7 +75,8 @@ pick = ListBlock([ListItem("Stap 1 uitleggen", "Wat doet het script precies?", n
 
 // Replies a model wrote from aight's OpenUI instructions (samples/), for checking real-world output:
 //   "supermarkt" -> table and stacked bar, "backup" -> markdown steps and a radio form,
-//   "energieverbruik" -> donut chart and entity list
+//   "energieverbruik" -> donut chart and entity list, "offerte" -> the real Hermes reply to an
+//   attached PDF quote (table and entity list)
 const sample = (name) => readFileSync(new URL(`./samples/${name}.md`, import.meta.url), "utf8");
 
 /** An OpenUI reply for [question], or null to fall back to the plain markdown answer. */
@@ -84,6 +85,7 @@ export function openUiReply(question, instructions) {
   if (/supermarkt/i.test(question)) return sample("supermarkets");
   if (/backup/i.test(question)) return sample("backups");
   if (/energieverbruik/i.test(question)) return sample("energy");
+  if (/offerte/i.test(question)) return sample("hermes-quote");
   if (/formulier|\bform\b/i.test(question)) return form;
   if (/grafiek|chart|verbruik/i.test(question)) return chart;
   if (/stappen|steps|instellen|setup/i.test(question)) return steps;
