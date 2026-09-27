@@ -17,8 +17,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.rounded.Check
+import androidx.compose.material.icons.rounded.ExpandMore
 import androidx.compose.material3.BottomSheetDefaults
 import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -42,11 +44,13 @@ import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.data.ModelChoice
 import nl.bartvandermeeren.aight.data.ModelProfile
-import nl.bartvandermeeren.aight.data.ReasoningMode
+import nl.bartvandermeeren.aight.data.ReasoningEffort
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.components.BlurBehindWindow
 import nl.bartvandermeeren.aight.ui.components.GlassDefaults
+import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
 import nl.bartvandermeeren.aight.ui.components.Segmented
+import nl.bartvandermeeren.aight.ui.components.Toggle
 import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.components.windowGlass
 import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
@@ -88,24 +92,24 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
                 color = Palette.TextSecondary,
                 modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 10.dp),
             )
-            Text(
-                stringResource(R.string.reasoning_title),
-                style = MaterialTheme.typography.titleMedium,
-                color = Palette.TextSecondary,
-                modifier = Modifier.padding(start = 24.dp, end = 24.dp, top = 18.dp, bottom = 8.dp),
-            )
-            Segmented(
-                options = ReasoningMode.entries.map { mode ->
-                    mode to when (mode) {
-                        ReasoningMode.Default -> stringResource(R.string.reasoning_default)
-                        ReasoningMode.Fast -> stringResource(R.string.reasoning_fast)
-                        ReasoningMode.Extended -> stringResource(R.string.reasoning_extended)
+            // Two separate Hermes options: how long the model thinks, and priority processing. A model
+            // that reports no support for one doesn't get its control.
+            val runsOn = catalog?.optionFor(selected)
+            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 12.dp)) {
+                if (runsOn?.reasoning != false) {
+                    EffortPicker(selected.effort, onSelect = { vm.setModel(profile, selected.copy(effort = it)) })
+                }
+                if (runsOn?.fast == true) {
+                    Toggle(stringResource(R.string.fast_mode), stringResource(R.string.fast_mode_detail), selected.fast) {
+                        vm.setModel(profile, selected.copy(fast = it))
                     }
-                },
-                selected = selected.reasoning,
-                onSelect = { vm.setModel(profile, selected.copy(reasoning = it)) },
-                modifier = Modifier.padding(horizontal = 20.dp),
-            )
+                }
+            }
+            // Switching models keeps the thinking level and fast mode where the new model takes them.
+            fun keepOptions(choice: ModelChoice): ModelChoice {
+                val moved = choice.copy(effort = selected.effort, fast = selected.fast)
+                return catalog?.supported(moved) ?: moved
+            }
             Text(
                 stringResource(R.string.model_picker_title),
                 style = MaterialTheme.typography.titleMedium,
@@ -118,7 +122,7 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
                         title = stringResource(R.string.model_default),
                         subtitle = catalog?.currentModel?.let { stringResource(R.string.model_default_detail, it) },
                         selected = selected.model == null,
-                        onClick = { vm.setModel(profile, ModelChoice(reasoning = selected.reasoning)) },
+                        onClick = { vm.setModel(profile, keepOptions(ModelChoice())) },
                     )
                 }
                 val options = catalog?.options.orEmpty()
@@ -137,7 +141,7 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
                             title = if (option.label == option.model) prettyModelName(option.model) else option.label,
                             subtitle = option.model,
                             selected = selected.model == option.model && (selected.provider == null || selected.provider == option.provider),
-                            onClick = { vm.setModel(profile, ModelChoice(option.provider, option.model, option.label, selected.reasoning)) },
+                            onClick = { vm.setModel(profile, keepOptions(ModelChoice(option.provider, option.model, option.label))) },
                         )
                     }
                 }
@@ -156,6 +160,62 @@ fun ModelPickerSheet(vm: MainViewModel, settings: AppSettings, initialProfile: M
         }
     }
 }
+
+/** The thinking level in use, with a menu of the levels Hermes accepts (Hermes' dashboard offers the same). */
+@Composable
+private fun EffortPicker(selected: ReasoningEffort?, onSelect: (ReasoningEffort?) -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box(Modifier.fillMaxWidth()) {
+        Row(
+            Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(16.dp))
+                .clickable { open = true }
+                .padding(vertical = 8.dp),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f).padding(end = 16.dp)) {
+                Text(stringResource(R.string.reasoning_title), style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
+                Text(effortLabel(selected), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+            }
+            Icon(Icons.Rounded.ExpandMore, contentDescription = null, tint = Palette.TextSecondary)
+        }
+        GlassDropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            (listOf(null) + ReasoningEffort.entries).forEach { effort ->
+                DropdownMenuItem(
+                    text = { Text(effortLabel(effort)) },
+                    trailingIcon = {
+                        if (effort == selected) Icon(Icons.Rounded.Check, contentDescription = null, tint = Palette.TextPrimary, modifier = Modifier.size(18.dp))
+                    },
+                    onClick = {
+                        open = false
+                        onSelect(effort)
+                    },
+                )
+            }
+        }
+    }
+}
+
+@Composable
+fun effortLabel(effort: ReasoningEffort?): String = stringResource(
+    when (effort) {
+        null -> R.string.reasoning_default
+        ReasoningEffort.Off -> R.string.effort_off
+        ReasoningEffort.Low -> R.string.effort_low
+        ReasoningEffort.Medium -> R.string.effort_medium
+        ReasoningEffort.High -> R.string.effort_high
+        ReasoningEffort.ExtraHigh -> R.string.effort_xhigh
+        ReasoningEffort.Max -> R.string.effort_max
+    },
+)
+
+/** What [choice] sets beyond the model, such as "Low · Fast"; empty when it leaves both to Hermes. */
+@Composable
+fun modelModeLabel(choice: ModelChoice): String = listOfNotNull(
+    choice.effort?.let { effortLabel(it) },
+    stringResource(R.string.fast_short).takeIf { choice.fast },
+).joinToString(" · ")
 
 /** A model in beautifului.dev's picker: the name, its id quieter underneath, a check on the one in use. */
 @Composable

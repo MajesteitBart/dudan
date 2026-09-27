@@ -20,7 +20,7 @@ import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.ModelChoice
 import nl.bartvandermeeren.aight.data.ModelProfile
-import nl.bartvandermeeren.aight.data.ReasoningMode
+import nl.bartvandermeeren.aight.data.ReasoningEffort
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -93,7 +93,7 @@ class ChatEngineTest {
     fun assistantChatsRunOnTheFastModelAndOtherChatsOnTheNormalOne() {
         settings = settings.copy(
             model = ModelChoice("anthropic", "big-model"),
-            fastModel = ModelChoice("openrouter", "small-model", reasoning = ReasoningMode.Fast),
+            assistantModel = ModelChoice("openrouter", "small-model", effort = ReasoningEffort.Low),
         )
         val runs = CopyOnWriteArrayList<String>()
         script { request ->
@@ -108,8 +108,8 @@ class ChatEngineTest {
         }
         sendAndSettle("Wat staat er vandaag in mijn agenda?", ModelProfile.Assistant)
         sendAndSettle("Help me met een langer plan")
-        assertTrue(runs[0], runs[0].contains(""""model":"small-model"""") && runs[0].contains(""""reasoning_effort":"low""""))
-        assertTrue(runs[1], runs[1].contains(""""model":"big-model"""") && !runs[1].contains("reasoning_effort"))
+        assertTrue(runs[0], runs[0].contains(""""model":"small-model"""") && runs[0].contains(""""reasoning_effort":"low"""") && !runs[0].contains("fast"))
+        assertTrue(runs[1], runs[1].contains(""""model":"big-model"""") && !runs[1].contains("model_options"))
         assertEquals(ModelProfile.Assistant, ChatEngine.profileOf(runs[0].substringAfter(""""session_id":"""").substringBefore('"')))
     }
 

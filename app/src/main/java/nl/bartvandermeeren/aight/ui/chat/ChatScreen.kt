@@ -69,7 +69,6 @@ import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.chat.ChatEngine
 import nl.bartvandermeeren.aight.chat.Role
 import nl.bartvandermeeren.aight.data.AppSettings
-import nl.bartvandermeeren.aight.data.ReasoningMode
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.components.AightIcons
 import nl.bartvandermeeren.aight.ui.components.AightMark
@@ -126,11 +125,7 @@ fun ChatPane(
     val modelTitle = activeModel.label?.takeIf { it != activeModel.model }
         ?: (activeModel.model ?: catalog?.currentModel)?.let(::prettyModelName)
         ?: stringResource(R.string.model_default)
-    val modelSubtitle = when (activeModel.reasoning) {
-        ReasoningMode.Default -> ""
-        ReasoningMode.Fast -> stringResource(R.string.reasoning_fast)
-        ReasoningMode.Extended -> stringResource(R.string.reasoning_extended)
-    }
+    val modelSubtitle = modelModeLabel(activeModel)
 
     Column(modifier.fillMaxSize()) {
         TopBar(

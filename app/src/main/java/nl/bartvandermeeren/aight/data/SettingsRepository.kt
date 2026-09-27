@@ -12,7 +12,33 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 
-enum class ReasoningMode { Default, Fast, Extended }
+/**
+ * Hermes' `reasoning_effort` levels the picker offers, weakest first. A level the model doesn't
+ * support is lowered by Hermes to the nearest one below it, or to the model's weakest level.
+ */
+enum class ReasoningEffort(val wire: String) {
+    Off("none"), Low("low"), Medium("medium"), High("high"), ExtraHigh("xhigh"), Max("max");
+
+    companion object {
+        fun fromWire(value: String?): ReasoningEffort? = entries.firstOrNull { it.wire == value }
+    }
+}
+
+/** Saved in place of an effort when the user leaves it to Hermes. */
+private const val HERMES_EFFORT = "default"
+
+/**
+ * The effort saved in [saved]. Before 0.6.3 the app had one Default/Fast/Extended setting that only
+ * ever set the effort; [legacy] carries that over. Nothing saved at all means [default].
+ */
+internal fun storedEffort(saved: String?, legacy: String?, default: ReasoningEffort?): ReasoningEffort? = when {
+    saved == HERMES_EFFORT -> null
+    saved != null -> ReasoningEffort.fromWire(saved) ?: default
+    legacy == "Default" -> null
+    legacy == "Fast" -> ReasoningEffort.Low
+    legacy == "Extended" -> ReasoningEffort.High
+    else -> default
+}
 
 /** Which default model a chat uses: regular chats, or chats started from the assistant (side key, overlay). */
 enum class ModelProfile { Chats, Assistant }
@@ -31,7 +57,10 @@ data class ModelChoice(
     val provider: String? = null,
     val model: String? = null,
     val label: String? = null,
-    val reasoning: ReasoningMode = ReasoningMode.Default,
+    /** Null leaves the effort to Hermes' own setting. */
+    val effort: ReasoningEffort? = null,
+    /** Priority processing (Hermes' `fast` option). The picker only offers it for models that report it. */
+    val fast: Boolean = false,
 )
 
 data class AppSettings(
@@ -52,7 +81,7 @@ data class AppSettings(
     /** Default for chats started in the app. */
     val model: ModelChoice = ModelChoice(),
     /** Default for chats started from the assistant; quick answers matter more there. */
-    val fastModel: ModelChoice = ModelChoice(reasoning = ReasoningMode.Fast),
+    val assistantModel: ModelChoice = ModelChoice(effort = ReasoningEffort.Low),
     val ttsEngine: TtsEngine = TtsEngine.Kokoro,
     val kokoroVoice: String = DEFAULT_KOKORO_VOICE,
     val dutchTtsEngine: DutchTtsEngine = DutchTtsEngine.Supertonic,
@@ -64,7 +93,7 @@ data class AppSettings(
 
     fun modelFor(profile: ModelProfile): ModelChoice = when (profile) {
         ModelProfile.Chats -> model
-        ModelProfile.Assistant -> fastModel
+        ModelProfile.Assistant -> assistantModel
     }
 
     companion object {
@@ -81,7 +110,9 @@ class SettingsRepository(private val context: Context) {
         val provider = stringPreferencesKey("${prefix}model_provider")
         val id = stringPreferencesKey("${prefix}model_id")
         val label = stringPreferencesKey("${prefix}model_label")
-        val reasoning = stringPreferencesKey("${prefix}reasoning")
+        val effort = stringPreferencesKey("${prefix}effort")
+        val fast = booleanPreferencesKey("${prefix}fast")
+        val legacyReasoning = stringPreferencesKey("${prefix}reasoning")
     }
 
     private object Keys {
@@ -114,11 +145,12 @@ class SettingsRepository(private val context: Context) {
 
     suspend fun current(): AppSettings = flow.first()
 
-    private fun Preferences.readModel(keys: ModelKeys, defaultReasoning: ReasoningMode) = ModelChoice(
+    private fun Preferences.readModel(keys: ModelKeys, defaultEffort: ReasoningEffort?) = ModelChoice(
         provider = this[keys.provider],
         model = this[keys.id],
         label = this[keys.label],
-        reasoning = this[keys.reasoning]?.let { runCatching { ReasoningMode.valueOf(it) }.getOrNull() } ?: defaultReasoning,
+        effort = storedEffort(this[keys.effort], this[keys.legacyReasoning], defaultEffort),
+        fast = this[keys.fast] ?: false,
     )
 
     private fun Preferences.toSettings() = AppSettings(
@@ -133,8 +165,8 @@ class SettingsRepository(private val context: Context) {
         accent = this[Keys.accent] ?: "Moon",
         sky = this[Keys.sky] ?: "Dusk",
         speechLanguage = this[Keys.speechLanguage].orEmpty(),
-        model = readModel(Keys.chatsModel, ReasoningMode.Default),
-        fastModel = readModel(Keys.assistantModel, ReasoningMode.Fast),
+        model = readModel(Keys.chatsModel, null),
+        assistantModel = readModel(Keys.assistantModel, ReasoningEffort.Low),
         ttsEngine = this[Keys.ttsEngine]?.let { runCatching { TtsEngine.valueOf(it) }.getOrNull() } ?: TtsEngine.Kokoro,
         kokoroVoice = this[Keys.kokoroVoice]?.takeIf { it.isNotBlank() } ?: AppSettings.DEFAULT_KOKORO_VOICE,
         dutchTtsEngine = this[Keys.dutchTtsEngine]?.let { runCatching { DutchTtsEngine.valueOf(it) }.getOrNull() } ?: DutchTtsEngine.Supertonic,
@@ -153,7 +185,7 @@ class SettingsRepository(private val context: Context) {
             it[Keys.speechLanguage] = speechLanguage.trim()
             val url = HermesApi.normalizeBaseUrl(serverUrl)
             if (it[Keys.serverUrl] != url) {
-                // Models picked on another server may not exist on this one.
+                // Models picked on another server may not exist on this one, nor their thinking level or fast mode.
                 ModelProfile.entries.forEach { profile -> it.clearModel(keysFor(profile)) }
             }
             it[Keys.serverUrl] = url
@@ -165,6 +197,9 @@ class SettingsRepository(private val context: Context) {
         remove(keys.provider)
         remove(keys.id)
         remove(keys.label)
+        remove(keys.effort)
+        remove(keys.fast)
+        remove(keys.legacyReasoning)
     }
 
     suspend fun setListenOnInvoke(value: Boolean) = context.dataStore.edit { it[Keys.listenOnInvoke] = value }
@@ -189,7 +224,9 @@ class SettingsRepository(private val context: Context) {
             put(keys.provider, choice.provider)
             put(keys.id, choice.model)
             put(keys.label, choice.label)
-            prefs[keys.reasoning] = choice.reasoning.name
+            prefs[keys.effort] = choice.effort?.wire ?: HERMES_EFFORT
+            prefs[keys.fast] = choice.fast
+            prefs.remove(keys.legacyReasoning)
         }
     }
 }

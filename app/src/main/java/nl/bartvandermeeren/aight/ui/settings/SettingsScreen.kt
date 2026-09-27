@@ -49,8 +49,6 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
-import androidx.compose.material3.Switch
-import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -87,18 +85,19 @@ import nl.bartvandermeeren.aight.chat.userMessage
 import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.ModelProfile
-import nl.bartvandermeeren.aight.data.ReasoningMode
 import nl.bartvandermeeren.aight.data.DutchTtsEngine
 import nl.bartvandermeeren.aight.data.SttEngine
 import nl.bartvandermeeren.aight.data.TtsEngine
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.chat.ModelPickerSheet
+import nl.bartvandermeeren.aight.ui.chat.modelModeLabel
 import nl.bartvandermeeren.aight.ui.chat.prettyModelName
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.CtaButton
 import nl.bartvandermeeren.aight.ui.components.Segmented
 import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
+import nl.bartvandermeeren.aight.ui.components.Toggle
 import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.components.outlined
 import nl.bartvandermeeren.aight.ui.theme.Accent
@@ -283,11 +282,7 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
         ?: choice.model?.let(::prettyModelName)
         ?: catalog?.currentModel?.let { stringResource(R.string.model_server_default_named, prettyModelName(it)) }
         ?: stringResource(R.string.model_default)
-    val mode = when (choice.reasoning) {
-        ReasoningMode.Default -> stringResource(R.string.reasoning_default)
-        ReasoningMode.Fast -> stringResource(R.string.reasoning_fast)
-        ReasoningMode.Extended -> stringResource(R.string.reasoning_extended)
-    }
+    val mode = modelModeLabel(choice)
     Row(
         Modifier
             .fillMaxWidth()
@@ -311,7 +306,7 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
                 color = Palette.TextSecondary,
             )
         }
-        Text("$name · $mode", style = MaterialTheme.typography.labelLarge, color = LocalAccent.current.soft)
+        Text(if (mode.isEmpty()) name else "$name · $mode", style = MaterialTheme.typography.labelLarge, color = LocalAccent.current.soft)
     }
     if (picking) ModelPickerSheet(vm, settings, initialProfile = profile, onDismiss = { picking = false })
 }
@@ -655,35 +650,6 @@ private fun Field(
         ),
         modifier = Modifier.fillMaxWidth(),
     )
-}
-
-@Composable
-private fun Toggle(title: String, detail: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .clip(RoundedCornerShape(16.dp))
-            .clickable { onChange(!checked) }
-            .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Column(Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(title, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
-            Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-        }
-        Switch(
-            checked = checked,
-            onCheckedChange = onChange,
-            colors = SwitchDefaults.colors(
-                checkedTrackColor = LocalAccent.current.color,
-                checkedThumbColor = LocalAccent.current.on,
-                checkedBorderColor = Color.Transparent,
-                uncheckedTrackColor = Palette.Surface,
-                uncheckedThumbColor = Palette.TextSecondary,
-                uncheckedBorderColor = Palette.Outline,
-            ),
-        )
-    }
 }
 
 @Composable

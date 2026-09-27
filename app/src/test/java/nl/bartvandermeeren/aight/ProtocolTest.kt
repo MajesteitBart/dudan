@@ -15,7 +15,7 @@ import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.HermesJson
 import nl.bartvandermeeren.aight.data.HermesMessage
 import nl.bartvandermeeren.aight.data.ModelChoice
-import nl.bartvandermeeren.aight.data.ReasoningMode
+import nl.bartvandermeeren.aight.data.ReasoningEffort
 import nl.bartvandermeeren.aight.data.RunOutcome
 import nl.bartvandermeeren.aight.data.SseReader
 import nl.bartvandermeeren.aight.ui.chat.prettyModelName
@@ -213,7 +213,7 @@ class HermesApiTest {
         )
         server.start()
         val api = HermesApi(OkHttpClient()) { HermesApi.ServerConfig(server.url("/").toString(), "secret-key") }
-        val runId = api.startRun("aight_1", "Hallo", ModelChoice(provider = "openrouter", model = "x/y", reasoning = ReasoningMode.Extended))
+        val runId = api.startRun("aight_1", "Hallo", ModelChoice(provider = "openrouter", model = "x/y", effort = ReasoningEffort.High, fast = true))
         assertEquals("run_1", runId)
         val start = server.takeRequest()
         assertEquals("/v1/runs", start.path)
@@ -221,7 +221,7 @@ class HermesApiTest {
         val body = HermesJson.parseToJsonElement(start.body.readUtf8()) as kotlinx.serialization.json.JsonObject
         assertEquals(JsonPrimitive("aight_1"), body["session_id"])
         assertEquals(JsonPrimitive("openrouter"), body["provider"])
-        assertTrue(body["model_options"].toString().contains("high"))
+        assertEquals("""{"reasoning_effort":"high","fast":true}""", body["model_options"].toString())
 
         val events = api.runEvents(runId).toList()
         assertEquals("/v1/runs/run_1/events", server.takeRequest().path)

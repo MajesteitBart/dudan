@@ -257,7 +257,32 @@ data class RunStatus(
         }
 }
 
-/** One model the user can pick, flattened from Hermes' /api/model/options payload. */
-data class ModelOption(val provider: String, val providerName: String, val model: String, val label: String, val isCurrent: Boolean)
+/**
+ * One model the user can pick, flattened from Hermes' /api/model/options payload. [reasoning] and
+ * [fast] say whether it takes a thinking level and priority processing; null when Hermes doesn't say.
+ */
+data class ModelOption(
+    val provider: String,
+    val providerName: String,
+    val model: String,
+    val label: String,
+    val isCurrent: Boolean,
+    val reasoning: Boolean? = null,
+    val fast: Boolean? = null,
+)
 
-data class ModelCatalog(val currentProvider: String?, val currentModel: String?, val options: List<ModelOption>)
+data class ModelCatalog(val currentProvider: String?, val currentModel: String?, val options: List<ModelOption>) {
+    /** The model [choice] runs on: the one it names, or the server default when it names none. */
+    fun optionFor(choice: ModelChoice): ModelOption? =
+        if (choice.model == null) options.firstOrNull { it.isCurrent }
+        else options.firstOrNull { it.model == choice.model && (choice.provider == null || it.provider == choice.provider) }
+
+    /** [choice] without a thinking level or fast mode its model reports it doesn't take. Unknown models keep both. */
+    fun supported(choice: ModelChoice): ModelChoice {
+        val option = optionFor(choice) ?: return choice
+        return choice.copy(
+            effort = choice.effort.takeIf { option.reasoning != false },
+            fast = choice.fast && option.fast == true,
+        )
+    }
+}

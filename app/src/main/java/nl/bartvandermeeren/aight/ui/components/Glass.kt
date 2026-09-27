@@ -12,10 +12,12 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.widthIn
@@ -28,6 +30,8 @@ import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
@@ -377,6 +381,36 @@ fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> 
                 )
             }
         }
+    }
+}
+
+/** A setting that is on or off: the name, what it does in grey underneath, and a switch in the accent color. */
+@Composable
+fun Toggle(title: String, detail: String, checked: Boolean, modifier: Modifier = Modifier, onChange: (Boolean) -> Unit) {
+    Row(
+        modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable { onChange(!checked) }
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+        }
+        Switch(
+            checked = checked,
+            onCheckedChange = onChange,
+            colors = SwitchDefaults.colors(
+                checkedTrackColor = LocalAccent.current.color,
+                checkedThumbColor = LocalAccent.current.on,
+                checkedBorderColor = Color.Transparent,
+                uncheckedTrackColor = Palette.Surface,
+                uncheckedThumbColor = Palette.TextSecondary,
+                uncheckedBorderColor = Palette.Outline,
+            ),
+        )
     }
 }
 
