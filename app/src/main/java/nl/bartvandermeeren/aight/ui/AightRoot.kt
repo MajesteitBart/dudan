@@ -133,8 +133,12 @@ private fun AightScreens(vm: MainViewModel) {
         }
     }
 
-    val pickPhotos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(4)) { uris ->
-        uris.forEach(vm::addImage)
+    // Photos go to the model as pictures; videos picked here are uploaded like any other file.
+    val pickPhotos = rememberLauncherForActivityResult(ActivityResultContracts.PickMultipleVisualMedia(8)) { uris ->
+        vm.addPicked(uris)
+    }
+    val pickFiles = rememberLauncherForActivityResult(ActivityResultContracts.OpenMultipleDocuments()) { uris ->
+        vm.addPicked(uris)
     }
     var cameraUri by rememberSaveable { mutableStateOf<String?>(null) }
     val takePhoto = rememberLauncherForActivityResult(ActivityResultContracts.TakePicture()) { saved ->
@@ -153,7 +157,7 @@ private fun AightScreens(vm: MainViewModel) {
     }
     LaunchedEffect(Unit) { vm.loadModels() }
     LaunchedEffect(vm, context, resources) {
-        vm.notices.collect { Toast.makeText(context, resources.getString(it), Toast.LENGTH_LONG).show() }
+        vm.notices.collect { Toast.makeText(context, resources.getString(it.text, *it.args.toTypedArray()), Toast.LENGTH_LONG).show() }
     }
 
     // Replies to long agent runs arrive as notifications when aight isn't on screen.
@@ -175,7 +179,8 @@ private fun AightScreens(vm: MainViewModel) {
             speech.cancel()
             withMic { vm.screen = Screen.Live }
         },
-        onPickPhotos = { pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageOnly)) },
+        onPickPhotos = { pickPhotos.launch(PickVisualMediaRequest(ActivityResultContracts.PickVisualMedia.ImageAndVideo)) },
+        onPickFiles = { pickFiles.launch(arrayOf("*/*")) },
         onTakePhoto = {
             val dir = File(context.cacheDir, "camera").apply { mkdirs() }
             val file = File(dir, "photo_${System.currentTimeMillis()}.jpg")

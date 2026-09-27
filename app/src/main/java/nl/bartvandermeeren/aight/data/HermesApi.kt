@@ -106,11 +106,16 @@ class HermesApi(
      * Starts a run bound to a session. Runs keep going on the server when the client disconnects,
      * which matters on a phone that switches networks or gets backgrounded mid-task.
      */
-    suspend fun startRun(sessionId: String, input: String, model: ModelChoice): String {
+    /**
+     * [instructions] is added to the system prompt of this turn only; Hermes doesn't store it, so it
+     * reaches no other channel.
+     */
+    suspend fun startRun(sessionId: String, input: String, model: ModelChoice, instructions: String? = null): String {
         val body = buildJsonObject {
             put("input", input)
             put("session_id", sessionId)
             putModel(model)
+            if (!instructions.isNullOrBlank()) put("instructions", instructions)
         }
         val root = sendJson(request("v1", "runs").post(body.toBody()).build()).asObject()
         return root?.str("run_id") ?: throw HermesException(500, "Hermes did not return a run id")
@@ -143,10 +148,11 @@ class HermesApi(
     }
 
     /** Session chat stream, used for turns with images (the Runs endpoint only takes text input). */
-    fun sessionChatStream(sessionId: String, message: JsonElement, model: ModelChoice): Flow<AgentEvent> = sse {
+    fun sessionChatStream(sessionId: String, message: JsonElement, model: ModelChoice, instructions: String? = null): Flow<AgentEvent> = sse {
         val body = buildJsonObject {
             put("message", message)
             putModel(model)
+            if (!instructions.isNullOrBlank()) put("system_message", instructions)
         }
         request("api", "sessions", sessionId, "chat", "stream")
             .header("Accept", "text/event-stream")

@@ -44,6 +44,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -56,6 +57,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalView
@@ -74,6 +76,9 @@ import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.components.windowGlass
+import nl.bartvandermeeren.aight.ui.openui.LocalOpenUiHost
+import nl.bartvandermeeren.aight.ui.openui.OpenUiHost
+import nl.bartvandermeeren.aight.ui.openui.openExternalUrl
 import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.SpeechInput
@@ -223,32 +228,36 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
                 PlainIconButton(Icons.Outlined.OpenInFull, stringResource(R.string.open_full_chat), onClick = state::openFullChat, size = 44.dp, iconSize = 20.dp)
                 PlainIconButton(Icons.Rounded.Close, stringResource(R.string.action_close), onClick = state.dismiss, size = 44.dp, iconSize = 22.dp)
             }
-            LazyColumn(
-                state = listState,
-                modifier = Modifier.heightIn(max = maxHeight),
-                contentPadding = PaddingValues(bottom = 16.dp, top = 4.dp),
-                verticalArrangement = Arrangement.spacedBy(18.dp),
-            ) {
-                itemsIndexed(conversation.messages, key = { _, m -> m.id }) { index, message ->
-                    if (message.role == Role.User) {
-                        UserMessageItem(message)
-                    } else {
-                        AssistantMessageItem(
-                            message = message,
-                            isLast = index == conversation.messages.lastIndex,
-                            assistantName = settings.assistantName,
-                            speaking = speakingId == message.id,
-                            onSpeak = {
-                                if (speakingId == message.id) state.speaker.stop()
-                                else state.speaker.speak(message.id, message.text, settings.speechLanguage)
-                            },
-                            onRetry = { state.sessionId?.let(state.engine::retry) },
-                            onApproval = { choice -> state.sessionId?.let { state.engine.resolveApproval(it, choice) } },
-                            showDisclaimer = false,
-                        )
+            val context = LocalContext.current
+            val openUiHost = remember(state) { OpenUiHost(send = state::sendFromReply, openUrl = { openExternalUrl(context, it) }) }
+            CompositionLocalProvider(LocalOpenUiHost provides openUiHost) {
+                LazyColumn(
+                    state = listState,
+                    modifier = Modifier.heightIn(max = maxHeight),
+                    contentPadding = PaddingValues(bottom = 16.dp, top = 4.dp),
+                    verticalArrangement = Arrangement.spacedBy(18.dp),
+                ) {
+                    itemsIndexed(conversation.messages, key = { _, m -> m.id }) { index, message ->
+                        if (message.role == Role.User) {
+                            UserMessageItem(message)
+                        } else {
+                            AssistantMessageItem(
+                                message = message,
+                                isLast = index == conversation.messages.lastIndex,
+                                assistantName = settings.assistantName,
+                                speaking = speakingId == message.id,
+                                onSpeak = {
+                                    if (speakingId == message.id) state.speaker.stop()
+                                    else state.speaker.speak(message.id, message.text, settings.speechLanguage)
+                                },
+                                onRetry = { state.sessionId?.let(state.engine::retry) },
+                                onApproval = { choice -> state.sessionId?.let { state.engine.resolveApproval(it, choice) } },
+                                showDisclaimer = false,
+                            )
+                        }
                     }
+                    item(key = "bottom") { Spacer(Modifier.size(1.dp)) }
                 }
-                item(key = "bottom") { Spacer(Modifier.size(1.dp)) }
             }
         }
     }

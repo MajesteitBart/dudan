@@ -96,6 +96,7 @@ import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.data.DutchTtsEngine
 import nl.bartvandermeeren.aight.data.SttEngine
 import nl.bartvandermeeren.aight.data.TtsEngine
+import nl.bartvandermeeren.aight.data.UploadClient
 import nl.bartvandermeeren.aight.device.PhoneControl
 import nl.bartvandermeeren.aight.device.Tailnet
 import nl.bartvandermeeren.aight.ui.MainViewModel
@@ -257,6 +258,8 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                         placeholder = stringResource(R.string.speech_language_hint),
                     )
                 }
+
+                Section(stringResource(R.string.section_replies_files)) { RepliesAndFilesSettings(vm, settings) }
 
                 Section(stringResource(R.string.section_phone_control)) { PhoneControlSettings(vm, settings) }
 
@@ -637,6 +640,43 @@ private fun PhoneControlSettings(vm: MainViewModel, settings: AppSettings) {
                 vm.settingsRepository.renewPhoneToken()
                 Toast.makeText(context, renewed, Toast.LENGTH_LONG).show()
             }
+        }
+    }
+}
+
+/** OpenUI replies on or off, and where attachments are uploaded, with a check that the service answers. */
+@Composable
+private fun RepliesAndFilesSettings(vm: MainViewModel, settings: AppSettings) {
+    val scope = rememberCoroutineScope()
+    Toggle(stringResource(R.string.rich_replies), stringResource(R.string.rich_replies_detail), settings.richReplies) {
+        scope.launch { vm.settingsRepository.setRichReplies(it) }
+    }
+    var address by rememberSaveable { mutableStateOf(settings.uploadUrl) }
+    var result by remember { mutableStateOf<String?>(null) }
+    var failed by remember { mutableStateOf(false) }
+    var checking by remember { mutableStateOf(false) }
+    Field(
+        address,
+        {
+            address = it
+            result = null
+            scope.launch { vm.settingsRepository.setUploadUrl(it) }
+        },
+        stringResource(R.string.upload_server),
+        placeholder = UploadClient.baseUrlFor(settings.serverUrl, "").ifBlank { null },
+        keyboard = KeyboardType.Uri,
+    )
+    Text(stringResource(R.string.upload_server_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+    result?.let { Notice(it, if (failed) Palette.Danger else Palette.Success, ok = !failed, error = failed) }
+    val ok = stringResource(R.string.upload_ok)
+    LinkAction(stringResource(if (checking) R.string.upload_checking else R.string.upload_check)) {
+        if (checking) return@LinkAction
+        scope.launch {
+            checking = true
+            val problem = vm.checkUploads()
+            failed = problem != null
+            result = problem ?: ok
+            checking = false
         }
     }
 }

@@ -3,6 +3,7 @@ package nl.bartvandermeeren.aight.chat
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.contentOrNull
+import nl.bartvandermeeren.aight.data.AttachmentNotes
 import nl.bartvandermeeren.aight.data.HermesJson
 import nl.bartvandermeeren.aight.data.HermesMessage
 import nl.bartvandermeeren.aight.data.contentImages
@@ -39,10 +40,11 @@ object HistoryMapper {
             when (message.role) {
                 "user" -> {
                     flushWork(index, timestampMs)
-                    val text = message.content.contentText()
+                    // Attached files travel as notes in the text; show them as files again.
+                    val (text, files) = AttachmentNotes.parse(message.content.contentText())
                     val images = message.content.contentImages().map(::ImageRef)
-                    if (text.isNotBlank() || images.isNotEmpty()) {
-                        out += UiMessage(id = message.id?.let { "h_$it" } ?: "h_$index", role = Role.User, text = text, images = images)
+                    if (text.isNotBlank() || images.isNotEmpty() || files.isNotEmpty()) {
+                        out += UiMessage(id = message.id?.let { "h_$it" } ?: "h_$index", role = Role.User, text = text, images = images, files = files)
                     }
                     turnStartedAt = timestampMs
                 }

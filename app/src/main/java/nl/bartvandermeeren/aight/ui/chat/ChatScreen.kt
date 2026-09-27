@@ -28,6 +28,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.outlined.AttachFile
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -43,6 +44,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -59,6 +61,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.CompositingStrategy
 import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -80,6 +83,9 @@ import nl.bartvandermeeren.aight.ui.components.GlassMenuItem
 import nl.bartvandermeeren.aight.ui.components.ModelPickerButton
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.pane
+import nl.bartvandermeeren.aight.ui.openui.LocalOpenUiHost
+import nl.bartvandermeeren.aight.ui.openui.OpenUiHost
+import nl.bartvandermeeren.aight.ui.openui.openExternalUrl
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 /** Callbacks the activity provides because they need permissions or activity result launchers. */
@@ -90,6 +96,7 @@ class ChatHostActions(
     val onLive: () -> Unit,
     val onPickPhotos: () -> Unit,
     val onTakePhoto: () -> Unit,
+    val onPickFiles: () -> Unit,
 )
 
 /**
@@ -202,8 +209,13 @@ fun ChatPane(
                         showAddMenu = false
                         actions.onTakePhoto()
                     }
+                    GlassMenuItem(Icons.Outlined.AttachFile, stringResource(R.string.attach_files), stringResource(R.string.attach_files_detail)) {
+                        showAddMenu = false
+                        actions.onPickFiles()
+                    }
                 }
             },
+            onRetryAttachment = vm::retryUpload,
         )
     }
 
@@ -314,29 +326,33 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
         if (follow && messages.isNotEmpty() && listState.canScrollForward) listState.animateScrollToItem(messages.size)
     }
 
+    val context = LocalContext.current
+    val openUiHost = remember(vm) { OpenUiHost(send = vm::sendFromReply, openUrl = { openExternalUrl(context, it) }) }
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
-        LazyColumn(
-            state = listState,
-            contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
-            verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.fillMaxSize().widthIn(max = 880.dp).fadeEdges(top = 18.dp, bottom = 14.dp),
-        ) {
-            itemsIndexed(messages, key = { _, m -> m.id }) { index, message ->
-                if (message.role == Role.User) {
-                    UserMessageItem(message)
-                } else {
-                    AssistantMessageItem(
-                        message = message,
-                        isLast = index == messages.lastIndex,
-                        assistantName = settings.assistantName,
-                        speaking = speakingId == message.id,
-                        onSpeak = { vm.toggleSpeak(message.id, message.text) },
-                        onRetry = vm::retry,
-                        onApproval = vm::resolveApproval,
-                    )
+        CompositionLocalProvider(LocalOpenUiHost provides openUiHost) {
+            LazyColumn(
+                state = listState,
+                contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(24.dp),
+                modifier = Modifier.fillMaxSize().widthIn(max = 880.dp).fadeEdges(top = 18.dp, bottom = 14.dp),
+            ) {
+                itemsIndexed(messages, key = { _, m -> m.id }) { index, message ->
+                    if (message.role == Role.User) {
+                        UserMessageItem(message)
+                    } else {
+                        AssistantMessageItem(
+                            message = message,
+                            isLast = index == messages.lastIndex,
+                            assistantName = settings.assistantName,
+                            speaking = speakingId == message.id,
+                            onSpeak = { vm.toggleSpeak(message.id, message.text) },
+                            onRetry = vm::retry,
+                            onApproval = vm::resolveApproval,
+                        )
+                    }
                 }
+                item(key = "bottom") { Spacer(Modifier.height(1.dp)) }
             }
-            item(key = "bottom") { Spacer(Modifier.height(1.dp)) }
         }
         AnimatedVisibility(
             visible = listState.canScrollForward && !follow,

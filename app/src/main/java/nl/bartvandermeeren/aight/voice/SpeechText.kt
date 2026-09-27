@@ -1,6 +1,11 @@
 package nl.bartvandermeeren.aight.voice
 
-/** Turns a markdown reply into something a TTS voice can read without saying "asterisk". */
+import nl.bartvandermeeren.aight.openui.OpenUiText
+
+/**
+ * Turns a markdown reply into something a TTS voice can read without saying "asterisk". OpenUI
+ * blocks are read as the text they show, not skipped like other code.
+ */
 object SpeechText {
     private val codeFence = Regex("```[\\s\\S]*?(```|$)")
     private val inlineCode = Regex("`([^`]+)`")
@@ -13,7 +18,7 @@ object SpeechText {
     private val tableRule = Regex("(?m)^\\s*\\|?\\s*:?-{3,}.*$")
     private val quote = Regex("(?m)^>\\s?")
 
-    fun fromMarkdown(markdown: String): String = markdown
+    fun fromMarkdown(markdown: String): String = OpenUiText.expand(markdown)
         .replace(codeFence, " ")
         .replace(image, "$1")
         .replace(link, "$1")

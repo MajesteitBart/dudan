@@ -72,11 +72,13 @@ class MainActivity : ComponentActivity() {
                 vm.requestVoice()
             }
             Intent.ACTION_SEND -> {
-                if (intent.type?.startsWith("image/") == true) {
-                    IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)?.let(vm::acceptSharedImage)
-                } else {
-                    intent.getStringExtra(Intent.EXTRA_TEXT)?.let(vm::acceptSharedText)
-                }
+                val stream = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
+                val text = intent.getStringExtra(Intent.EXTRA_TEXT)
+                if (stream != null) vm.acceptShared(listOf(stream), text) else text?.let(vm::acceptSharedText)
+            }
+            Intent.ACTION_SEND_MULTIPLE -> {
+                val streams = IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
+                if (streams.isNotEmpty()) vm.acceptShared(streams, intent.getStringExtra(Intent.EXTRA_TEXT))
             }
         }
         if (startVoice) vm.requestVoice()

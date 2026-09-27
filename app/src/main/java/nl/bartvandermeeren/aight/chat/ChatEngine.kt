@@ -22,11 +22,14 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import nl.bartvandermeeren.aight.data.AgentEvent
 import nl.bartvandermeeren.aight.data.ApprovalRequest
+import nl.bartvandermeeren.aight.data.AttachmentNotes
+import nl.bartvandermeeren.aight.data.FileRef
 import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.data.RunOutcome
 import nl.bartvandermeeren.aight.data.SessionSummary
 import nl.bartvandermeeren.aight.data.AppSettings
+import nl.bartvandermeeren.aight.openui.OpenUiPrompt
 
 /** An image ready to send: JPEG bytes plus the data: URL Hermes expects. */
 class PreparedImage(val bytes: ByteArray, val dataUrl: String)
@@ -41,8 +44,12 @@ class ChatEngine(
     private val scope: CoroutineScope,
     private val currentSettings: suspend () -> AppSettings,
 ) {
-    /** One agent turn. Cleanup only touches shared state this turn still owns. */
-    private class Turn(val sessionId: String, val messageId: String, val text: String, val images: List<PreparedImage>) {
+    /**
+     * One agent turn. [text] is what the user typed; [input] is what Hermes gets, with a note per
+     * attached file. Cleanup only touches shared state this turn still owns.
+     */
+    private class Turn(val sessionId: String, val messageId: String, val text: String, val images: List<PreparedImage>, files: List<FileRef>) {
+        val input: String = AttachmentNotes.compose(text, files)
         var job: Job? = null
         var runId: String? = null
         var stopRequested = false
@@ -107,17 +114,17 @@ class ChatEngine(
     }
 
     /** Starts a turn. Returns false when the conversation is still busy with the previous one. */
-    fun send(sessionId: String, text: String, images: List<PreparedImage> = emptyList()): Boolean {
+    fun send(sessionId: String, text: String, images: List<PreparedImage> = emptyList(), files: List<FileRef> = emptyList()): Boolean {
         val flow = flowFor(sessionId)
-        if (flow.value.isBusy || (text.isBlank() && images.isEmpty())) return false
-        val user = UiMessage(id = nextLocalId(), role = Role.User, text = text, images = images.map { ImageRef(it.dataUrl) })
+        if (flow.value.isBusy || (text.isBlank() && images.isEmpty() && files.isEmpty())) return false
+        val user = UiMessage(id = nextLocalId(), role = Role.User, text = text, images = images.map { ImageRef(it.dataUrl) }, files = files)
         val assistant = UiMessage(
             id = nextLocalId(), role = Role.Assistant, state = MessageState.Streaming, startedAtMs = System.currentTimeMillis(),
         )
         val wasNew = flow.value.isNew
         flow.update { it.copy(messages = it.messages + user + assistant, loaded = true, loadError = null) }
-        if (wasNew) addOptimisticSession(sessionId, text)
-        val turn = Turn(sessionId, assistant.id, text, images)
+        if (wasNew) addOptimisticSession(sessionId, text.ifBlank { files.joinToString(", ") { it.name } })
+        val turn = Turn(sessionId, assistant.id, text, images, files)
         turns[sessionId] = turn
         turn.job = scope.launch { runTurn(turn) }
         return true
@@ -135,7 +142,7 @@ class ChatEngine(
         val images = lastUser.images.mapNotNull { ref ->
             ref.source.takeIf { it.startsWith("data:") }?.let { PreparedImage(ByteArray(0), it) }
         }
-        send(sessionId, lastUser.text, images)
+        send(sessionId, lastUser.text, images, lastUser.files)
     }
 
     /**
@@ -279,14 +286,16 @@ class ChatEngine(
                     api.createSession(sessionId)
                     conversations[sessionId]?.update { it.copy(isNew = false) }
                 }
-                val model = currentSettings().modelFor(profileOf(sessionId))
+                val settings = currentSettings()
+                val model = settings.modelFor(profileOf(sessionId))
+                val instructions = OpenUiPrompt.instructions.takeIf { settings.richReplies }
                 val events: Flow<AgentEvent> = if (turn.usesRuns) {
-                    val runId = api.startRun(sessionId, turn.text, model)
+                    val runId = api.startRun(sessionId, turn.input, model, instructions)
                     turn.runId = runId
                     if (turn.stopRequested) sendStop(turn)
                     api.runEvents(runId)
                 } else {
-                    api.sessionChatStream(sessionId, multimodalMessage(turn.text, turn.images), model)
+                    api.sessionChatStream(sessionId, multimodalMessage(turn.input, turn.images), model, instructions)
                 }
                 var sawTerminal = false
                 events.collect { event ->

@@ -17,6 +17,8 @@ Everything the agent does happens on the Hermes server. The app talks to the Her
 - Voice input with a live waveform, read-aloud per reply, and a hands-free Live mode. Speech is transcribed on the phone by [Orukeet](https://github.com/Oruk-AI/orukeet), Oruk's multilingual fine-tune of NVIDIA Parakeet TDT 0.6B v3, which handles Dutch and English without a language setting. English replies are read by Kokoro-82M and Dutch replies by Supertonic 3, both on the phone. Before Supertonic reads a Dutch reply, the app writes out numbers, times, amounts and dates, because it misreads digits.
 - Assistant overlay on the side key: starts listening right away, can attach the current screen ("Ask about screen"), reads spoken questions' answers aloud, and hands off to the full app.
 - Model picker backed by Hermes' model inventory. Each default also sets the thinking level (Hermes' own setting, or off up to max) and, for models that support it, fast mode, which asks the provider for priority processing at a higher price. There are two defaults: one for chats started in the app, and a quick one for chats started from the assistant overlay or the assist gesture. A chat keeps the model of the place it started, also when you continue it in the app.
+- Files: the attach menu takes photos, videos and any other file up to 250 MB (PDF, Word, spreadsheets, audio, archives), and other apps can share files to aight. Photos go to the model as pictures. Other files upload to a small service next to Hermes while you type, and the turn tells the agent where the file is, in the same words Hermes' Telegram and Discord adapters use. The agent then reads, transcribes or inspects it with its own tools. See [Files](#files).
+- Rich replies: when a table, chart, steps, choices or a short form help, the agent adds an [OpenUI](https://www.openui.com) block to its answer, and aight draws it as native UI in the chat. Buttons, follow-up suggestions and form submits send your next message. See [Rich replies](#rich-replies).
 - Search, pin, rename and delete chats; browse Hermes skills; run, pause or resume scheduled tasks.
 - Phone control: Hermes can open apps and links, set timers and alarms, and control media on the phone, whichever channel you ask it from. See [Phone control](#phone-control).
 - English and Dutch UI.
@@ -34,6 +36,8 @@ API_SERVER_HOST=0.0.0.0      # or the Tailscale IP, so the phone can reach it
 Restart the gateway (`hermes gateway restart`) and check `curl http://<host>:8642/health`.
 
 Keep the port inside the tailnet. The API server runs agent turns with terminal access, so anyone holding the key can run commands on the host. Plain `http://` is fine over Tailscale because WireGuard encrypts the traffic; the app warns when an `http://` address points outside the tailnet.
+
+For attachments other than photos, also run the upload service on the Hermes host; [Files](#files) explains why and `tools/hermes-upload/README.md` has the steps. Chat works without it.
 
 ## Phone setup
 
@@ -84,7 +88,35 @@ Android only lets an app open other apps while one of its windows is on screen, 
 
 New key in the same section replaces the token; copy the setup again afterwards. For testing in the emulator, debug builds also answer on loopback: `adb forward tcp:18643 tcp:8643`, then send requests to `http://127.0.0.1:18643/mcp` with the token.
 
-## Build
+## Files
+
+Hermes' API server only takes images, and it rejects any request over 10 MB. Its messaging adapters handle files differently: Telegram's adapter saves a document under `~/.hermes/cache/` and adds a note to the user's turn, such as `[The user sent a document: 'offer.pdf'. It is saved at: /home/…/offer.pdf. …]`. The agent then extracts the text, transcribes the audio or runs a video tool itself.
+
+aight does the same with a service of its own, `tools/hermes-upload/aight_upload.py` (Python 3, standard library only). It runs on the Hermes host on port 8645 and accepts the Hermes API key, so the app needs no new secret. The app uploads a file in 8 MB chunks as soon as you pick it. After a dropped connection it asks the service how far it got and continues from there, and it checks the SHA-256 when the upload completes. Files land in `~/.hermes/uploads/aight/` and are deleted after 30 days. Removing a file from the prompt bar before sending deletes it from the host.
+
+The turn itself is plain text: your words, then one note per file in Hermes' own wording. That also lets file turns use the Runs API, so they survive a dropped connection. The chat history turns the notes back into file chips.
+
+Settings > Replies and files has the service's address; empty means port 8645 on the Hermes server. Tapping Check the upload service there tests the address and the key.
+
+## Rich replies
+
+[OpenUI](https://www.openui.com) is an open standard for generative UI: the model writes a compact, line-based language (OpenUI Lang) that names components from a fixed library, and the client renders them. aight sends Hermes the language rules and the components it draws as extra instructions on each turn (`instructions` on the Runs API, `system_message` on the session stream). Hermes adds them to the system prompt for that turn only and doesn't store them, so Telegram and the CLI never see them. Settings > Replies and files > Rich replies turns this off.
+
+The agent answers in markdown as usual and adds a fenced `openui-lang` block when structure helps:
+
+````
+```openui-lang
+root = Card([header, table, followUps])
+header = CardHeader("Energy contracts", "Fixed, 1 year")
+table = Table([Col("Supplier", ["A", "B"]), Col("Per month", ["€142", "€148"], "number")])
+followUps = FollowUpBlock([FollowUpItem("Which one is greenest?")])
+```
+````
+
+`openui/` holds a Kotlin port of the reference parser in `@openuidev/lang-core` (spec v0.5): statements, references in any order, expressions, `$variables`, `@Each` and the data built-ins. Like the reference, it closes unfinished strings and brackets, so a block renders while it streams in. `ui/openui/` draws the OpenUI chat library's components with their positional arguments in the same order: cards, headers, text, callouts, code, images, tables, bar, line, area, pie and stacked charts, steps, tabs, accordions, lists, tags, buttons, follow-ups and forms with validation. Charts take their colors from a fixed palette checked for colorblind separation on aight's skies; tap one to read its values, or switch it to a table. A block that doesn't parse shows as code, and components aight doesn't draw show their text.
+
+Copy, share, the reply notification and read-aloud turn each block into the markdown it stands for: a table stays a table, and steps become a numbered list.
+
 
 Requires JDK 17 and the Android SDK (compileSdk 36). The first build downloads the sherpa-onnx AAR (Kokoro's runtime, 39 MB) from GitHub into `app/libs` and checks its SHA-256.
 
@@ -106,6 +138,8 @@ node tools/mock-hermes/server.mjs 8650
 
 In the emulator, connect to `http://10.0.2.2:8650` with key `dev-key-aight-0000000000`. Messages containing "verwijder" or "delete" trigger an approval request.
 
+The mock also runs the upload service's protocol on port 8645 (a second argument changes it), so attachments work in the emulator and the reply names the files it got. With Rich replies on, messages containing "vergelijk", "formulier", "grafiek" or "stappen" get scripted OpenUI replies, and "supermarkt", "backup" or "energieverbruik" get replies a model wrote from aight's OpenUI instructions (`tools/mock-hermes/samples/`). A unit test parses those samples too.
+
 Use the debug build on an x86_64 emulator. Release builds only contain arm64 libraries; the emulator runs those through ARM translation, and Kokoro's native library crashes there while loading.
 
 Questions containing "english" get an English reply from the mock, for testing Kokoro.
@@ -126,7 +160,8 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 
 ## Code map
 
-- `data/`: Hermes HTTP client, SSE reader, payload parsing, settings with the API key encrypted by an Android Keystore key
+- `data/`: Hermes HTTP client, SSE reader, payload parsing, settings with the API key encrypted by an Android Keystore key. `UploadClient` talks to the upload service; `AttachmentNotes` writes and reads Hermes' file notes
+- `openui/`: OpenUI Lang parser and evaluator (`OpenUiParser`, `OpenUiRuntime`), the instructions the agent gets (`OpenUiPrompt`) and the markdown export for copy and speech (`OpenUiText`). `ui/openui/` renders the components
 - `chat/`: `ChatEngine` owns every conversation and run for the whole process, shared by the app, the overlay and Live mode; `TurnReducer` folds stream events into a message; `HistoryMapper` turns a Hermes transcript into bubbles
 - `assist/`: voice interaction service, the overlay session (Compose inside a `VoiceInteractionSession`) and the proxy recognition service
 - `device/`: phone control. `PhoneTools` implements the tools, `McpHandler` speaks MCP's JSON-RPC, `McpHttpServer` serves it on the Tailscale address (`Tailnet`), `PhoneControlService` keeps it running, and `PhoneControl` starts activities or falls back to a notification. `tools/hermes-phone-bridge/` is the Hermes side
@@ -136,8 +171,10 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 
 ## Known limits
 
-- Hermes' Runs API takes text only, so turns with images use the session chat stream. Those turns stop if the connection drops mid-run.
-- Hermes accepts images but no other files, so the attach menu offers photos and the camera only.
+- Turns with photos use the session chat stream, because that is where Hermes validates image parts. Those turns stop if the connection drops mid-run. Turns with other files are text and use the Runs API.
+- Files other than photos need the upload service on the Hermes host. The model never sees them directly: the agent opens them with its tools, so what it can do with a video or a spreadsheet depends on the tools and skills Hermes has.
+- Uploads run while aight is open. When Android stops the app during a large upload, pick the file again.
+- OpenUI blocks can't fetch data: `Query` renders its defaults, and `Mutation` and `@Run` do nothing. aight draws the chat library's common components; card blocks such as `SnippetCardBlock` show their text without their layout, and icons cover a few dozen lucide names.
 - The side-key overlay needs the microphone permission granted once in the app. Without it, the overlay opens the app to ask.
 - Kokoro synthesizes a whole sentence before it plays it, so a long first sentence delays the start of speech. On the x86 emulator a sentence of about 3 seconds starts playing 1.7 to 2.1 seconds after the request once the model is loaded; a phone's arm64 cores are faster, but this hasn't been measured on the Fold 7 yet.
 - Orukeet transcribes after you stop talking (1.1 s of silence ends a question), with previews of the text so far. Voice typing in other apps still goes to the phone's recognizer.

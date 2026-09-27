@@ -58,7 +58,7 @@
     <string name="action_scroll_down">Naar beneden</string>
     <string name="attach_photos">Foto\'s</string>
     <string name="attach_camera">Camera</string>
-    <string name="attach_photos_detail">Kies uit je galerij</string>
+    <string name="attach_photos_detail">Foto\'s en video\'s</string>
     <string name="attach_camera_detail">Maak een foto</string>
 
     <!-- Agent work -->
@@ -218,4 +218,47 @@
     <string name="phone_control_notification_text">Om apps en links te openen als je daarom vraagt. Tik om dit te wijzigen.</string>
     <string name="phone_action_title">%1$s wil iets openen</string>
     <string name="phone_action_tap_to_open">Tik om %1$s te openen</string>
+
+    <!-- Files -->
+    <string name="attach_files">Bestanden</string>
+    <string name="attach_files_detail">Elk bestand tot 250 MB</string>
+    <string name="upload_progress">%1$d%% van %2$s</string>
+    <string name="upload_failed_retry">Uploaden mislukt. Tik om het opnieuw te proberen</string>
+    <string name="upload_fix_first">Een van de bestanden is niet geüpload. Tik erop om het opnieuw te proberen, of verwijder het.</string>
+    <string name="file_too_large">%1$s is groter dan %2$d MB.</string>
+    <string name="upload_failed">%1$s kon niet worden geüpload: %2$s</string>
+    <string name="upload_rejected_key">De uploadservice weigert de API-sleutel.</string>
+    <string name="upload_unreachable">De uploadservice op de Hermes-server is niet bereikbaar. Zie Instellingen, Antwoorden en bestanden.</string>
+
+    <!-- Replies and files settings -->
+    <string name="section_replies_files">Antwoorden en bestanden</string>
+    <string name="rich_replies">Rijke antwoorden</string>
+    <string name="rich_replies_detail">Tabellen, grafieken, stappen, formulieren en vervolgvragen in antwoorden, getekend met OpenUI</string>
+    <string name="upload_server">Uploadserver</string>
+    <string name="upload_server_detail">Bestanden tot 250 MB gaan naar de uploadservice van aight op de Hermes-server, en de agent leest ze daar. Laat dit leeg om poort 8645 op de Hermes-server te gebruiken.</string>
+    <string name="upload_check">Uploadservice controleren</string>
+    <string name="upload_checking">Controleren…</string>
+    <string name="upload_ok">De uploadservice werkt.</string>
+
+    <!-- OpenUI replies -->
+    <string name="openui_busy">Wacht tot het antwoord klaar is.</string>
+    <string name="openui_sources">Bronnen</string>
+    <plurals name="openui_show_more_rows">
+        <item quantity="one">Nog %d rij tonen</item>
+        <item quantity="other">Nog %d rijen tonen</item>
+    </plurals>
+    <string name="openui_show_table">Tabel</string>
+    <string name="openui_show_chart">Grafiek</string>
+    <string name="openui_chart_hint">Tik op de grafiek om waarden te lezen</string>
+    <string name="openui_choose">Kies…</string>
+    <string name="openui_pick_date">Kies een datum</string>
+    <string name="openui_error_required">Vul dit in</string>
+    <string name="openui_error_email">Vul een e-mailadres in</string>
+    <string name="openui_error_url">Vul een webadres in dat met https:// begint</string>
+    <string name="openui_error_number">Vul een getal in</string>
+    <string name="openui_error_min_length">Gebruik minstens %s tekens</string>
+    <string name="openui_error_max_length">Gebruik hoogstens %s tekens</string>
+    <string name="openui_error_min">Vul %s of meer in</string>
+    <string name="openui_error_max">Vul %s of minder in</string>
+    <string name="openui_error_pattern">Dit heeft niet de juiste vorm</string>
 </resources>

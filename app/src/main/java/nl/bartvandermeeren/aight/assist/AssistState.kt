@@ -134,6 +134,13 @@ class AssistState(
         }
     }
 
+    /** Sends what an OpenUI button or follow-up asks for; false while a reply is still running. */
+    fun sendFromReply(message: String): Boolean {
+        val id = sessionId ?: return false
+        speech.cancel()
+        return engine.send(id, message)
+    }
+
     fun stop() {
         sessionId?.let(engine::stop)
     }

@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.DisableSelection
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.rounded.Check
@@ -61,6 +62,8 @@ import androidx.compose.ui.unit.em
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import nl.bartvandermeeren.aight.R
+import nl.bartvandermeeren.aight.openui.OpenUiText
+import nl.bartvandermeeren.aight.ui.openui.OpenUiBlock
 import nl.bartvandermeeren.aight.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
@@ -123,7 +126,12 @@ private fun MarkdownBlock(node: Node, style: TextStyle, depth: Int) {
         }
         is BulletList -> ListBlock(node, ordered = false, start = 1, style = style, depth = depth)
         is OrderedList -> ListBlock(node, ordered = true, start = node.markerStartNumber ?: 1, style = style, depth = depth)
-        is FencedCodeBlock -> CodeBlock(node.info?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }, node.literal.trimEnd('\n'))
+        is FencedCodeBlock -> if (OpenUiText.isOpenUiFence(node.info)) {
+            // Text fields and buttons inside an OpenUI block don't mix with the reply's text selection.
+            DisableSelection { OpenUiBlock(node.literal) }
+        } else {
+            CodeBlock(node.info?.trim()?.substringBefore(' ')?.takeIf { it.isNotEmpty() }, node.literal.trimEnd('\n'))
+        }
         is IndentedCodeBlock -> CodeBlock(null, node.literal.trimEnd('\n'))
         is BlockQuote -> Row(Modifier.height(IntrinsicSize.Min)) {
             Box(Modifier.width(3.dp).fillMaxHeight().clip(RoundedCornerShape(2.dp)).background(Palette.Outline))
@@ -272,9 +280,28 @@ private fun TableView(node: TableBlock, style: TextStyle) {
         }
     }
     val columns = rows.maxOfOrNull { it.cells.size } ?: 0
-    if (columns == 0) return
-    val rowBottoms = remember(node) { IntArray(rows.size) }
     val cellStyle = style.copy(fontSize = 15.sp, lineHeight = 22.sp)
+    TableGrid(rows.size, columns) { r, col ->
+        val row = rows[r]
+        Text(
+            row.cells.getOrElse(col) { AnnotatedString("") },
+            style = if (row.header) cellStyle.copy(fontWeight = FontWeight.SemiBold) else cellStyle,
+            color = Palette.TextPrimary,
+            modifier = Modifier
+                .background(if (row.header) Palette.Surface else Color.Transparent)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+        )
+    }
+}
+
+/**
+ * Cells in a hairline frame with a line between rows. Each column is as wide as its widest cell,
+ * between 64 and 280 dp, and the table scrolls sideways when it doesn't fit.
+ */
+@Composable
+fun TableGrid(rowCount: Int, columnCount: Int, cell: @Composable (row: Int, column: Int) -> Unit) {
+    if (rowCount == 0 || columnCount == 0) return
+    val rowBottoms = remember(rowCount) { IntArray(rowCount) }
     Box(
         Modifier
             .horizontalScroll(rememberScrollState())
@@ -282,16 +309,10 @@ private fun TableView(node: TableBlock, style: TextStyle) {
     ) {
         Layout(
             content = {
-                rows.forEach { row ->
-                    repeat(columns) { col ->
-                        Text(
-                            row.cells.getOrElse(col) { AnnotatedString("") },
-                            style = if (row.header) cellStyle.copy(fontWeight = FontWeight.SemiBold) else cellStyle,
-                            color = Palette.TextPrimary,
-                            modifier = Modifier
-                                .background(if (row.header) Palette.Surface else Color.Transparent)
-                                .padding(horizontal = 14.dp, vertical = 10.dp),
-                        )
+                repeat(rowCount) { r ->
+                    repeat(columnCount) { c ->
+                        // Cells are measured at their column's width and their row's height.
+                        Box(propagateMinConstraints = true) { cell(r, c) }
                     }
                 }
             },
@@ -305,15 +326,15 @@ private fun TableView(node: TableBlock, style: TextStyle) {
         ) { measurables, _ ->
             val maxCell = 280.dp.roundToPx()
             val minCell = 64.dp.roundToPx()
-            val widths = IntArray(columns) { col ->
-                rows.indices.maxOf { r -> measurables[r * columns + col].maxIntrinsicWidth(Constraints.Infinity) }
+            val widths = IntArray(columnCount) { col ->
+                (0 until rowCount).maxOf { r -> measurables[r * columnCount + col].maxIntrinsicWidth(Constraints.Infinity) }
                     .coerceIn(minCell, maxCell)
             }
-            val heights = IntArray(rows.size) { r ->
-                (0 until columns).maxOf { c -> measurables[r * columns + c].maxIntrinsicHeight(widths[c]) }
+            val heights = IntArray(rowCount) { r ->
+                (0 until columnCount).maxOf { c -> measurables[r * columnCount + c].maxIntrinsicHeight(widths[c]) }
             }
             val placeablesFixed = measurables.mapIndexed { i, m ->
-                m.measure(Constraints.fixed(widths[i % columns], heights[i / columns]))
+                m.measure(Constraints.fixed(widths[i % columnCount], heights[i / columnCount]))
             }
             var y = 0
             heights.forEachIndexed { r, h ->
@@ -322,10 +343,10 @@ private fun TableView(node: TableBlock, style: TextStyle) {
             }
             layout(widths.sum(), heights.sum()) {
                 var top = 0
-                rows.indices.forEach { r ->
+                repeat(rowCount) { r ->
                     var left = 0
-                    repeat(columns) { c ->
-                        placeablesFixed[r * columns + c].placeRelative(left, top)
+                    repeat(columnCount) { c ->
+                        placeablesFixed[r * columnCount + c].placeRelative(left, top)
                         left += widths[c]
                     }
                     top += heights[r]
