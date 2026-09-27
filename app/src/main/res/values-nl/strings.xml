@@ -197,4 +197,25 @@
     <string name="sky_midnight">Middernacht</string>
     <string name="reduce_transparency">Transparantie verminderen</string>
     <string name="reduce_transparency_detail">Effen panelen in plaats van matglas. Staat ook aan als het kleurcontrast van je telefoon op gemiddeld of hoog staat.</string>
+
+    <!-- Phone control -->
+    <string name="section_phone_control">Telefoonbediening</string>
+    <string name="phone_control">Hermes deze telefoon laten gebruiken</string>
+    <string name="phone_control_detail">Hermes kan apps en links openen, timers en wekkers zetten en bedienen wat er speelt. Hermes bereikt de telefoon alleen via Tailscale, met een eigen sleutel.</string>
+    <string name="phone_control_reachable">Hermes bereikt deze telefoon op %1$s</string>
+    <string name="phone_control_no_tailscale">Tailscale is niet verbonden op deze telefoon, dus Hermes kan hem niet bereiken.</string>
+    <string name="phone_control_starting">Telefoonbediening starten…</string>
+    <string name="phone_control_failed">Telefoonbediening is niet gestart: %1$s</string>
+    <string name="phone_control_background">Hermes kan alleen apps openen als aight in beeld is. Maak aight hierboven je standaardassistent, of sta Weergeven boven andere apps toe. Tot die tijd toont de telefoon een melding om op te tikken.</string>
+    <string name="phone_control_background_allow">Weergeven boven andere apps toestaan</string>
+    <string name="phone_control_copy">Hermes-instellingen kopiëren</string>
+    <string name="phone_control_copied">Gekopieerd. Plak het op de Hermes-server; bij elk deel staat waar het hoort.</string>
+    <string name="phone_control_renew">Nieuwe sleutel</string>
+    <string name="phone_control_renewed">Nieuwe sleutel gemaakt. Kopieer de Hermes-instellingen opnieuw; de oude sleutel werkt niet meer.</string>
+    <string name="notification_channel_phone_control">Telefoonbediening</string>
+    <string name="notification_channel_phone_actions">Acties van Hermes</string>
+    <string name="phone_control_notification_title">Hermes kan deze telefoon gebruiken</string>
+    <string name="phone_control_notification_text">Om apps en links te openen als je daarom vraagt. Tik om dit te wijzigen.</string>
+    <string name="phone_action_title">%1$s wil iets openen</string>
+    <string name="phone_action_tap_to_open">Tik om %1$s te openen</string>
 </resources>

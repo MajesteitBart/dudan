@@ -199,4 +199,25 @@
     <string name="sky_midnight">Midnight</string>
     <string name="reduce_transparency">Reduce transparency</string>
     <string name="reduce_transparency_detail">Solid panels instead of frosted glass. Also on when the phone\'s color contrast is set to medium or high.</string>
+
+    <!-- Phone control -->
+    <string name="section_phone_control">Phone control</string>
+    <string name="phone_control">Let Hermes use this phone</string>
+    <string name="phone_control_detail">Hermes can open apps and links, set timers and alarms, and control what\'s playing. It reaches the phone over Tailscale only, with a key of its own.</string>
+    <string name="phone_control_reachable">Hermes can reach this phone at %1$s</string>
+    <string name="phone_control_no_tailscale">Tailscale isn\'t connected on this phone, so Hermes can\'t reach it.</string>
+    <string name="phone_control_starting">Starting phone control…</string>
+    <string name="phone_control_failed">Phone control didn\'t start: %1$s</string>
+    <string name="phone_control_background">Hermes can only open apps while aight is on screen. Make aight the default assistant above, or allow Display over other apps. Until then, the phone shows a notification to tap.</string>
+    <string name="phone_control_background_allow">Allow Display over other apps</string>
+    <string name="phone_control_copy">Copy Hermes setup</string>
+    <string name="phone_control_copied">Copied. Paste it on the Hermes host; each part says where it goes.</string>
+    <string name="phone_control_renew">New key</string>
+    <string name="phone_control_renewed">New key made. Copy the Hermes setup again; the old key no longer works.</string>
+    <string name="notification_channel_phone_control">Phone control</string>
+    <string name="notification_channel_phone_actions">Actions from Hermes</string>
+    <string name="phone_control_notification_title">Hermes can use this phone</string>
+    <string name="phone_control_notification_text">To open apps and links when you ask. Tap to change.</string>
+    <string name="phone_action_title">%1$s wants to open something</string>
+    <string name="phone_action_tap_to_open">Tap to open %1$s</string>
 </resources>

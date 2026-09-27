@@ -12,6 +12,7 @@ import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
 import nl.bartvandermeeren.aight.chat.ChatEngine
+import nl.bartvandermeeren.aight.device.PhoneControl
 import nl.bartvandermeeren.aight.voice.KokoroVoice
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.OrukeetEngine
@@ -58,8 +59,13 @@ class AppContainer(context: Context) {
         Speaker(appContext, KokoroVoice(appContext, kokoroModel), SupertonicVoice(appContext, supertonicModel)) { settingsSnapshot.value }
     }
 
+    val phoneControl = PhoneControl(appContext, settingsSnapshot)
+
     init {
         ReplyNotifier(appContext, engine, settings, appScope)
+        appScope.launch {
+            settings.flow.map { it.phoneControl }.distinctUntilChanged().collect(phoneControl::sync)
+        }
         // Kokoro is the default voice: fetch its model on the first unmetered network, also when only the overlay runs.
         appScope.launch {
             settings.flow.map { it.ttsEngine }.distinctUntilChanged().collect { engine ->

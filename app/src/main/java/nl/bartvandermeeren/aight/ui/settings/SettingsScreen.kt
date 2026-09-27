@@ -2,8 +2,12 @@ package nl.bartvandermeeren.aight.ui.settings
 
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
+import android.content.ClipData
+import android.content.ClipboardManager
 import android.content.Intent
+import android.os.PersistableBundle
 import android.provider.Settings
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
@@ -73,11 +77,15 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.lifecycle.repeatOnLifecycle
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import nl.bartvandermeeren.aight.BuildConfig
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.appContainer
@@ -88,6 +96,8 @@ import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.data.DutchTtsEngine
 import nl.bartvandermeeren.aight.data.SttEngine
 import nl.bartvandermeeren.aight.data.TtsEngine
+import nl.bartvandermeeren.aight.device.PhoneControl
+import nl.bartvandermeeren.aight.device.Tailnet
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.chat.ModelPickerSheet
 import nl.bartvandermeeren.aight.ui.chat.modelModeLabel
@@ -247,6 +257,8 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                         placeholder = stringResource(R.string.speech_language_hint),
                     )
                 }
+
+                Section(stringResource(R.string.section_phone_control)) { PhoneControlSettings(vm, settings) }
 
                 Section(stringResource(R.string.section_appearance)) {
                     SkyPicker(Sky.from(settings.sky)) { scope.launch { vm.settingsRepository.setSky(it.name) } }
@@ -567,6 +579,63 @@ private fun SkyPicker(selected: Sky, onSelect: (Sky) -> Unit) {
                     }
                     Text(name, style = MaterialTheme.typography.bodySmall, color = if (chosen) Palette.TextPrimary else Palette.TextSecondary, maxLines = 1)
                 }
+            }
+        }
+    }
+}
+
+/** Whether Hermes may act on this phone, where it can reach it, and the setup to paste on the Hermes host. */
+@Composable
+private fun PhoneControlSettings(vm: MainViewModel, settings: AppSettings) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val control = context.appContainer.phoneControl
+    val state by control.state.collectAsStateWithLifecycle()
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var address by remember { mutableStateOf<String?>(null) }
+    var opensFromBackground by remember { mutableStateOf(true) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            opensFromBackground = control.canStartFromBackground()
+            // Tailscale can connect while this screen is open.
+            while (true) {
+                address = withContext(Dispatchers.IO) { Tailnet.ownAddress()?.hostAddress }
+                delay(3_000)
+            }
+        }
+    }
+    Toggle(stringResource(R.string.phone_control), stringResource(R.string.phone_control_detail), settings.phoneControl) {
+        scope.launch { vm.settingsRepository.setPhoneControl(it) }
+    }
+    if (!settings.phoneControl) return
+    when (val s = state) {
+        is PhoneControl.State.Running -> address?.let {
+            Notice(stringResource(R.string.phone_control_reachable, "http://$it:${s.port}/mcp"), Palette.Success, ok = true)
+        } ?: Notice(stringResource(R.string.phone_control_no_tailscale), Palette.SparkAmber)
+        is PhoneControl.State.Failed -> Notice(stringResource(R.string.phone_control_failed, s.message), Palette.Danger, error = true)
+        PhoneControl.State.Off -> Notice(stringResource(R.string.phone_control_starting), Palette.TextSecondary)
+    }
+    if (!opensFromBackground) {
+        Notice(stringResource(R.string.phone_control_background), Palette.SparkAmber)
+        LinkAction(stringResource(R.string.phone_control_background_allow)) {
+            val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
+            runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+        }
+    }
+    val copied = stringResource(R.string.phone_control_copied)
+    val renewed = stringResource(R.string.phone_control_renewed)
+    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+        LinkAction(stringResource(R.string.phone_control_copy)) {
+            val clip = ClipData.newPlainText("Hermes setup", control.hermesSetup(address, settings.phoneToken))
+            // Keeps the token out of the clipboard preview and keyboard suggestions.
+            clip.description.extras = PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
+            context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
+            Toast.makeText(context, copied, Toast.LENGTH_LONG).show()
+        }
+        LinkAction(stringResource(R.string.phone_control_renew)) {
+            scope.launch {
+                vm.settingsRepository.renewPhoneToken()
+                Toast.makeText(context, renewed, Toast.LENGTH_LONG).show()
             }
         }
     }

@@ -45,6 +45,7 @@ class MainActivity : ComponentActivity() {
     override fun onResume() {
         super.onResume()
         AppVisibility.activityResumed = true
+        appContainer.phoneControl.ensureRunning()
     }
 
     override fun onPause() {
