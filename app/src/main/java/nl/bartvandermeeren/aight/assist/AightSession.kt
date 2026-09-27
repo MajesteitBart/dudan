@@ -30,6 +30,7 @@ import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.appContainer
 import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.AightTheme
+import nl.bartvandermeeren.aight.ui.theme.Sky
 
 /**
  * The overlay Android shows when the user invokes the assistant (long-press power or home, corner
@@ -90,6 +91,7 @@ class AightSession(context: Context) :
             AightTheme(
                 reduceTransparency = state.settings?.reduceTransparency == true,
                 accent = Accent.from(state.settings?.accent),
+                sky = Sky.from(state.settings?.sky),
             ) {
                 AssistOverlay(state)
             }

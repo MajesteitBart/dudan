@@ -63,6 +63,8 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
@@ -102,6 +104,7 @@ import nl.bartvandermeeren.aight.ui.components.outlined
 import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
+import nl.bartvandermeeren.aight.ui.theme.Sky
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.KokoroVoice
 import nl.bartvandermeeren.aight.voice.SupertonicVoice
@@ -247,6 +250,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 }
 
                 Section(stringResource(R.string.section_appearance)) {
+                    SkyPicker(Sky.from(settings.sky)) { scope.launch { vm.settingsRepository.setSky(it.name) } }
                     AccentPicker(Accent.from(settings.accent)) { scope.launch { vm.settingsRepository.setAccent(it.name) } }
                     Toggle(stringResource(R.string.reduce_transparency), stringResource(R.string.reduce_transparency_detail), settings.reduceTransparency) {
                         scope.launch { vm.settingsRepository.setReduceTransparency(it) }
@@ -520,15 +524,65 @@ private fun DefaultAssistantStatus() {
     }
 }
 
+/** A setting's label with the chosen value's name beside it. */
+@Composable
+private fun PickerLabel(label: String, value: String) {
+    Row(verticalAlignment = Alignment.CenterVertically) {
+        Text(label, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary, modifier = Modifier.weight(1f))
+        Text(value, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+    }
+}
+
+/**
+ * A small sky per background, like a wallpaper picker, as a radio group of two rows of three. The
+ * chosen one wears a ring and a check.
+ */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun SkyPicker(selected: Sky, onSelect: (Sky) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        PickerLabel(stringResource(R.string.background), stringResource(selected.label))
+        FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(10.dp), verticalArrangement = Arrangement.spacedBy(10.dp), maxItemsInEachRow = 3) {
+            Sky.entries.forEach { sky ->
+                val chosen = sky == selected
+                val name = stringResource(sky.label)
+                val shape = RoundedCornerShape(16.dp)
+                Column(
+                    Modifier
+                        .weight(1f)
+                        .clip(RoundedCornerShape(18.dp))
+                        .selectable(selected = chosen, role = Role.RadioButton) { onSelect(sky) }
+                        .semantics(mergeDescendants = true) {},
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Box(
+                        Modifier
+                            .fillMaxWidth()
+                            .height(60.dp)
+                            .then(if (chosen) Modifier.border(2.dp, Palette.TextPrimary, RoundedCornerShape(18.dp)) else Modifier)
+                            .padding(4.dp)
+                            .clip(shape)
+                            .background(Brush.verticalGradient(0f to sky.top, 0.45f to sky.mid, 1f to sky.horizon))
+                            .background(Brush.radialGradient(listOf(sky.glow.copy(alpha = 0.45f), Color.Transparent), center = Offset(0f, Float.POSITIVE_INFINITY)))
+                            .border(1.dp, Palette.Hairline, shape),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        if (chosen) Icon(Icons.Rounded.Check, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+                    }
+                    Text(name, style = MaterialTheme.typography.bodySmall, color = if (chosen) Palette.TextPrimary else Palette.TextSecondary, maxLines = 1)
+                }
+            }
+        }
+    }
+}
+
 /** A swatch per accent, as a radio group: the chosen one wears a ring and a check, and its name shows beside the label. */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun AccentPicker(selected: Accent, onSelect: (Accent) -> Unit) {
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
-            Text(stringResource(R.string.accent_color), style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary, modifier = Modifier.weight(1f))
-            Text(stringResource(selected.label), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
-        }
+        PickerLabel(stringResource(R.string.accent_color), stringResource(selected.label))
         // Two rows of four, so the eight swatches never break unevenly on the narrow cover screen.
         FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp), maxItemsInEachRow = 4) {
             Accent.entries.forEach { accent ->

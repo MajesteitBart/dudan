@@ -183,6 +183,13 @@
     <string name="accent_amber">Amber</string>
     <string name="accent_coral">Coral</string>
     <string name="accent_pink">Pink</string>
+    <string name="background">Background</string>
+    <string name="sky_dusk">Dusk</string>
+    <string name="sky_ocean">Ocean</string>
+    <string name="sky_forest">Forest</string>
+    <string name="sky_sunset">Sunset</string>
+    <string name="sky_graphite">Graphite</string>
+    <string name="sky_midnight">Midnight</string>
     <string name="reduce_transparency">Reduce transparency</string>
     <string name="reduce_transparency_detail">Solid panels instead of frosted glass. Also on when the phone\'s color contrast is set to medium or high.</string>
 </resources>

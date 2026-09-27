@@ -181,6 +181,13 @@
     <string name="accent_amber">Amber</string>
     <string name="accent_coral">Koraal</string>
     <string name="accent_pink">Roze</string>
+    <string name="background">Achtergrond</string>
+    <string name="sky_dusk">Schemering</string>
+    <string name="sky_ocean">Oceaan</string>
+    <string name="sky_forest">Bos</string>
+    <string name="sky_sunset">Zonsondergang</string>
+    <string name="sky_graphite">Grafiet</string>
+    <string name="sky_midnight">Middernacht</string>
     <string name="reduce_transparency">Transparantie verminderen</string>
     <string name="reduce_transparency_detail">Effen panelen in plaats van matglas. Staat ook aan als het kleurcontrast van je telefoon op gemiddeld of hoog staat.</string>
 </resources>

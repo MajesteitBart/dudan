@@ -18,6 +18,7 @@ import nl.bartvandermeeren.aight.ui.AightRoot
 import nl.bartvandermeeren.aight.ui.MainViewModel
 import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.AightTheme
+import nl.bartvandermeeren.aight.ui.theme.Sky
 
 class MainActivity : ComponentActivity() {
     private val vm: MainViewModel by viewModels()
@@ -31,7 +32,11 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
-            AightTheme(reduceTransparency = settings?.reduceTransparency == true, accent = Accent.from(settings?.accent)) {
+            AightTheme(
+                reduceTransparency = settings?.reduceTransparency == true,
+                accent = Accent.from(settings?.accent),
+                sky = Sky.from(settings?.sky),
+            ) {
                 AightRoot(vm)
             }
         }

@@ -49,6 +49,7 @@ import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.ShaderBrush
 import androidx.compose.ui.graphics.TileMode
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.takeOrElse
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.graphics.drawscope.scale
@@ -70,7 +71,9 @@ import kotlin.random.Random
 import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
+import nl.bartvandermeeren.aight.ui.theme.LocalSky
 import nl.bartvandermeeren.aight.ui.theme.Palette
+import nl.bartvandermeeren.aight.ui.theme.Sky
 
 /** The state behind the current screen's glass, so glass cards can frost the sky under them. Null where nothing is blurred. */
 val LocalHazeState = staticCompositionLocalOf<HazeState?> { null }
@@ -92,9 +95,6 @@ object GlassDefaults {
     val SheetBlur = 48.dp
     val WindowBlur = 32.dp
     val CardShape = RoundedCornerShape(28.dp)
-
-    /** The body of Superhuman's "Get Superhuman" button; its arrow tile takes the accent (see [CtaButton]). */
-    val CtaBody = Color(0xFF1C1936)
 }
 
 /** A quiet surface inside a card: a flat fill, optionally with a hairline. */
@@ -108,9 +108,10 @@ fun Modifier.outlined(shape: Shape, fill: Color = Color.Transparent, outline: Co
     clip(shape).background(fill).border(1.dp, outline, shape)
 
 /**
- * A glass card: the sky behind it blurred (see [LocalHazeState]), washed toward violet-navy by [wash]
+ * A glass card: the sky behind it blurred (see [LocalHazeState]), washed toward the sky's dark by [wash]
  * so white text keeps its contrast, then [tint], a faint sheen and a light edge. Without a haze state
  * (the assistant overlay) the colors are painted flat. With Reduce transparency the card is [solid].
+ * [solid] and [wash] default to the current sky's.
  */
 fun Modifier.glass(
     shape: Shape,
@@ -118,12 +119,14 @@ fun Modifier.glass(
     blur: Boolean = true,
     blurRadius: Dp = GlassDefaults.CardBlur,
     border: Boolean = true,
-    solid: Color = Palette.ChromeSolid,
-    wash: Color = Palette.GlassWash,
+    solid: Color = Color.Unspecified,
+    wash: Color = Color.Unspecified,
 ): Modifier = composed {
+    val solidFill = solid.takeOrElse { Palette.ChromeSolid }
+    val washFill = wash.takeOrElse { Palette.GlassWash }
     val clipped = clip(shape)
     if (LocalReduceTransparency.current) {
-        val filled = clipped.background(solid)
+        val filled = clipped.background(solidFill)
         return@composed if (border) filled.border(GlassDefaults.SolidBorder, shape) else filled
     }
     val hazeState = LocalHazeState.current.takeIf { blur }
@@ -132,15 +135,15 @@ fun Modifier.glass(
             hazeState,
             HazeStyle(
                 backgroundColor = Palette.Background,
-                tints = listOf(HazeTint(wash), HazeTint(tint)),
+                tints = listOf(HazeTint(washFill), HazeTint(tint)),
                 blurRadius = blurRadius,
                 noiseFactor = 0.08f,
                 // Where blur is off (battery saver on some phones), the solid color keeps text readable.
-                fallbackTint = HazeTint(solid),
+                fallbackTint = HazeTint(solidFill),
             ),
         )
     } else {
-        clipped.background(wash).background(tint)
+        clipped.background(washFill).background(tint)
     }
     val lit = filled.background(GlassDefaults.Sheen)
     if (border) lit.border(GlassDefaults.Border, shape) else lit
@@ -194,28 +197,32 @@ private fun rememberGrain(): ImageBitmap = remember {
 }
 
 /**
- * A dusk sky for the glass to frost, after the twilight photo behind Superhuman's panels: deep blue
+ * A sky for the glass to frost, after the twilight photo behind Superhuman's panels. On Dusk: deep blue
  * at the top (where the status bar and titles sit), periwinkle in the middle, a lavender horizon with
- * light in the accent's hue low on the left, soft streaks of cloud and a little grain. [glow] lifts the
- * horizon, as on the empty chat. [dim] lets the sky fall toward night behind an open conversation:
- * replies sit on the sky itself, and white text on the bare horizon would drop under 4.5:1.
+ * light in the accent's hue low on the left, soft streaks of cloud and a little grain. The other skies
+ * (see [Sky]) follow the same stops. [glow] lifts the horizon, as on the empty chat. [dim] lets the sky
+ * fall toward night behind an open conversation: replies sit on the sky itself, and white text on the
+ * bare horizon would drop under 4.5:1.
  */
 @Composable
 fun GlassBackdrop(modifier: Modifier = Modifier, glow: Boolean = false, dim: Boolean = false) {
     val strength by animateFloatAsState(if (glow) 1f else 0f, tween(900), label = "backdrop-glow")
     val night by animateFloatAsState(if (dim) 1f else 0f, tween(700), label = "backdrop-dim")
-    val light = LocalAccent.current.glow
+    val sky = LocalSky.current
+    val accent = LocalAccent.current
+    // Moon is white, so the light low on the left comes from the sky itself.
+    val light = if (accent == Accent.Moon) sky.glow else accent.glow
     val grain = rememberGrain()
     val grainBrush = remember(grain) { ShaderBrush(ImageShader(grain, TileMode.Repeated, TileMode.Repeated)) }
     Canvas(modifier.fillMaxSize()) {
-        drawSky(strength, light)
+        drawSky(sky, strength, light)
         if (night > 0f) {
             // Deeper where the sky is brightest, so text keeps the same contrast from top to bottom.
             drawRect(
                 Brush.verticalGradient(
-                    0f to Palette.SkyDeep.copy(alpha = 0.3f * night),
-                    0.5f to Palette.SkyDeep.copy(alpha = 0.5f * night),
-                    1f to Palette.SkyDeep.copy(alpha = 0.66f * night),
+                    0f to sky.deep.copy(alpha = 0.3f * night),
+                    0.5f to sky.deep.copy(alpha = 0.5f * night),
+                    1f to sky.deep.copy(alpha = 0.66f * night),
                 ),
             )
         }
@@ -223,21 +230,21 @@ fun GlassBackdrop(modifier: Modifier = Modifier, glow: Boolean = false, dim: Boo
     }
 }
 
-private fun DrawScope.drawSky(strength: Float, light: Color) {
+private fun DrawScope.drawSky(sky: Sky, strength: Float, light: Color) {
     val w = size.width
     val h = size.height
     val unit = size.minDimension
     drawRect(
         Brush.verticalGradient(
-            0f to Palette.SkyTop,
-            0.28f to Palette.SkyHigh,
-            0.62f to Palette.SkyMid,
-            0.9f to Palette.SkyHorizon,
-            1f to Palette.SkyHorizon,
+            0f to sky.top,
+            0.28f to sky.high,
+            0.62f to sky.mid,
+            0.9f to sky.horizon,
+            1f to sky.horizon,
         ),
     )
     // Cool light high on the right, the accent's light low on the left.
-    drawRect(Brush.radialGradient(listOf(Color(0xFF8FA6E6).copy(alpha = 0.22f), Color.Transparent), center = Offset(w * 0.95f, h * 0.32f), radius = unit * 0.85f))
+    drawRect(Brush.radialGradient(listOf(sky.light.copy(alpha = 0.22f), Color.Transparent), center = Offset(w * 0.95f, h * 0.32f), radius = unit * 0.85f))
     drawRect(
         Brush.radialGradient(
             listOf(light.copy(alpha = 0.36f + 0.16f * strength), light.copy(alpha = 0.1f), Color.Transparent),
@@ -255,8 +262,8 @@ private fun DrawScope.drawSky(strength: Float, light: Color) {
         }
     }
     // Night settling into the lower right corner, and the top kept deep for the status bar.
-    drawRect(Brush.radialGradient(listOf(Palette.SkyDeep.copy(alpha = 0.75f), Color.Transparent), center = Offset(w * 1.05f, h * 1.05f), radius = unit * 0.95f))
-    drawRect(Brush.verticalGradient(0f to Palette.SkyTop.copy(alpha = 0.6f), 0.12f to Color.Transparent))
+    drawRect(Brush.radialGradient(listOf(sky.deep.copy(alpha = 0.75f), Color.Transparent), center = Offset(w * 1.05f, h * 1.05f), radius = unit * 0.95f))
+    drawRect(Brush.verticalGradient(0f to sky.top.copy(alpha = 0.6f), 0.12f to Color.Transparent))
 }
 
 /**
@@ -373,20 +380,22 @@ fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> 
     }
 }
 
-private val MoonTile = Brush.linearGradient(listOf(Color(0xFF5E5BD4), Color(0xFF8A6AD8), Color(0xFFCF7EB3)))
-
-/** Superhuman's primary button: a dark body with the label, and a gradient tile holding an arrow. */
+/**
+ * Superhuman's primary button: a dark body in the sky's hue with the label, and a gradient tile
+ * holding an arrow.
+ */
 @Composable
 fun CtaButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, busy: @Composable (() -> Unit)? = null) {
     val shape = RoundedCornerShape(16.dp)
     val accent = LocalAccent.current
-    // Moon keeps Superhuman's violet-to-rose tile; a colored accent fills the tile itself.
-    val tile = if (accent == Accent.Moon) MoonTile else Brush.linearGradient(listOf(accent.color, accent.soft))
+    val sky = LocalSky.current
+    // Moon takes the sky's tile (on Dusk, Superhuman's violet to rose); a colored accent fills the tile itself.
+    val tile = if (accent == Accent.Moon) Brush.linearGradient(sky.tile) else Brush.linearGradient(listOf(accent.color, accent.soft))
     val arrow = if (accent == Accent.Moon) Color.White else accent.on
     Row(
         modifier
             .clip(shape)
-            .background(if (enabled) GlassDefaults.CtaBody else Palette.Disabled)
+            .background(if (enabled) sky.ctaBody else Palette.Disabled)
             .border(1.dp, Color.White.copy(alpha = if (enabled) 0.16f else 0.1f), shape)
             .clickable(enabled = enabled, onClick = onClick)
             .padding(start = 20.dp, end = 6.dp, top = 6.dp, bottom = 6.dp),
