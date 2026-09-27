@@ -74,34 +74,47 @@ private val moonShadowStops = arrayOf(
 private val moonStops = arrayOf(0f to Color(0xFFA9C2FF), 0.6f to Color(0xFF7F9FF8), 1f to Color(0xFF5F84F0))
 private val MoonHighlight = Offset(-13.613f, -18.15f)
 
-/** The aight mark: a violet orb with a small moon. While the agent works the moon circles the orb and the mark breathes. */
+/**
+ * The aight mark: a violet orb with a small moon. While the agent works the moon circles the orb and the
+ * mark breathes. At rest nothing runs: a running animation redraws the frame, and with the glass that
+ * means blurring the sky again on every frame of an idle chat.
+ */
 @Composable
 fun AightMark(size: Dp, modifier: Modifier = Modifier, working: Boolean = false, halo: Boolean = false) {
-    val transition = rememberInfiniteTransition(label = "mark")
-    val orbit by transition.animateFloat(
-        initialValue = 0f, targetValue = 360f,
-        animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "orbit",
-    )
-    val pulse by transition.animateFloat(
-        initialValue = 0.92f, targetValue = 1.04f,
-        animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse",
-    )
     val amount by animateFloatAsState(if (working) 1f else 0f, tween(400), label = "working")
+    if (working || amount > 0f) {
+        val transition = rememberInfiniteTransition(label = "mark")
+        val orbit by transition.animateFloat(
+            initialValue = 0f, targetValue = 360f,
+            animationSpec = infiniteRepeatable(tween(2600, easing = LinearEasing)), label = "orbit",
+        )
+        val pulse by transition.animateFloat(
+            initialValue = 0.92f, targetValue = 1.04f,
+            animationSpec = infiniteRepeatable(tween(900), RepeatMode.Reverse), label = "pulse",
+        )
+        MarkCanvas(size, modifier, halo, scale = { 1f + (pulse - 1f) * amount }, orbit = { orbit * amount })
+    } else {
+        MarkCanvas(size, modifier, halo, scale = { 1f }, orbit = { 0f })
+    }
+}
+
+@Composable
+private fun MarkCanvas(size: Dp, modifier: Modifier, halo: Boolean, scale: () -> Float, orbit: () -> Float) {
     Canvas(
         modifier
             .size(size)
             .graphicsLayer {
-                val s = 1f + (pulse - 1f) * amount
+                val s = scale()
                 scaleX = s
                 scaleY = s
             },
     ) {
-        val scale = this.size.minDimension / MARK_SIZE
+        val factor = this.size.minDimension / MARK_SIZE
         withTransform({
-            scale(scale, scale, pivot = Offset.Zero)
+            scale(factor, factor, pivot = Offset.Zero)
             translate(-MARK_LEFT, -MARK_TOP)
         }) {
-            drawMark(orbitDegrees = orbit * amount, halo = halo)
+            drawMark(orbitDegrees = orbit(), halo = halo)
         }
     }
 }
