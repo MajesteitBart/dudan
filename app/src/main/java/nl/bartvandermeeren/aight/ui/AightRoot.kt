@@ -31,6 +31,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalResources
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
@@ -84,6 +85,7 @@ private fun AightScreens(vm: MainViewModel) {
     }
 
     val context = LocalContext.current
+    val resources = LocalResources.current
     val speech = remember { SpeechInput(context.applicationContext) }
     DisposableEffect(Unit) { onDispose { speech.cancel() } }
     val phase by speech.phase.collectAsStateWithLifecycle()
@@ -150,8 +152,8 @@ private fun AightScreens(vm: MainViewModel) {
         }
     }
     LaunchedEffect(Unit) { vm.loadModels() }
-    LaunchedEffect(Unit) {
-        vm.notices.collect { Toast.makeText(context, context.getString(it), Toast.LENGTH_LONG).show() }
+    LaunchedEffect(vm, context, resources) {
+        vm.notices.collect { Toast.makeText(context, resources.getString(it), Toast.LENGTH_LONG).show() }
     }
 
     // Replies to long agent runs arrive as notifications when aight isn't on screen.
