@@ -15,6 +15,7 @@ import kotlinx.coroutines.launch
 import nl.bartvandermeeren.aight.MainActivity
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.chat.ChatEngine
+import nl.bartvandermeeren.aight.device.PhoneControl
 import nl.bartvandermeeren.aight.voice.SpeechText
 
 /** Which aight surfaces the user can currently see; replies they can see need no notification. */
@@ -26,15 +27,14 @@ object AppVisibility {
 
 /**
  * Agent turns can take minutes, and the user usually switches away meanwhile. When a reply lands
- * while no aight surface is visible, post a notification that opens that chat. [quiet] skips it,
- * such as right after the agent opened an app the user is now looking at.
+ * while no aight surface is visible, post a notification that opens that chat. A turn that opened an
+ * app or link on the phone gets none: the user is looking at what it opened.
  */
 class ReplyNotifier(
     private val context: Context,
     private val engine: ChatEngine,
     private val settings: SettingsRepository,
     scope: CoroutineScope,
-    private val quiet: () -> Boolean = { false },
 ) {
     private var lastSeq = engine.completedTurns.value?.seq ?: 0L
 
@@ -43,7 +43,7 @@ class ReplyNotifier(
             engine.completedTurns.collect { turn ->
                 if (turn == null || turn.seq <= lastSeq) return@collect
                 lastSeq = turn.seq
-                if (!AppVisibility.anyVisible && !quiet()) notify(turn)
+                if (!AppVisibility.anyVisible && !PhoneControl.openedSomething(turn.tools)) notify(turn)
             }
         }
     }

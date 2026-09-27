@@ -80,7 +80,7 @@ To set it up, turn on Phone control and tap Copy Hermes setup. The copied text h
    ```
 5. Run `hermes gateway restart`, then `hermes mcp test phone`. The first start needs the phone online to fetch the tool list.
 
-Android only lets an app open other apps while one of its windows is on screen, while it's the default digital assistant, or while it has "Display over other apps". As the assistant, aight can open apps any time. When it's neither the assistant nor allowed to display over other apps, and no aight window is on screen, the phone shows a notification that opens the app or link when tapped, and the tool tells the agent so. When the agent opens an app from the side-key overlay, the overlay closes, and a reply that lands within two minutes of that doesn't post a notification.
+Android only lets an app open other apps while one of its windows is on screen, while it's the default digital assistant, or while it has "Display over other apps". As the assistant, aight can open apps any time. When it's neither the assistant nor allowed to display over other apps, and no aight window is on screen, the phone shows a notification that opens the app or link when tapped, and the tool tells the agent so. When the agent opens an app from the side-key overlay, the overlay closes. The reply to a turn that opened an app or link doesn't post a notification, since you're looking at what it opened; replies in other chats still do.
 
 New key in the same section replaces the token; copy the setup again afterwards. For testing in the emulator, debug builds also answer on loopback: `adb forward tcp:18643 tcp:8643`, then send requests to `http://127.0.0.1:18643/mcp` with the token.
 

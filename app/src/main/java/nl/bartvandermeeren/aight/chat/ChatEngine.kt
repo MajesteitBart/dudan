@@ -61,7 +61,14 @@ class ChatEngine(
     private val _completedTurns = MutableStateFlow<CompletedTurn?>(null)
     val completedTurns: StateFlow<CompletedTurn?> = _completedTurns.asStateFlow()
 
-    data class CompletedTurn(val sessionId: String, val messageId: String, val text: String, val seq: Long)
+    /** [tools] names the tools the turn called, as Hermes reports them (MCP tools as mcp__server__tool). */
+    data class CompletedTurn(
+        val sessionId: String,
+        val messageId: String,
+        val text: String,
+        val seq: Long,
+        val tools: List<String> = emptyList(),
+    )
 
     fun conversation(sessionId: String): StateFlow<Conversation> = flowFor(sessionId).asStateFlow()
 
@@ -306,7 +313,8 @@ class ChatEngine(
             if (turns[sessionId] === turn) turns.remove(sessionId)
             conversations[sessionId]?.value?.messages?.firstOrNull { it.id == turn.messageId }?.let { message ->
                 if (message.state == MessageState.Done && message.text.isNotBlank()) {
-                    _completedTurns.value = CompletedTurn(sessionId, turn.messageId, message.text, idCounter.incrementAndGet())
+                    val tools = message.steps.filter { it.kind == StepKind.Tool }.map { it.title }
+                    _completedTurns.value = CompletedTurn(sessionId, turn.messageId, message.text, idCounter.incrementAndGet(), tools)
                 }
             }
             refreshSessions()

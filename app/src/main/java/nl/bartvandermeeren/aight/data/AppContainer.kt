@@ -62,7 +62,7 @@ class AppContainer(context: Context) {
     val phoneControl = PhoneControl(appContext, settingsSnapshot)
 
     init {
-        ReplyNotifier(appContext, engine, settings, appScope) { phoneControl.launchedRecently }
+        ReplyNotifier(appContext, engine, settings, appScope)
         appScope.launch {
             settings.flow.map { it.phoneControl }.distinctUntilChanged().collect(phoneControl::sync)
         }

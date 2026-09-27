@@ -10,7 +10,6 @@ import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
-import android.os.SystemClock
 import android.provider.Settings
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -47,13 +46,7 @@ class PhoneControl(private val context: Context, private val settings: StateFlow
     /** Emits after a tool brought an app to the front, so the assistant overlay can step aside. */
     val launches: SharedFlow<Unit> = _launches.asSharedFlow()
 
-    @Volatile private var lastLaunchAt = 0L
-
     val tools: List<PhoneTool> by lazy { PhoneTools(context, this).all() }
-
-    /** A reply that lands right after a tool opened an app needs no notification: the user is looking at that app. */
-    val launchedRecently: Boolean
-        get() = lastLaunchAt != 0L && SystemClock.elapsedRealtime() - lastLaunchAt < QUIET_AFTER_LAUNCH_MS
 
     internal fun setState(state: State) {
         _state.value = state
@@ -101,10 +94,7 @@ class PhoneControl(private val context: Context, private val settings: StateFlow
         } catch (_: ActivityNotFoundException) {
             throw ToolFailure("Nothing on the phone can open $what.")
         }
-        if (reveals) {
-            lastLaunchAt = SystemClock.elapsedRealtime()
-            _launches.tryEmit(Unit)
-        }
+        if (reveals) _launches.tryEmit(Unit)
         val locked = context.getSystemService(KeyguardManager::class.java)?.isKeyguardLocked == true
         return if (locked) Launch.OpenedWhileLocked else Launch.Opened
     }
@@ -165,6 +155,14 @@ class PhoneControl(private val context: Context, private val settings: StateFlow
         const val PORT = 8643
         private const val ACTIONS_CHANNEL = "phone_actions"
         private const val NOTIFY_ID_BASE = 0x5000_0000
-        private const val QUIET_AFTER_LAUNCH_MS = 2 * 60_000L
+
+        /** open_app and open_link, as Hermes names them for any MCP server name: mcp__phone__open_app. */
+        private val OPENING_TOOL = Regex("(^|_)open_(app|link)$")
+
+        /**
+         * True when a turn called a tool that brings something to the front on the phone. The reply to that
+         * turn needs no notification: the user is looking at what it opened.
+         */
+        fun openedSomething(tools: List<String>): Boolean = tools.any(OPENING_TOOL::containsMatchIn)
     }
 }

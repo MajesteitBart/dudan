@@ -21,6 +21,7 @@ import nl.bartvandermeeren.aight.data.HermesApi
 import nl.bartvandermeeren.aight.data.ModelChoice
 import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.data.ReasoningEffort
+import nl.bartvandermeeren.aight.device.PhoneControl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -136,6 +137,28 @@ class ChatEngineTest {
         assertTrue(runs[0], runs[0].contains(""""model":"small-model"""") && runs[0].contains(""""reasoning_effort":"low"""") && !runs[0].contains("fast"))
         assertTrue(runs[1], runs[1].contains(""""model":"big-model"""") && !runs[1].contains("model_options"))
         assertEquals(ModelProfile.Assistant, ChatEngine.profileOf(runs[0].substringAfter(""""session_id":"""").substringBefore('"')))
+    }
+
+    @Test
+    fun completedTurnsNameTheToolsTheyCalled() {
+        script { request ->
+            when {
+                request.path == "/v1/runs" -> MockResponse().setResponseCode(202).setBody("""{"run_id":"run_tools"}""")
+                request.path!!.endsWith("/events") -> sse(
+                    """{"event":"tool.started","tool":"mcp__phone__open_app","preview":"Spotify"}""",
+                    """{"event":"tool.completed","tool":"mcp__phone__open_app","preview":"Opened Spotify."}""",
+                    """{"event":"run.completed","output":"Spotify staat aan."}""",
+                )
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        sendAndSettle("Open Spotify")
+        val turn = runBlocking {
+            withTimeout(5_000) { withContext(dispatcher) { engine.completedTurns }.first { it != null }!! }
+        }
+        // The reply notifier keys off this to stay quiet about a turn that opened something.
+        assertEquals(listOf("mcp__phone__open_app"), turn.tools)
+        assertTrue(PhoneControl.openedSomething(turn.tools))
     }
 
     @Test

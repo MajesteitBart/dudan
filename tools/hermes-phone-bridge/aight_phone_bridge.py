@@ -78,6 +78,23 @@ def describe_failure(exc):
     )
 
 
+def save_cache(tools):
+    """Replaces the cache in one step, so a failed or concurrent write never leaves half a file behind."""
+    temp = CACHE.with_name(f"{CACHE.name}.{os.getpid()}.tmp")
+    try:
+        with open(temp, "w", encoding="utf-8") as handle:
+            json.dump(tools, handle)
+            handle.flush()
+            os.fsync(handle.fileno())
+        os.replace(temp, CACHE)
+    except OSError as exc:
+        log(f"could not cache the tool list at {CACHE}: {exc}")
+        try:
+            temp.unlink()
+        except OSError:
+            pass
+
+
 def list_tools(message):
     try:
         reply = post(message)
@@ -85,10 +102,7 @@ def list_tools(message):
     except Exception as exc:  # noqa: BLE001 - any failure falls back to the cache
         log(f"tools/list from the phone failed, using the cache: {exc}")
     else:
-        try:
-            CACHE.write_text(json.dumps(tools), encoding="utf-8")
-        except OSError as exc:
-            log(f"could not cache the tool list at {CACHE}: {exc}")
+        save_cache(tools)
         return reply
     try:
         return result(message.get("id"), {"tools": json.loads(CACHE.read_text(encoding="utf-8"))})

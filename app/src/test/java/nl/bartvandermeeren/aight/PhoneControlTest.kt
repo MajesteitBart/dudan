@@ -17,6 +17,7 @@ import nl.bartvandermeeren.aight.device.LaunchableApp
 import nl.bartvandermeeren.aight.device.LinkRules
 import nl.bartvandermeeren.aight.device.McpHandler
 import nl.bartvandermeeren.aight.device.McpHttpServer
+import nl.bartvandermeeren.aight.device.PhoneControl
 import nl.bartvandermeeren.aight.device.PhoneTool
 import nl.bartvandermeeren.aight.device.Tailnet
 import nl.bartvandermeeren.aight.device.objectSchema
@@ -311,6 +312,17 @@ class LinkRulesTest {
     fun refusesSchemesThatReachFilesOrComponents() {
         listOf("intent:#Intent;component=x/y;end", "file:///sdcard/x", "content://x/y", "javascript:alert(1)", "no scheme", "")
             .forEach { assertNull(it, LinkRules.actionFor(it)) }
+    }
+}
+
+class OpenedSomethingTest {
+    @Test
+    fun onlyTurnsThatOpenedAnAppOrLinkCount() {
+        assertTrue(PhoneControl.openedSomething(listOf("web_search", "mcp__phone__open_app")))
+        assertTrue(PhoneControl.openedSomething(listOf("mcp__fold__open_link")))
+        assertFalse(PhoneControl.openedSomething(listOf("mcp__phone__set_timer", "mcp__phone__phone_status", "terminal")))
+        assertFalse(PhoneControl.openedSomething(listOf("mcp__phone__open_application_settings")))
+        assertFalse(PhoneControl.openedSomething(emptyList()))
     }
 }
 
