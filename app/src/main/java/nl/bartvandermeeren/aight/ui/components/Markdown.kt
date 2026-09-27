@@ -62,6 +62,7 @@ import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.ui.theme.GoogleSansCode
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import org.commonmark.ext.autolink.AutolinkExtension
 import org.commonmark.ext.gfm.strikethrough.Strikethrough
@@ -139,7 +140,8 @@ private fun MarkdownBlock(node: Node, style: TextStyle, depth: Int) {
 
 @Composable
 private fun InlineText(node: Node, style: TextStyle, modifier: Modifier = Modifier) {
-    val annotated = remember(node) { inlineString(node) }
+    val link = LocalAccent.current.soft
+    val annotated = remember(node, link) { inlineString(node, link) }
     Text(annotated, style = style, color = style.color.takeIf { it != Color.Unspecified } ?: Palette.TextPrimary, modifier = modifier)
 }
 
@@ -167,37 +169,37 @@ private fun ListBlock(node: Node, ordered: Boolean, start: Int, style: TextStyle
     }
 }
 
-private fun inlineString(node: Node): AnnotatedString = buildAnnotatedString { appendChildren(node) }
+private fun inlineString(node: Node, link: Color): AnnotatedString = buildAnnotatedString { appendChildren(node, link) }
 
-private fun AnnotatedString.Builder.appendChildren(parent: Node) {
+private fun AnnotatedString.Builder.appendChildren(parent: Node, link: Color) {
     var child = parent.firstChild
     while (child != null) {
-        appendInline(child)
+        appendInline(child, link)
         child = child.next
     }
 }
 
-private fun AnnotatedString.Builder.appendInline(node: Node) {
+private fun AnnotatedString.Builder.appendInline(node: Node, link: Color) {
     when (node) {
         is MdText -> append(node.literal)
-        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { appendChildren(node) }
-        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { appendChildren(node) }
-        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { appendChildren(node) }
+        is Emphasis -> withStyle(SpanStyle(fontStyle = FontStyle.Italic)) { appendChildren(node, link) }
+        is StrongEmphasis -> withStyle(SpanStyle(fontWeight = FontWeight.SemiBold)) { appendChildren(node, link) }
+        is Strikethrough -> withStyle(SpanStyle(textDecoration = TextDecoration.LineThrough)) { appendChildren(node, link) }
         is Code -> withStyle(SpanStyle(fontFamily = GoogleSansCode, fontSize = 0.88.em, background = Palette.InlineCode)) {
             append(" ")
             append(node.literal)
             append(" ")
         }
         is Link -> withLink(
-            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = Palette.Link, textDecoration = TextDecoration.Underline))),
-        ) { if (node.firstChild != null) appendChildren(node) else append(node.destination) }
+            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = link, textDecoration = TextDecoration.Underline))),
+        ) { if (node.firstChild != null) appendChildren(node, link) else append(node.destination) }
         is Image -> withLink(
-            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = Palette.Link, textDecoration = TextDecoration.Underline))),
-        ) { if (node.firstChild != null) appendChildren(node) else append(node.destination) }
+            LinkAnnotation.Url(node.destination, TextLinkStyles(SpanStyle(color = link, textDecoration = TextDecoration.Underline))),
+        ) { if (node.firstChild != null) appendChildren(node, link) else append(node.destination) }
         is SoftLineBreak -> append(" ")
         is HardLineBreak -> append("\n")
         is HtmlInline -> append(node.literal)
-        else -> appendChildren(node)
+        else -> appendChildren(node, link)
     }
 }
 
@@ -261,10 +263,11 @@ private class TableRowData(val header: Boolean, val cells: List<AnnotatedString>
 
 @Composable
 private fun TableView(node: TableBlock, style: TextStyle) {
-    val rows = remember(node) {
+    val link = LocalAccent.current.soft
+    val rows = remember(node, link) {
         node.children().flatMap { section ->
             section.children().map { row ->
-                TableRowData(section is TableHead, row.children().filterIsInstance<TableCell>().map { inlineString(it) })
+                TableRowData(section is TableHead, row.children().filterIsInstance<TableCell>().map { inlineString(it, link) })
             }
         }
     }

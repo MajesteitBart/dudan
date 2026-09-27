@@ -6,11 +6,15 @@ import android.content.Intent
 import android.provider.Settings
 import androidx.activity.compose.BackHandler
 import androidx.annotation.StringRes
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -23,6 +27,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
@@ -32,6 +38,7 @@ import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
+import androidx.compose.material.icons.rounded.Check
 import androidx.compose.material.icons.rounded.Visibility
 import androidx.compose.material.icons.rounded.VisibilityOff
 import androidx.compose.material3.CircularProgressIndicator
@@ -59,6 +66,9 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -89,7 +99,8 @@ import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.components.outlined
-import nl.bartvandermeeren.aight.ui.components.pane
+import nl.bartvandermeeren.aight.ui.theme.Accent
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 import nl.bartvandermeeren.aight.voice.ModelPackage
 import nl.bartvandermeeren.aight.voice.KokoroVoice
@@ -236,6 +247,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 }
 
                 Section(stringResource(R.string.section_appearance)) {
+                    AccentPicker(Accent.from(settings.accent)) { scope.launch { vm.settingsRepository.setAccent(it.name) } }
                     Toggle(stringResource(R.string.reduce_transparency), stringResource(R.string.reduce_transparency_detail), settings.reduceTransparency) {
                         scope.launch { vm.settingsRepository.setReduceTransparency(it) }
                     }
@@ -248,13 +260,10 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                             vm.refreshSessions()
                         }
                     }
+                    // Inside the card: on the bare lower sky this small print measured 1.7:1.
+                    Text("aight ${BuildConfig.VERSION_NAME}", style = MaterialTheme.typography.bodySmall, color = Palette.TextTertiary)
                 }
-                Text(
-                    "aight ${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = Palette.TextTertiary,
-                    modifier = Modifier.padding(start = 4.dp, top = 4.dp, bottom = 24.dp),
-                )
+                Spacer(Modifier.height(16.dp))
             }
         }
     }
@@ -298,7 +307,7 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
                 color = Palette.TextSecondary,
             )
         }
-        Text("$name · $mode", style = MaterialTheme.typography.labelLarge, color = Palette.Link)
+        Text("$name · $mode", style = MaterialTheme.typography.labelLarge, color = LocalAccent.current.soft)
     }
     if (picking) ModelPickerSheet(vm, settings, initialProfile = profile, onDismiss = { picking = false })
 }
@@ -428,7 +437,7 @@ private fun ModelStatus(model: ModelPackage, texts: ModelTexts) {
             )
             LinearProgressIndicator(
                 progress = { state.fraction },
-                color = Palette.Link,
+                color = LocalAccent.current.soft,
                 trackColor = Palette.Surface,
                 modifier = Modifier.fillMaxWidth(),
             )
@@ -450,7 +459,7 @@ private fun LinkAction(text: String, onClick: () -> Unit) {
     Text(
         text,
         style = MaterialTheme.typography.labelLarge,
-        color = Palette.Link,
+        color = LocalAccent.current.soft,
         modifier = Modifier
             .clip(RoundedCornerShape(8.dp))
             .clickable(onClick = onClick)
@@ -488,7 +497,7 @@ private fun DefaultAssistantStatus() {
         Text(
             stringResource(R.string.open_assistant_settings),
             style = MaterialTheme.typography.labelLarge,
-            color = Palette.Link,
+            color = LocalAccent.current.soft,
             modifier = Modifier
                 .clip(RoundedCornerShape(8.dp))
                 .clickable {
@@ -508,6 +517,39 @@ private fun DefaultAssistantStatus() {
                 }
                 .padding(vertical = 6.dp),
         )
+    }
+}
+
+/** A swatch per accent, as a radio group: the chosen one wears a ring and a check, and its name shows beside the label. */
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun AccentPicker(selected: Accent, onSelect: (Accent) -> Unit) {
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(stringResource(R.string.accent_color), style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary, modifier = Modifier.weight(1f))
+            Text(stringResource(selected.label), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+        }
+        // Two rows of four, so the eight swatches never break unevenly on the narrow cover screen.
+        FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(14.dp), verticalArrangement = Arrangement.spacedBy(12.dp), maxItemsInEachRow = 4) {
+            Accent.entries.forEach { accent ->
+                val chosen = accent == selected
+                val name = stringResource(accent.label)
+                Box(
+                    Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .selectable(selected = chosen, role = Role.RadioButton) { onSelect(accent) }
+                        .semantics { contentDescription = name }
+                        .then(if (chosen) Modifier.border(2.dp, accent.color, CircleShape) else Modifier)
+                        .padding(5.dp)
+                        .clip(CircleShape)
+                        .background(accent.color),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    if (chosen) Icon(Icons.Rounded.Check, contentDescription = null, tint = accent.on, modifier = Modifier.size(20.dp))
+                }
+            }
+        }
     }
 }
 
@@ -549,13 +591,13 @@ private fun Field(
         trailingIcon = trailing,
         shape = RoundedCornerShape(18.dp),
         colors = OutlinedTextFieldDefaults.colors(
-            focusedBorderColor = Palette.Primary,
+            focusedBorderColor = LocalAccent.current.color,
             unfocusedBorderColor = Palette.Outline,
             focusedLabelColor = Palette.TextPrimary,
             unfocusedLabelColor = Palette.TextSecondary,
             focusedContainerColor = Palette.Surface,
             unfocusedContainerColor = Palette.Surface,
-            cursorColor = Palette.Link,
+            cursorColor = LocalAccent.current.soft,
         ),
         modifier = Modifier.fillMaxWidth(),
     )
@@ -579,8 +621,8 @@ private fun Toggle(title: String, detail: String, checked: Boolean, onChange: (B
             checked = checked,
             onCheckedChange = onChange,
             colors = SwitchDefaults.colors(
-                checkedTrackColor = Palette.Primary,
-                checkedThumbColor = Palette.OnPrimary,
+                checkedTrackColor = LocalAccent.current.color,
+                checkedThumbColor = LocalAccent.current.on,
                 checkedBorderColor = Color.Transparent,
                 uncheckedTrackColor = Palette.Surface,
                 uncheckedThumbColor = Palette.TextSecondary,

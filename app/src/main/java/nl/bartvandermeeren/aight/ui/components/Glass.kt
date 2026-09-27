@@ -67,6 +67,8 @@ import dev.chrisbanes.haze.HazeTint
 import dev.chrisbanes.haze.hazeEffect
 import java.util.function.Consumer
 import kotlin.random.Random
+import nl.bartvandermeeren.aight.ui.theme.Accent
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.LocalReduceTransparency
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
@@ -91,9 +93,8 @@ object GlassDefaults {
     val WindowBlur = 32.dp
     val CardShape = RoundedCornerShape(28.dp)
 
-    /** The body and arrow tile of Superhuman's "Get Superhuman" button, for the one primary action on a page. */
+    /** The body of Superhuman's "Get Superhuman" button; its arrow tile takes the accent (see [CtaButton]). */
     val CtaBody = Color(0xFF1C1936)
-    val CtaTile = Brush.linearGradient(listOf(Color(0xFF5E5BD4), Color(0xFF8A6AD8), Color(0xFFCF7EB3)))
 }
 
 /** A quiet surface inside a card: a flat fill, optionally with a hairline. */
@@ -195,21 +196,34 @@ private fun rememberGrain(): ImageBitmap = remember {
 /**
  * A dusk sky for the glass to frost, after the twilight photo behind Superhuman's panels: deep blue
  * at the top (where the status bar and titles sit), periwinkle in the middle, a lavender horizon with
- * mauve light low on the left, soft streaks of cloud and a little grain. [glow] lifts the horizon, as
- * on the empty chat.
+ * light in the accent's hue low on the left, soft streaks of cloud and a little grain. [glow] lifts the
+ * horizon, as on the empty chat. [dim] lets the sky fall toward night behind an open conversation:
+ * replies sit on the sky itself, and white text on the bare horizon would drop under 4.5:1.
  */
 @Composable
-fun GlassBackdrop(modifier: Modifier = Modifier, glow: Boolean = false) {
+fun GlassBackdrop(modifier: Modifier = Modifier, glow: Boolean = false, dim: Boolean = false) {
     val strength by animateFloatAsState(if (glow) 1f else 0f, tween(900), label = "backdrop-glow")
+    val night by animateFloatAsState(if (dim) 1f else 0f, tween(700), label = "backdrop-dim")
+    val light = LocalAccent.current.glow
     val grain = rememberGrain()
     val grainBrush = remember(grain) { ShaderBrush(ImageShader(grain, TileMode.Repeated, TileMode.Repeated)) }
     Canvas(modifier.fillMaxSize()) {
-        drawSky(strength)
+        drawSky(strength, light)
+        if (night > 0f) {
+            // Deeper where the sky is brightest, so text keeps the same contrast from top to bottom.
+            drawRect(
+                Brush.verticalGradient(
+                    0f to Palette.SkyDeep.copy(alpha = 0.3f * night),
+                    0.5f to Palette.SkyDeep.copy(alpha = 0.5f * night),
+                    1f to Palette.SkyDeep.copy(alpha = 0.66f * night),
+                ),
+            )
+        }
         drawRect(grainBrush, alpha = 0.045f)
     }
 }
 
-private fun DrawScope.drawSky(strength: Float) {
+private fun DrawScope.drawSky(strength: Float, light: Color) {
     val w = size.width
     val h = size.height
     val unit = size.minDimension
@@ -222,11 +236,11 @@ private fun DrawScope.drawSky(strength: Float) {
             1f to Palette.SkyHorizon,
         ),
     )
-    // Cool light high on the right, mauve light low on the left.
+    // Cool light high on the right, the accent's light low on the left.
     drawRect(Brush.radialGradient(listOf(Color(0xFF8FA6E6).copy(alpha = 0.22f), Color.Transparent), center = Offset(w * 0.95f, h * 0.32f), radius = unit * 0.85f))
     drawRect(
         Brush.radialGradient(
-            listOf(Palette.SkyGlow.copy(alpha = 0.36f + 0.16f * strength), Palette.SkyGlow.copy(alpha = 0.1f), Color.Transparent),
+            listOf(light.copy(alpha = 0.36f + 0.16f * strength), light.copy(alpha = 0.1f), Color.Transparent),
             center = Offset(w * 0.08f, h * 0.94f),
             radius = size.maxDimension * (0.55f + 0.1f * strength),
         ),
@@ -337,13 +351,14 @@ fun GlassMenuItem(icon: ImageVector, title: String, detail: String?, onClick: ()
 /** beautifului.dev's segmented switch: a dark track with the chosen option lifted onto a lighter pill. */
 @Composable
 fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> Unit, modifier: Modifier = Modifier) {
+    val accent = LocalAccent.current
     Row(modifier.pane(CircleShape, Palette.Code, outline = Palette.Hairline).padding(4.dp)) {
         options.forEach { (value, label) ->
             val active = value == selected
             Box(
                 Modifier
                     .clip(CircleShape)
-                    .then(if (active) Modifier.background(Palette.Card).border(1.dp, Palette.Hairline, CircleShape) else Modifier)
+                    .then(if (active) Modifier.background(accent.color.copy(alpha = if (accent == Accent.Moon) 0.1f else 0.22f)).border(1.dp, accent.color.copy(alpha = 0.4f), CircleShape) else Modifier)
                     .clickable { onSelect(value) }
                     .padding(horizontal = 16.dp, vertical = 8.dp),
             ) {
@@ -358,10 +373,16 @@ fun <T> Segmented(options: List<Pair<T, String>>, selected: T, onSelect: (T) -> 
     }
 }
 
+private val MoonTile = Brush.linearGradient(listOf(Color(0xFF5E5BD4), Color(0xFF8A6AD8), Color(0xFFCF7EB3)))
+
 /** Superhuman's primary button: a dark body with the label, and a gradient tile holding an arrow. */
 @Composable
 fun CtaButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, busy: @Composable (() -> Unit)? = null) {
     val shape = RoundedCornerShape(16.dp)
+    val accent = LocalAccent.current
+    // Moon keeps Superhuman's violet-to-rose tile; a colored accent fills the tile itself.
+    val tile = if (accent == Accent.Moon) MoonTile else Brush.linearGradient(listOf(accent.color, accent.soft))
+    val arrow = if (accent == Accent.Moon) Color.White else accent.on
     Row(
         modifier
             .clip(shape)
@@ -378,10 +399,10 @@ fun CtaButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier,
             Modifier
                 .size(width = 48.dp, height = 40.dp)
                 .clip(RoundedCornerShape(11.dp))
-                .background(if (enabled) GlassDefaults.CtaTile else Brush.linearGradient(listOf(Palette.Disabled, Palette.Disabled))),
+                .background(if (enabled) tile else Brush.linearGradient(listOf(Palette.Disabled, Palette.Disabled))),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = Color.White, modifier = Modifier.size(22.dp))
+            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = if (enabled) arrow else Palette.TextTertiary, modifier = Modifier.size(22.dp))
         }
     }
 }

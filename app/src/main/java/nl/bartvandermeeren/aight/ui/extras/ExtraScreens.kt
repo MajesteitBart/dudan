@@ -62,6 +62,7 @@ import nl.bartvandermeeren.aight.ui.components.GlassDefaults
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.components.outlined
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 @Composable
@@ -122,7 +123,7 @@ fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
                         onValueChange = { query = it },
                         singleLine = true,
                         textStyle = MaterialTheme.typography.bodyLarge.copy(color = Palette.TextPrimary),
-                        cursorBrush = SolidColor(Palette.Link),
+                        cursorBrush = SolidColor(LocalAccent.current.soft),
                         modifier = Modifier.weight(1f).focusRequester(focus),
                         decorationBox = { inner ->
                             Box {
@@ -207,7 +208,7 @@ fun SkillsScreen(vm: MainViewModel, onBack: () -> Unit) {
                         Text(
                             category.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.uppercase() },
                             style = MaterialTheme.typography.labelMedium,
-                            color = Palette.Link,
+                            color = LocalAccent.current.soft,
                             modifier = Modifier.padding(start = 28.dp, top = 18.dp, bottom = 8.dp),
                         )
                     }

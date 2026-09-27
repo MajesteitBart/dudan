@@ -1,7 +1,6 @@
 package nl.bartvandermeeren.aight.ui.chat
 
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.animation.scaleIn
@@ -76,13 +75,11 @@ import nl.bartvandermeeren.aight.ui.components.AightIcons
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.Avatar
 import nl.bartvandermeeren.aight.ui.components.Composer
-import nl.bartvandermeeren.aight.ui.components.GlassDefaults
 import nl.bartvandermeeren.aight.ui.components.GlassDialog
 import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
 import nl.bartvandermeeren.aight.ui.components.GlassMenuItem
 import nl.bartvandermeeren.aight.ui.components.ModelPickerButton
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
-import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
@@ -97,9 +94,9 @@ class ChatHostActions(
 )
 
 /**
- * The chat as Superhuman lays out its assistant: a title bar on the sky and one glass card holding the
- * conversation with the prompt bar at its foot. An empty chat shrinks the card to the prompt bar and
- * puts a large greeting on the sky above it.
+ * The chat on the sky: a title bar, the conversation straight on the sky (which deepens while it is
+ * open, see GlassBackdrop) and the prompt bar as a glass card at the foot. An empty chat shows a large
+ * greeting above the prompt bar instead.
  */
 @Composable
 fun ChatPane(
@@ -158,72 +155,61 @@ fun ChatPane(
 
         if (empty) {
             Greeting(settings.userName, Modifier.weight(1f).fillMaxWidth())
-        }
-
-        Column(
-            Modifier
-                .then(if (empty) Modifier else Modifier.weight(1f))
-                .align(Alignment.CenterHorizontally)
-                .widthIn(max = 880.dp)
-                .fillMaxWidth()
-                .navigationBarsPadding()
-                .imePadding()
-                .padding(start = 10.dp, end = 10.dp, bottom = 10.dp, top = 2.dp)
-                // Without a conversation the prompt bar is the card; a second frame around it would only echo it.
-                .then(if (empty) Modifier else Modifier.glass(GlassDefaults.CardShape))
-                .animateContentSize(),
-        ) {
-            if (!empty) {
-                Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
-                    when {
-                        conversation.loading && messages.isEmpty() -> CircularProgressIndicator(
-                            color = Palette.TextSecondary,
-                            strokeWidth = 2.dp,
-                            modifier = Modifier.align(Alignment.Center).size(28.dp),
-                        )
-                        conversation.loadError != null && messages.isEmpty() -> LoadError(conversation.loadError!!, onRetry = vm::reloadCurrent)
-                        else -> MessageList(vm, settings, speakingId)
-                    }
+        } else {
+            Box(Modifier.weight(1f).fillMaxWidth(), contentAlignment = Alignment.TopCenter) {
+                when {
+                    conversation.loading && messages.isEmpty() -> CircularProgressIndicator(
+                        color = Palette.TextSecondary,
+                        strokeWidth = 2.dp,
+                        modifier = Modifier.align(Alignment.Center).size(28.dp),
+                    )
+                    conversation.loadError != null && messages.isEmpty() -> LoadError(conversation.loadError!!, onRetry = vm::reloadCurrent)
+                    else -> MessageList(vm, settings, speakingId)
                 }
             }
-            Composer(
-                text = vm.composerText,
-                onTextChange = { vm.composerText = it },
-                placeholder = stringResource(R.string.composer_hint, settings.assistantName),
-                attachments = vm.attachments,
-                onRemoveAttachment = vm::removeAttachment,
-                listening = listening,
-                voiceLevel = voiceLevel,
-                voiceText = voiceText,
-                busy = conversation.isBusy || vm.preparingSend,
-                onAddClick = { showAddMenu = true },
-                onMicClick = actions.onMic,
-                onStopListening = actions.onStopListening,
-                onSend = { if (listening) actions.onSendWhileListening() else vm.send() },
-                onStop = vm::stop,
-                onLiveClick = actions.onLive,
-                inset = !empty,
-                modifier = if (empty) Modifier else Modifier.padding(8.dp),
-                modelPicker = {
-                    ModelPickerButton(modelTitle, modelSubtitle, onClick = {
-                        vm.loadModels()
-                        showModelPicker = true
-                    })
-                },
-                addMenu = {
-                    GlassDropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
-                        GlassMenuItem(Icons.Outlined.PhotoLibrary, stringResource(R.string.attach_photos), stringResource(R.string.attach_photos_detail)) {
-                            showAddMenu = false
-                            actions.onPickPhotos()
-                        }
-                        GlassMenuItem(Icons.Outlined.PhotoCamera, stringResource(R.string.attach_camera), stringResource(R.string.attach_camera_detail)) {
-                            showAddMenu = false
-                            actions.onTakePhoto()
-                        }
-                    }
-                },
-            )
         }
+
+        Composer(
+            text = vm.composerText,
+            onTextChange = { vm.composerText = it },
+            placeholder = stringResource(R.string.composer_hint, settings.assistantName),
+            attachments = vm.attachments,
+            onRemoveAttachment = vm::removeAttachment,
+            listening = listening,
+            voiceLevel = voiceLevel,
+            voiceText = voiceText,
+            busy = conversation.isBusy || vm.preparingSend,
+            onAddClick = { showAddMenu = true },
+            onMicClick = actions.onMic,
+            onStopListening = actions.onStopListening,
+            onSend = { if (listening) actions.onSendWhileListening() else vm.send() },
+            onStop = vm::stop,
+            onLiveClick = actions.onLive,
+            modifier = Modifier
+                .align(Alignment.CenterHorizontally)
+                .widthIn(max = 880.dp)
+                .navigationBarsPadding()
+                .imePadding()
+                .padding(start = 10.dp, end = 10.dp, bottom = 10.dp, top = 6.dp),
+            modelPicker = {
+                ModelPickerButton(modelTitle, modelSubtitle, onClick = {
+                    vm.loadModels()
+                    showModelPicker = true
+                })
+            },
+            addMenu = {
+                GlassDropdownMenu(expanded = showAddMenu, onDismissRequest = { showAddMenu = false }) {
+                    GlassMenuItem(Icons.Outlined.PhotoLibrary, stringResource(R.string.attach_photos), stringResource(R.string.attach_photos_detail)) {
+                        showAddMenu = false
+                        actions.onPickPhotos()
+                    }
+                    GlassMenuItem(Icons.Outlined.PhotoCamera, stringResource(R.string.attach_camera), stringResource(R.string.attach_camera_detail)) {
+                        showAddMenu = false
+                        actions.onTakePhoto()
+                    }
+                }
+            },
+        )
     }
 
     if (showModelPicker) {
@@ -336,9 +322,9 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         LazyColumn(
             state = listState,
-            contentPadding = PaddingValues(top = 22.dp, bottom = 12.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
             verticalArrangement = Arrangement.spacedBy(24.dp),
-            modifier = Modifier.fillMaxSize().fadeEdges(top = 22.dp, bottom = 14.dp),
+            modifier = Modifier.fillMaxSize().widthIn(max = 880.dp).fadeEdges(top = 18.dp, bottom = 14.dp),
         ) {
             itemsIndexed(messages, key = { _, m -> m.id }) { index, message ->
                 if (message.role == Role.User) {
@@ -377,7 +363,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     }
 }
 
-/** Fades the messages out at the card's top edge and just above the prompt bar, instead of cutting them off. */
+/** Fades the messages out under the title bar and just above the prompt bar, instead of cutting them off. */
 private fun Modifier.fadeEdges(top: Dp, bottom: Dp): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()

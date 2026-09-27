@@ -16,6 +16,7 @@ import nl.bartvandermeeren.aight.data.AppVisibility
 import nl.bartvandermeeren.aight.data.ModelProfile
 import nl.bartvandermeeren.aight.ui.AightRoot
 import nl.bartvandermeeren.aight.ui.MainViewModel
+import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.AightTheme
 
 class MainActivity : ComponentActivity() {
@@ -30,7 +31,7 @@ class MainActivity : ComponentActivity() {
         if (savedInstanceState == null) handleIntent(intent)
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
-            AightTheme(reduceTransparency = settings?.reduceTransparency == true) {
+            AightTheme(reduceTransparency = settings?.reduceTransparency == true, accent = Accent.from(settings?.accent)) {
                 AightRoot(vm)
             }
         }

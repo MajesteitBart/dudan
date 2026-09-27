@@ -56,6 +56,7 @@ import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.bartvandermeeren.aight.R
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 /** A picked image waiting in the composer. Exactly one of [uri] or [bitmap] is set. */
@@ -65,8 +66,8 @@ private enum class TrailingMode { Idle, Content, Listening, Busy }
 
 /**
  * The prompt bar, after beautifului.dev's: the message on top, and below it the attach button, an
- * optional [modelPicker], the mic and one white primary button (Live, Send or Stop). [inset] draws it as
- * an outlined field inside a glass card; otherwise it is a glass card of its own.
+ * optional [modelPicker], the mic and one primary button (Live, Send or Stop) in the user's accent, on a
+ * glass card of its own.
  */
 @Composable
 fun Composer(
@@ -87,8 +88,7 @@ fun Composer(
     onStop: () -> Unit,
     onLiveClick: (() -> Unit)?,
     modifier: Modifier = Modifier,
-    inset: Boolean = false,
-    /** The glass tint when it is a card of its own. */
+    /** The glass tint. */
     containerColor: Color = Palette.Composer,
     /** The wash under that tint; the overlay has no sky to wash, so it passes Transparent. */
     containerWash: Color = Palette.GlassWash,
@@ -105,12 +105,8 @@ fun Composer(
         hasContent -> TrailingMode.Content
         else -> TrailingMode.Idle
     }
-    val shape = RoundedCornerShape(if (inset) 22.dp else 28.dp)
-    val container = if (inset) {
-        Modifier.outlined(shape)
-    } else {
-        Modifier.glass(shape, containerColor, solid = solidColor, wash = containerWash)
-    }
+    val accent = LocalAccent.current
+    val container = Modifier.glass(RoundedCornerShape(28.dp), containerColor, solid = solidColor, wash = containerWash)
     Column(modifier.fillMaxWidth().then(container).padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)) {
         if (attachments.isNotEmpty()) {
             LazyRow(
@@ -149,7 +145,7 @@ fun Composer(
                     value = text,
                     onValueChange = onTextChange,
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = Palette.TextPrimary, fontSize = 18.sp),
-                    cursorBrush = SolidColor(Palette.Link),
+                    cursorBrush = SolidColor(accent.soft),
                     maxLines = 8,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
                     modifier = Modifier
@@ -187,19 +183,19 @@ fun Composer(
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
                     when (current) {
                         TrailingMode.Busy ->
-                            CircleIconButton(Icons.Rounded.Stop, stringResource(R.string.action_stop), Palette.Primary, onStop, tint = Palette.OnPrimary)
+                            CircleIconButton(Icons.Rounded.Stop, stringResource(R.string.action_stop), accent.color, onStop, tint = accent.on)
                         TrailingMode.Listening -> {
                             CircleIconButton(Icons.Rounded.Stop, stringResource(R.string.action_stop_listening), Palette.Card, onStopListening)
-                            CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), Palette.Primary, onSend, tint = Palette.OnPrimary)
+                            CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), accent.color, onSend, tint = accent.on)
                         }
                         TrailingMode.Content -> {
                             PlainIconButton(Icons.Rounded.MicNone, stringResource(R.string.action_voice), onClick = onMicClick, size = 44.dp)
-                            CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), Palette.Primary, onSend, tint = Palette.OnPrimary)
+                            CircleIconButton(Icons.Rounded.ArrowUpward, stringResource(R.string.action_send), accent.color, onSend, tint = accent.on)
                         }
                         TrailingMode.Idle -> {
                             PlainIconButton(Icons.Rounded.MicNone, stringResource(R.string.action_voice), onClick = onMicClick, size = 44.dp)
                             if (onLiveClick != null) {
-                                CircleIconButton(AightIcons.Live, stringResource(R.string.action_live), Palette.Primary, onLiveClick, tint = Palette.OnPrimary)
+                                CircleIconButton(AightIcons.Live, stringResource(R.string.action_live), accent.color, onLiveClick, tint = accent.on)
                             }
                         }
                     }

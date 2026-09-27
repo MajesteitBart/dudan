@@ -4,7 +4,6 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -66,6 +65,7 @@ import nl.bartvandermeeren.aight.ui.components.GlassDropdownMenu
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.glass
 import nl.bartvandermeeren.aight.ui.components.pane
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
 enum class SidebarMode { Docked, Overlay }
@@ -231,13 +231,13 @@ private fun SessionItem(
                 .padding(start = 8.dp, end = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            // Superhuman's selection mark: a short bar of light at the start of the row.
+            // Superhuman's selection mark: a short bar in the accent at the start of the row.
             Box(
                 Modifier
                     .width(3.dp)
                     .height(20.dp)
                     .clip(RoundedCornerShape(2.dp))
-                    .background(if (selected) Palette.Primary else Color.Transparent),
+                    .background(if (selected) LocalAccent.current.color else Color.Transparent),
             )
             Spacer(Modifier.width(9.dp))
             Text(
@@ -297,11 +297,11 @@ fun RenameDialog(initial: String, onDismiss: () -> Unit, onConfirm: (String) -> 
                 singleLine = true,
                 shape = RoundedCornerShape(18.dp),
                 colors = OutlinedTextFieldDefaults.colors(
-                    focusedBorderColor = Palette.Link,
+                    focusedBorderColor = LocalAccent.current.color,
                     unfocusedBorderColor = Palette.Outline,
                     focusedContainerColor = Palette.Surface,
                     unfocusedContainerColor = Palette.Surface,
-                    cursorColor = Palette.Link,
+                    cursorColor = LocalAccent.current.soft,
                 ),
             )
         },

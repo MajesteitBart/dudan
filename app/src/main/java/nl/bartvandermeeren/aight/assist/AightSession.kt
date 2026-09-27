@@ -28,6 +28,7 @@ import kotlinx.coroutines.cancel
 import nl.bartvandermeeren.aight.MainActivity
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.appContainer
+import nl.bartvandermeeren.aight.ui.theme.Accent
 import nl.bartvandermeeren.aight.ui.theme.AightTheme
 
 /**
@@ -86,7 +87,10 @@ class AightSession(context: Context) :
         setViewTreeViewModelStoreOwner(this@AightSession)
         setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnLifecycleDestroyed(this@AightSession))
         setContent {
-            AightTheme(reduceTransparency = state.settings?.reduceTransparency == true) {
+            AightTheme(
+                reduceTransparency = state.settings?.reduceTransparency == true,
+                accent = Accent.from(state.settings?.accent),
+            ) {
                 AssistOverlay(state)
             }
         }

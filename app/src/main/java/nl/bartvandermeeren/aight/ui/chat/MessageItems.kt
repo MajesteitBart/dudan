@@ -22,7 +22,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.width
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
@@ -80,9 +79,10 @@ import nl.bartvandermeeren.aight.ui.components.outlined
 import nl.bartvandermeeren.aight.ui.components.pane
 import nl.bartvandermeeren.aight.ui.components.rememberImageBitmap
 import nl.bartvandermeeren.aight.ui.theme.GoogleSansCode
+import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
-/** A light bubble like Superhuman's "yes!", its tail corner toward the edge the user writes from. */
+/** A bubble like Superhuman's "yes!", tinted with the user's accent, its tail toward the edge they write from. */
 private val UserBubbleShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 6.dp, bottomStart = 22.dp)
 
 @Composable
@@ -102,7 +102,7 @@ fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
         if (message.text.isNotBlank()) {
             var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
             val long = message.text.length > 420 || message.text.count { it == '\n' } > 6
-            Box(Modifier.pane(UserBubbleShape, Palette.UserBubble)) {
+            Box(Modifier.pane(UserBubbleShape, LocalAccent.current.bubble)) {
                 Box(Modifier.animateContentSize()) {
                     SelectionContainer {
                         Text(
@@ -200,7 +200,7 @@ fun AssistantMessageItem(
                     Text(
                         stringResource(R.string.action_retry),
                         style = MaterialTheme.typography.labelLarge,
-                        color = Palette.Link,
+                        color = LocalAccent.current.soft,
                         modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable(onClick = onRetry).padding(4.dp),
                     )
                 }
@@ -329,7 +329,7 @@ private fun WorkPanel(message: UiMessage) {
 private fun StepItem(step: Step) {
     val icon: @Composable () -> Unit = {
         when {
-            step.running -> CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.Link, modifier = Modifier.size(16.dp))
+            step.running -> CircularProgressIndicator(strokeWidth = 2.dp, color = LocalAccent.current.soft, modifier = Modifier.size(16.dp))
             step.failed -> Icon(Icons.Outlined.ErrorOutline, null, tint = Palette.Danger, modifier = Modifier.size(18.dp))
             step.kind == StepKind.Commentary -> Icon(Icons.Outlined.ChatBubbleOutline, null, tint = Palette.TextSecondary, modifier = Modifier.size(17.dp))
             step.kind == StepKind.Subagent -> Icon(Icons.Outlined.AccountTree, null, tint = Palette.TextSecondary, modifier = Modifier.size(17.dp))
@@ -427,13 +427,14 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                 }
             }
             val primary = request.choices.firstOrNull { it != "deny" }
+            val accent = LocalAccent.current
             FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
                 request.choices.forEach { choice ->
                     val pending = request.pendingChoice == choice
                     val isPrimary = choice == primary
                     Box(
                         Modifier
-                            .then(if (isPrimary) Modifier.pane(CircleShape, Palette.Primary) else Modifier.outlined(CircleShape))
+                            .then(if (isPrimary) Modifier.pane(CircleShape, accent.color) else Modifier.outlined(CircleShape))
                             .clickable(enabled = request.pendingChoice == null) { onChoice(choice) },
                     ) {
                         Row(
@@ -441,7 +442,7 @@ private fun ApprovalCard(request: ApprovalRequest, onChoice: (String) -> Unit) {
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(8.dp),
                         ) {
-                            val ink = if (isPrimary) Palette.OnPrimary else Palette.TextPrimary
+                            val ink = if (isPrimary) accent.on else Palette.TextPrimary
                             if (pending) CircularProgressIndicator(strokeWidth = 2.dp, color = ink, modifier = Modifier.size(14.dp))
                             Text(approvalLabel(choice), style = MaterialTheme.typography.labelLarge, color = ink)
                         }
@@ -510,7 +511,7 @@ private fun ActionRow(text: String, speaking: Boolean, onSpeak: () -> Unit) {
             stringResource(if (speaking) R.string.action_stop_reading else R.string.action_read_aloud),
             onClick = onSpeak,
             size = 44.dp, iconSize = 22.dp,
-            tint = if (speaking) Palette.Link else Palette.Icon,
+            tint = if (speaking) LocalAccent.current.soft else Palette.Icon,
         )
     }
 }

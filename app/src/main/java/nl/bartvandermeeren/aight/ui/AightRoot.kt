@@ -62,7 +62,12 @@ fun AightRoot(vm: MainViewModel) {
     val haze = rememberHazeState()
     val emptyChat = vm.screen == Screen.Chat && conversation.messages.isEmpty() && !conversation.loading
     Box(Modifier.fillMaxSize()) {
-        GlassBackdrop(Modifier.hazeSource(haze), glow = emptyChat || settingsState?.isConfigured == false)
+        GlassBackdrop(
+            Modifier.hazeSource(haze),
+            glow = emptyChat || settingsState?.isConfigured == false,
+            // Replies sit on the sky itself, so it deepens while a conversation is open.
+            dim = vm.screen == Screen.Chat && !emptyChat,
+        )
         CompositionLocalProvider(LocalHazeState provides haze) {
             AightScreens(vm)
         }

@@ -172,6 +172,15 @@
     <string name="speech_language_hint">Systeemstandaard, of bijvoorbeeld nl-NL</string>
     <string name="show_all_channels">Gesprekken van alle kanalen tonen</string>
     <string name="show_all_channels_detail">Ook Telegram-, CLI- en andere Hermes-sessies tonen onder Recent</string>
+    <string name="accent_color">Accentkleur</string>
+    <string name="accent_moon">Maan</string>
+    <string name="accent_lavender">Lavendel</string>
+    <string name="accent_blue">Blauw</string>
+    <string name="accent_teal">Turkoois</string>
+    <string name="accent_green">Groen</string>
+    <string name="accent_amber">Amber</string>
+    <string name="accent_coral">Koraal</string>
+    <string name="accent_pink">Roze</string>
     <string name="reduce_transparency">Transparantie verminderen</string>
     <string name="reduce_transparency_detail">Effen panelen in plaats van matglas. Staat ook aan als het kleurcontrast van je telefoon op gemiddeld of hoog staat.</string>
 </resources>

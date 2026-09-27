@@ -44,6 +44,8 @@ data class AppSettings(
     val showAllChannels: Boolean = false,
     /** Solid panels instead of frosted glass (see LocalReduceTransparency). */
     val reduceTransparency: Boolean = false,
+    /** The name of the accent color (ui.theme.Accent). */
+    val accent: String = "Moon",
     val speechLanguage: String = "",
     /** Default for chats started in the app. */
     val model: ModelChoice = ModelChoice(),
@@ -89,6 +91,7 @@ class SettingsRepository(private val context: Context) {
         val speakReplies = booleanPreferencesKey("speak_replies")
         val showAllChannels = booleanPreferencesKey("show_all_channels")
         val reduceTransparency = booleanPreferencesKey("reduce_transparency")
+        val accent = stringPreferencesKey("accent")
         val speechLanguage = stringPreferencesKey("speech_language")
         val chatsModel = ModelKeys("")
         val assistantModel = ModelKeys("fast_")
@@ -124,6 +127,7 @@ class SettingsRepository(private val context: Context) {
         speakReplies = this[Keys.speakReplies] ?: true,
         showAllChannels = this[Keys.showAllChannels] ?: false,
         reduceTransparency = this[Keys.reduceTransparency] ?: false,
+        accent = this[Keys.accent] ?: "Moon",
         speechLanguage = this[Keys.speechLanguage].orEmpty(),
         model = readModel(Keys.chatsModel, ReasoningMode.Default),
         fastModel = readModel(Keys.assistantModel, ReasoningMode.Fast),
@@ -163,6 +167,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setSpeakReplies(value: Boolean) = context.dataStore.edit { it[Keys.speakReplies] = value }
     suspend fun setShowAllChannels(value: Boolean) = context.dataStore.edit { it[Keys.showAllChannels] = value }
     suspend fun setReduceTransparency(value: Boolean) = context.dataStore.edit { it[Keys.reduceTransparency] = value }
+    suspend fun setAccent(name: String) = context.dataStore.edit { it[Keys.accent] = name }
     suspend fun setSpeechLanguage(value: String) = context.dataStore.edit { it[Keys.speechLanguage] = value.trim() }
     suspend fun setTtsEngine(value: TtsEngine) = context.dataStore.edit { it[Keys.ttsEngine] = value.name }
     suspend fun setKokoroVoice(value: String) = context.dataStore.edit { it[Keys.kokoroVoice] = value }

@@ -27,7 +27,8 @@ import nl.bartvandermeeren.aight.R
  * components. The sky (GlassBackdrop) runs from deep blue at the top to a lavender horizon. Glass cards
  * frost it into slate-lavender that keeps white text above 7:1; Superhuman's own panels over bright sky
  * measure 3.3 to 4.3:1, too low for reading replies all day. Inside a card, elements are outlined or
- * flat. Every translucent color has a solid counterpart for Reduce transparency.
+ * flat. The accent the user picks lives in Accent.kt. Every translucent color has a solid counterpart
+ * for Reduce transparency.
  */
 object Palette {
     // The dusk sky, top to horizon, and the dark it fades to at the corners.
@@ -35,7 +36,6 @@ object Palette {
     val SkyHigh = Color(0xFF394891)
     val SkyMid = Color(0xFF5061A6)
     val SkyHorizon = Color(0xFF8676BA)
-    val SkyGlow = Color(0xFFC08AB4) // mauve light low in the sky, like the clouds in Superhuman's photo
     val SkyDeep = Color(0xFF17173A)
     val Background = Color(0xFF1E2350) // the sky's average; what glass and fallbacks blend toward
     val BackdropCenter = SkyMid
@@ -55,7 +55,6 @@ object Palette {
     val Hairline = Color(0x1FFFFFFF)
     val Outline = Color(0x38FFFFFF) // chip and field borders
     val Code = Color(0x38000010) // code blocks: darker than the card
-    val UserBubble = Color(0x24FFFFFF)
 
     // Window glass: popups, dialogs and sheets live in their own window, where the app's blur can't
     // reach. The system blurs behind dialogs and sheets; menus and phones without that blur get the
@@ -72,15 +71,11 @@ object Palette {
     val TextSecondary = Color(0xFFCBCDE2)
     val TextTertiary = Color(0xFFBCBFDA)
     val Icon = Color(0xFFEDEEF8)
-    // White is the primary action, as in beautifului.dev's send button; dark ink goes on it.
-    val Primary = Color(0xFFF4F4F8)
-    val OnPrimary = Color(0xFF1E1C3A)
     val Send = Color(0xFF6A62F2)
     val Live = Color(0x1FFFFFFF)
     val Button = Color(0x2EFFFFFF)
     val ButtonText = Color(0xFFF7F7FC)
     val Disabled = Color(0x14FFFFFF)
-    val Link = Color(0xFFD3D9FF)
     val InlineCode = Color(0x29000010)
     val Danger = Color(0xFFFFB0B3)
     val DangerPane = Color(0x33FF5A6A)
@@ -138,9 +133,10 @@ val AightTypography = Typography(
     labelSmall = style(12, 16, FontWeight.Medium),
 )
 
-private val AightColors = darkColorScheme(
-    primary = Palette.Link,
-    onPrimary = Color(0xFF14195C),
+/** Material components (dialog buttons, text fields) take the accent's soft tone as their primary color. */
+private fun aightColors(accent: Accent) = darkColorScheme(
+    primary = accent.soft,
+    onPrimary = accent.on,
     primaryContainer = Palette.Send,
     onPrimaryContainer = Color.White,
     secondary = Palette.TextSecondary,
@@ -174,10 +170,11 @@ private val AightColors = darkColorScheme(
 val LocalReduceTransparency = staticCompositionLocalOf { false }
 
 @Composable
-fun AightTheme(reduceTransparency: Boolean = false, content: @Composable () -> Unit) {
+fun AightTheme(reduceTransparency: Boolean = false, accent: Accent = Accent.Moon, content: @Composable () -> Unit) {
     val reduced = reduceTransparency || rememberSystemHighContrast()
-    CompositionLocalProvider(LocalReduceTransparency provides reduced) {
-        MaterialTheme(colorScheme = AightColors, typography = AightTypography, content = content)
+    val colors = remember(accent) { aightColors(accent) }
+    CompositionLocalProvider(LocalReduceTransparency provides reduced, LocalAccent provides accent) {
+        MaterialTheme(colorScheme = colors, typography = AightTypography, content = content)
     }
 }
 
