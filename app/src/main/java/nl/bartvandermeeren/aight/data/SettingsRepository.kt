@@ -7,6 +7,7 @@ import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import java.security.SecureRandom
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
@@ -87,6 +88,10 @@ data class AppSettings(
     val dutchTtsEngine: DutchTtsEngine = DutchTtsEngine.Supertonic,
     val supertonicVoice: String = DEFAULT_SUPERTONIC_VOICE,
     val sttEngine: SttEngine = SttEngine.Orukeet,
+    /** Hermes may act on this phone through its MCP server; see device/PhoneControl. */
+    val phoneControl: Boolean = false,
+    /** The bearer token Hermes sends to that server. Created when phone control is first turned on. */
+    val phoneToken: String = "",
 ) {
     val isConfigured: Boolean get() = serverUrl.isNotBlank() && apiKey.isNotBlank()
     val server: HermesApi.ServerConfig get() = HermesApi.ServerConfig(serverUrl, apiKey)
@@ -134,6 +139,8 @@ class SettingsRepository(private val context: Context) {
         val dutchTtsEngine = stringPreferencesKey("dutch_tts_engine")
         val supertonicVoice = stringPreferencesKey("supertonic_voice")
         val sttEngine = stringPreferencesKey("stt_engine")
+        val phoneControl = booleanPreferencesKey("phone_control")
+        val phoneToken = stringPreferencesKey("phone_token_enc")
     }
 
     private fun keysFor(profile: ModelProfile) = when (profile) {
@@ -172,6 +179,8 @@ class SettingsRepository(private val context: Context) {
         dutchTtsEngine = this[Keys.dutchTtsEngine]?.let { runCatching { DutchTtsEngine.valueOf(it) }.getOrNull() } ?: DutchTtsEngine.Supertonic,
         supertonicVoice = this[Keys.supertonicVoice]?.takeIf { it.isNotBlank() } ?: AppSettings.DEFAULT_SUPERTONIC_VOICE,
         sttEngine = this[Keys.sttEngine]?.let { runCatching { SttEngine.valueOf(it) }.getOrNull() } ?: SttEngine.Orukeet,
+        phoneControl = this[Keys.phoneControl] ?: false,
+        phoneToken = this[Keys.phoneToken]?.let(SecretBox::decrypt).orEmpty(),
     )
 
     /**
@@ -214,6 +223,16 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDutchTtsEngine(value: DutchTtsEngine) = context.dataStore.edit { it[Keys.dutchTtsEngine] = value.name }
     suspend fun setSupertonicVoice(value: String) = context.dataStore.edit { it[Keys.supertonicVoice] = value }
     suspend fun setSttEngine(value: SttEngine) = context.dataStore.edit { it[Keys.sttEngine] = value.name }
+
+    suspend fun setPhoneControl(enabled: Boolean) = context.dataStore.edit {
+        it[Keys.phoneControl] = enabled
+        if (enabled && it[Keys.phoneToken]?.let(SecretBox::decrypt).isNullOrBlank()) it[Keys.phoneToken] = SecretBox.encrypt(newToken())
+    }
+
+    /** Replaces the token; Hermes can't reach the phone until it has the new one. */
+    suspend fun renewPhoneToken() = context.dataStore.edit { it[Keys.phoneToken] = SecretBox.encrypt(newToken()) }
+
+    private fun newToken(): String = ByteArray(32).also(SecureRandom()::nextBytes).joinToString("") { "%02x".format(it) }
 
     suspend fun setModel(profile: ModelProfile, choice: ModelChoice) {
         val keys = keysFor(profile)

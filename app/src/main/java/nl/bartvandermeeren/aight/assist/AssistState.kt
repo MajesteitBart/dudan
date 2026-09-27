@@ -60,11 +60,16 @@ class AssistState(
                 }
             }
         }
+        // The agent opened an app or link on the phone: get out of the way so the user sees it.
+        scope.launch {
+            container.phoneControl.launches.collect { if (shown) dismiss() }
+        }
     }
 
     fun onShown() {
         shown = true
         AppVisibility.overlayShown = true
+        container.phoneControl.ensureRunning()
         sessionId = null
         text = ""
         attachScreenshot = false

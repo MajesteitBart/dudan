@@ -26,13 +26,15 @@ object AppVisibility {
 
 /**
  * Agent turns can take minutes, and the user usually switches away meanwhile. When a reply lands
- * while no aight surface is visible, post a notification that opens that chat.
+ * while no aight surface is visible, post a notification that opens that chat. [quiet] skips it,
+ * such as right after the agent opened an app the user is now looking at.
  */
 class ReplyNotifier(
     private val context: Context,
     private val engine: ChatEngine,
     private val settings: SettingsRepository,
     scope: CoroutineScope,
+    private val quiet: () -> Boolean = { false },
 ) {
     private var lastSeq = engine.completedTurns.value?.seq ?: 0L
 
@@ -41,7 +43,7 @@ class ReplyNotifier(
             engine.completedTurns.collect { turn ->
                 if (turn == null || turn.seq <= lastSeq) return@collect
                 lastSeq = turn.seq
-                if (!AppVisibility.anyVisible) notify(turn)
+                if (!AppVisibility.anyVisible && !quiet()) notify(turn)
             }
         }
     }
