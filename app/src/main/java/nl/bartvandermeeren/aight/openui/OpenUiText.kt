@@ -51,21 +51,67 @@ object OpenUiText {
         return blocks
     }
 
-    /** The same root shapes that the on-screen dispatcher can actually render. */
+    /**
+     * True when the on-screen dispatcher would draw something for [value]. Components are checked
+     * down to their contents, so `Card([missing])` counts as empty and its block shows the source.
+     */
     fun hasRenderableRoot(value: Any?): Boolean = when (val v = unbind(value)) {
-        is UiNode -> true
+        is UiNode -> drawsSomething(v)
         is List<*> -> v.any(::hasRenderableRoot)
         is String -> v.isNotBlank()
         is Double, is Boolean -> true
         else -> false
     }
 
+    /** Mirrors the early returns of each component's view in ui/openui. */
+    private fun drawsSomething(n: UiNode): Boolean = when (n.type) {
+        "Card" -> hasRenderableRoot(n["children"]) || n.list("sources").any { displayText((unbind(it) as? Map<*, *>)?.get("url")).isNotBlank() }
+        "Stack" -> hasRenderableRoot(n["children"])
+        "CardHeader" -> n.string("title") != null || n.string("subtitle") != null
+        "InlineHeader" -> n.string("heading") != null || n.string("description") != null
+        "TextContent", "Label" -> n.string("text") != null
+        "Tag" -> n.string("text").orEmpty().isNotBlank()
+        "MarkDownRenderer" -> n.string("textMarkdown") != null
+        "Callout", "TextCallout" -> n.props["visible"] == null || truthy(n["visible"])
+        "CodeBlock", "Separator", "Form" -> true
+        "Image", "ImageBlock" -> n.string("src") != null
+        "ImageGallery" -> n.list("images").any { displayText((unbind(it) as? Map<*, *>)?.get("src")).isNotBlank() }
+        "Table" -> n.nodes("columns").isNotEmpty()
+        "BarChart", "LineChart", "AreaChart", "HorizontalBarChart" -> {
+            val series = n.list("series")
+            n.list("labels").isNotEmpty() && (series.all { unbind(it) is Number } || series.any { unbind(it) is UiNode })
+        }
+        "PieChart", "RadialChart", "SingleStackedBarChart" -> n.list("labels").isNotEmpty() && n.list("values").isNotEmpty()
+        "Steps", "Tabs", "Accordion", "ListBlock" -> n.nodes("items").isNotEmpty()
+        "SectionBlock" -> n.nodes("sections").isNotEmpty()
+        "Carousel" -> n.list("children").any { (unbind(it) as? List<*>)?.isNotEmpty() == true }
+        "TagBlock" -> n.list("tags").any { unbind(it) != null }
+        "EntityList" -> n.map("header") != null || n.list("rows").any { unbind(it) is Map<*, *> }
+        "FollowUpBlock" -> n.nodes("items").any { it.string("text") != null }
+        "Buttons" -> n.nodes("buttons").any { it.string("label") != null }
+        "Button" -> n.string("label") != null
+        "FormControl" -> n.string("label") != null || n.node("input") != null || n.string("hint") != null
+        "Icon" -> n.string("name") != null
+        in OpenUiLibrary.inputs -> true
+        // Components aight doesn't draw show their text and child components; ids stay hidden.
+        else -> n.args.any { arg ->
+            when (val part = unbind(arg)) {
+                is String -> part.isNotBlank() && !looksLikeId(part)
+                is UiNode, is List<*> -> hasRenderableRoot(part)
+                else -> false
+            }
+        }
+    }
+
+    /** Ids such as "revenue" or "art-museums" in a card item's first slot are for the program, not the reader. */
+    fun looksLikeId(text: String): Boolean = text.length <= 40 && !text.contains(' ') && text.all { it.isLowerCase() || it.isDigit() || it == '-' || it == '_' }
+
     fun toMarkdown(source: String): String {
         val program = OpenUiParser.parse(source)
         if (program.isEmpty) return ""
         val evaluator = OpenUiEvaluator(program, OpenUiEvaluator.stateDefaults(program))
         val root = evaluator.root()
-        if (root !is UiNode && (root !is List<*> || !hasRenderableRoot(root))) return ""
+        if ((root !is UiNode && root !is List<*>) || !hasRenderableRoot(root)) return ""
         val blocks = mutableListOf<String>()
         write(root, blocks)
         return blocks.filter { it.isNotBlank() }.joinToString("\n\n")

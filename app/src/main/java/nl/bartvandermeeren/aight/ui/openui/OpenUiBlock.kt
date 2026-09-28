@@ -192,7 +192,7 @@ fun OpenUiBlock(source: String, modifier: Modifier = Modifier) {
     CompositionLocalProvider(LocalOpenUiScope provides scope) {
         Box(modifier.fillMaxWidth()) {
             when {
-                root is UiNode || (root is List<*> && OpenUiText.hasRenderableRoot(root)) -> Render(root, topLevel = true)
+                (root is UiNode || root is List<*>) && OpenUiText.hasRenderableRoot(root) -> Render(root, topLevel = true)
                 streaming -> Skeleton()
                 source.isNotBlank() -> CodeBlock("openui-lang", source.trimEnd())
             }
@@ -877,15 +877,12 @@ private fun Fallback(n: UiNode, modifier: Modifier) {
     ) {
         parts.forEach { part ->
             when (part) {
-                is String -> if (!part.looksLikeId()) Text(part, style = MaterialTheme.typography.bodyMedium, color = Palette.TextPrimary)
+                is String -> if (!OpenUiText.looksLikeId(part)) Text(part, style = MaterialTheme.typography.bodyMedium, color = Palette.TextPrimary)
                 else -> Render(part)
             }
         }
     }
 }
-
-/** Ids such as "revenue" or "art-museums" in a card item's first slot are for the program, not the reader. */
-private fun String.looksLikeId(): Boolean = length <= 40 && !contains(' ') && all { it.isLowerCase() || it.isDigit() || it == '-' || it == '_' }
 
 /** Stands in for a part that is still streaming in. */
 @Composable

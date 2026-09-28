@@ -212,6 +212,37 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun fallsBackForComponentsWithoutVisibleContent() {
+        val empty = listOf(
+            "root = Card([missing])",
+            "root = Stack([Card([missing])])",
+            "root = Card([TextContent(missing)])",
+            "root = Card([CardHeader(), Tag(\" \")])",
+            "root = Card([BarChart([], [1, 2]), PieChart([\"A\"], [])])",
+            "root = Card([Buttons([Button(missing)]), Carousel([[]])])",
+            "root = Unknown(\"just-an-id\", [missing])",
+        )
+        for (body in empty) {
+            val source = "```openui-lang\n$body\n```"
+            val root = OpenUiEvaluator(OpenUiParser.parse(body), emptyMap()).root()
+            assertFalse(body, OpenUiText.hasRenderableRoot(root))
+            assertEquals(body, source, OpenUiText.expand(source))
+        }
+        val visible = listOf(
+            "root = Card([CardHeader(\"Title\")])",
+            "root = Card([missing], [{url: \"https://example.com\"}])",
+            "root = Stack([Card([missing]), Separator()])",
+            "root = Card([BarChart([\"A\"], [1])])",
+            "root = Card([Buttons([Button(\"Go\")])])",
+            "root = Unknown(\"A readable line\")",
+        )
+        for (body in visible) {
+            val root = OpenUiEvaluator(OpenUiParser.parse(body), emptyMap()).root()
+            assertTrue(body, OpenUiText.hasRenderableRoot(root))
+        }
+    }
+
+    @Test
     fun leavesUnsupportedOpenUiFenceLanguagesAsCode() {
         val source = "```openui-json\nroot = TextContent(\"Visible source\")\n```"
         assertEquals(source, OpenUiText.expand(source))
