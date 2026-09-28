@@ -178,6 +178,30 @@ class UploadClient(
         Unit
     }
 
+    /**
+     * [delete], retried while the failure may pass: no network, a restarting host, or a dropped
+     * upload still holding the service lock. Waits double from [firstWaitMs] up to five minutes. It
+     * gives up after [giveUpAfterMs], or at once on an answer retrying won't change, such as a
+     * rejected key; the service's retention removes whatever is left. True once the upload is gone.
+     */
+    suspend fun deleteEventually(handle: UploadHandle, giveUpAfterMs: Long = 60 * 60_000L, firstWaitMs: Long = 6_000L): Boolean {
+        val deadline = System.nanoTime() + giveUpAfterMs * 1_000_000
+        var wait = firstWaitMs
+        while (true) {
+            try {
+                delete(handle)
+                return true
+            } catch (e: kotlin.coroutines.cancellation.CancellationException) {
+                throw e
+            } catch (e: Exception) {
+                val transient = e is IOException && (e !is UploadException || e.code == "upload_busy" || e.status >= 500)
+                if (!transient || System.nanoTime() >= deadline) return false
+            }
+            delay(wait)
+            wait = (wait * 2).coerceAtMost(MAX_DELETE_WAIT_MS)
+        }
+    }
+
     private suspend fun serverOffset(handle: UploadHandle): Long? =
         runCatching { send(request(handle.config, "uploads", handle.id).get().build()).dbl("offset")?.toLong() }.getOrNull()
 
@@ -253,6 +277,7 @@ class UploadClient(
         private const val MAX_CHUNK = 16 * 1024 * 1024
         private const val MAX_RETRIES = 8
         private const val MAX_BUSY_WAITS = 18
+        private const val MAX_DELETE_WAIT_MS = 5 * 60_000L
         private val JSON = "application/json; charset=utf-8".toMediaType()
         private val OCTETS = "application/octet-stream".toMediaType()
 

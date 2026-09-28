@@ -1,5 +1,6 @@
 package nl.bartvandermeeren.aight
 
+import androidx.compose.runtime.mutableStateMapOf
 import nl.bartvandermeeren.aight.openui.ActionPlan
 import nl.bartvandermeeren.aight.openui.ActionStep
 import nl.bartvandermeeren.aight.openui.Bound
@@ -8,6 +9,8 @@ import nl.bartvandermeeren.aight.openui.OpenUiParser
 import nl.bartvandermeeren.aight.openui.OpenUiText
 import nl.bartvandermeeren.aight.openui.Pending
 import nl.bartvandermeeren.aight.openui.UiNode
+import nl.bartvandermeeren.aight.ui.openui.OpenUiHost
+import nl.bartvandermeeren.aight.ui.openui.OpenUiScope
 import nl.bartvandermeeren.aight.ui.openui.radialStrokePx
 import nl.bartvandermeeren.aight.voice.SpeechText
 import org.junit.Assert.assertEquals
@@ -251,6 +254,26 @@ class OpenUiTextTest {
             val root = OpenUiEvaluator(OpenUiParser.parse(body), emptyMap()).root()
             assertTrue(body, OpenUiText.hasRenderableRoot(root))
         }
+    }
+
+    @Test
+    fun rejectedSendStopsTheRestOfTheActionPlan() {
+        var notices = 0
+        val sent = mutableListOf<String>()
+        var accept = false
+        val host = OpenUiHost(send = { sent += it; accept }, openUrl = {})
+        val state = mutableStateMapOf<String, Any?>("draft" to "keep me")
+        val scope = OpenUiScope(OpenUiParser.parse(""), emptyMap(), state, mutableStateMapOf(), streaming = false, host = host) { notices++ }
+        val plan = ActionPlan(listOf(ActionStep.ToAssistant("Submit", null), ActionStep.Reset(listOf("draft"))))
+
+        scope.run(plan, "Submit", null)
+        assertEquals(1, notices)
+        assertEquals("keep me", state["draft"])
+
+        accept = true
+        scope.run(plan, "Submit", null)
+        assertEquals(listOf("Submit", "Submit"), sent)
+        assertFalse(state.containsKey("draft"))
     }
 
     @Test

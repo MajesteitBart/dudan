@@ -22,7 +22,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.ExperimentalCoroutinesApi
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.channels.Channel
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
@@ -395,27 +394,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun deleteFromHost(handle: UploadClient.UploadHandle) {
-        container.appScope.launch {
-            // A stalled chunk can hold the service lock for 120 seconds, plus the DELETE wait.
-            val deadline = android.os.SystemClock.elapsedRealtime() + 135_000
-            var attempts = 0
-            while (true) {
-                try {
-                    container.uploads.delete(handle)
-                    return@launch
-                } catch (e: CancellationException) {
-                    throw e
-                } catch (e: Exception) {
-                    attempts++
-                    if (e !is UploadClient.UploadException || e.code != "upload_busy") {
-                        if (attempts >= 2) return@launch
-                    } else if (android.os.SystemClock.elapsedRealtime() >= deadline) {
-                        return@launch
-                    }
-                }
-                delay(6_000)
-            }
-        }
+        container.appScope.launch { container.uploads.deleteEventually(handle) }
     }
 
     private fun clearAttachments() {

@@ -141,7 +141,11 @@ internal class OpenUiScope(
                         form?.summary(this@OpenUiScope)?.takeIf { it.isNotBlank() }?.let { append("\n\n").append(it) }
                     }.trim()
                     val host = host ?: return
-                    if (message.isNotEmpty() && !host.send(message)) busyNotice()
+                    // Nothing was sent, so the steps after it (a Reset, say) must not run either.
+                    if (message.isNotEmpty() && !host.send(message)) {
+                        busyNotice()
+                        return
+                    }
                 }
                 is ActionStep.OpenUrl -> host?.openUrl(step.url)
                 is ActionStep.SetState -> state[step.target] = unbind(OpenUiEvaluator(program, values()).eval(step.value, step.scope))

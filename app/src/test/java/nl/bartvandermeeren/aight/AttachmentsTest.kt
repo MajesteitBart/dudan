@@ -228,6 +228,32 @@ class UploadClientTest {
     }
 
     @Test
+    fun cleanupKeepsRetryingFailuresThatMayPass() = runBlocking {
+        val other = MockWebServer()
+        other.start()
+        try {
+            val client = UploadClient(OkHttpClient(), busyWaitMs = 10) { error("cleanup uses the handle's own server") }
+            val handle = UploadClient.UploadHandle("abc123", UploadClient.Config(other.url("/").toString().trimEnd('/'), "secret-key-0123456789"))
+            other.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START))
+            other.enqueue(MockResponse().setResponseCode(503).setBody("""{"error": {"code": "unavailable", "message": "restarting"}}"""))
+            other.enqueue(MockResponse().setResponseCode(409).setBody("""{"error": {"code": "upload_busy", "message": "busy"}}"""))
+            other.enqueue(MockResponse().setResponseCode(204))
+            assertTrue(client.deleteEventually(handle, giveUpAfterMs = 60_000, firstWaitMs = 1))
+            assertEquals(4, other.requestCount)
+            // The dropped connection is recorded without a request line.
+            val recorded = List(4) { other.takeRequest() }.filter { it.path != null }
+            assertTrue(recorded.isNotEmpty() && recorded.all { it.method == "DELETE" && it.path == "/uploads/abc123" })
+
+            other.enqueue(MockResponse().setResponseCode(403).setBody("""{"error": {"code": "forbidden", "message": "bad key"}}"""))
+            val before = other.requestCount
+            assertFalse(client.deleteEventually(handle, giveUpAfterMs = 60_000, firstWaitMs = 1))
+            assertEquals(before + 1, other.requestCount)
+        } finally {
+            other.shutdown()
+        }
+    }
+
+    @Test
     fun healthRefusesServicesThatAreNotTheUploadService() = runBlocking {
         val other = MockWebServer()
         other.start()
