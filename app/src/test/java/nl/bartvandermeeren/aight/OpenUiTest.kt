@@ -188,6 +188,14 @@ class OpenUiTextTest {
         assertEquals(scalar, OpenUiText.expand(scalar))
     }
 
+    @Test
+    fun leavesUnsupportedOpenUiFenceLanguagesAsCode() {
+        val source = "```openui-json\nroot = TextContent(\"Visible source\")\n```"
+        assertEquals(source, OpenUiText.expand(source))
+        assertFalse(OpenUiText.containsOpenUi(source))
+        assertFalse(OpenUiText.isOpenUiFence("openui-json"))
+    }
+
     private val reply = """
         Here is the comparison.
 

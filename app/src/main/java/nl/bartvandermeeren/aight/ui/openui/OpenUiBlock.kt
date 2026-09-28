@@ -567,7 +567,7 @@ private fun TableView(n: UiNode, modifier: Modifier) {
 @Composable
 internal fun DataTable(headers: List<String>, rows: List<List<Any?>>, numeric: List<Boolean> = emptyList()) {
     val cellStyle = MaterialTheme.typography.bodyLarge.copy(fontSize = 15.sp, lineHeight = 22.sp)
-    TableGrid(rowCount = rows.size + 1, columnCount = headers.size) { r, c ->
+    TableGrid(rowCount = rows.size + 1, columnCount = headers.size, alignRight = numeric) { r, c ->
         val align = if (numeric.getOrElse(c) { false }) TextAlign.End else TextAlign.Start
         if (r == 0) {
             Text(

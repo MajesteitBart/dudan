@@ -297,9 +297,10 @@ private fun TableView(node: TableBlock, style: TextStyle) {
 /**
  * Cells in a hairline frame with a line between rows. Each column is as wide as its widest cell,
  * between 64 and 280 dp, and the table scrolls sideways when it doesn't fit.
+ * Cells are measured once because OpenUI components such as LazyRow cannot answer intrinsic queries.
  */
 @Composable
-fun TableGrid(rowCount: Int, columnCount: Int, cell: @Composable (row: Int, column: Int) -> Unit) {
+fun TableGrid(rowCount: Int, columnCount: Int, alignRight: List<Boolean> = emptyList(), cell: @Composable (row: Int, column: Int) -> Unit) {
     if (rowCount == 0 || columnCount == 0) return
     val rowBottoms = remember(rowCount) { IntArray(rowCount) }
     Box(
@@ -326,15 +327,12 @@ fun TableGrid(rowCount: Int, columnCount: Int, cell: @Composable (row: Int, colu
         ) { measurables, _ ->
             val maxCell = 280.dp.roundToPx()
             val minCell = 64.dp.roundToPx()
+            val placeables = measurables.map { it.measure(Constraints(maxWidth = maxCell, maxHeight = 2000.dp.roundToPx())) }
             val widths = IntArray(columnCount) { col ->
-                (0 until rowCount).maxOf { r -> measurables[r * columnCount + col].maxIntrinsicWidth(Constraints.Infinity) }
-                    .coerceIn(minCell, maxCell)
+                (0 until rowCount).maxOf { r -> placeables[r * columnCount + col].width }.coerceIn(minCell, maxCell)
             }
             val heights = IntArray(rowCount) { r ->
-                (0 until columnCount).maxOf { c -> measurables[r * columnCount + c].maxIntrinsicHeight(widths[c]) }
-            }
-            val placeablesFixed = measurables.mapIndexed { i, m ->
-                m.measure(Constraints.fixed(widths[i % columnCount], heights[i / columnCount]))
+                (0 until columnCount).maxOf { c -> placeables[r * columnCount + c].height }
             }
             var y = 0
             heights.forEachIndexed { r, h ->
@@ -346,7 +344,9 @@ fun TableGrid(rowCount: Int, columnCount: Int, cell: @Composable (row: Int, colu
                 repeat(rowCount) { r ->
                     var left = 0
                     repeat(columnCount) { c ->
-                        placeablesFixed[r * columnCount + c].placeRelative(left, top)
+                        val measured = placeables[r * columnCount + c]
+                        val inset = if (alignRight.getOrElse(c) { false }) widths[c] - measured.width else 0
+                        measured.placeRelative(left + inset, top)
                         left += widths[c]
                     }
                     top += heights[r]

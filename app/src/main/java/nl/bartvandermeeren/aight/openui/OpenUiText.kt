@@ -9,11 +9,11 @@ object OpenUiText {
     private val fenceLanguages = setOf("openui-lang", "openui", "openuilang")
 
     // An unclosed fence at the end is a block that is still streaming.
-    private val fence = Regex("```[ \\t]*(?:openui-lang|openuilang|openui)[^\\n]*\\n([\\s\\S]*?)(?:\\n?```|$)", RegexOption.IGNORE_CASE)
+    private val fence = Regex("```[ \\t]*(?:openui-lang|openuilang|openui)(?=[ \\t\\r\\n])[^\\n]*\\n([\\s\\S]*?)(?:\\n?```|$)", RegexOption.IGNORE_CASE)
 
     /** True for the info string of a fenced block that holds OpenUI Lang. */
     fun isOpenUiFence(info: String?): Boolean =
-        info?.trim()?.substringBefore(' ')?.lowercase() in fenceLanguages
+        info?.trim()?.takeWhile { !it.isWhitespace() }?.lowercase() in fenceLanguages
 
     fun containsOpenUi(markdown: String): Boolean = fence.containsMatchIn(markdown)
 
