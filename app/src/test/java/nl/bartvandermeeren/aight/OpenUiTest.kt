@@ -196,6 +196,17 @@ class OpenUiTextTest {
         assertFalse(OpenUiText.isOpenUiFence("openui-json"))
     }
 
+    @Test
+    fun followsMarkdownFenceLengthsAndTildeFences() {
+        val example = "````markdown\n```openui-lang\nroot = TextContent(\"Example\")\n```\n````"
+        assertFalse(OpenUiText.containsOpenUi(example))
+        assertEquals(example, OpenUiText.expand(example))
+
+        val tilde = "Before\n\n~~~openui-lang\nroot = TextContent(\"Converted\")\n~~~\n\nAfter"
+        assertTrue(OpenUiText.containsOpenUi(tilde))
+        assertEquals("Before\n\nConverted\n\nAfter", OpenUiText.expand(tilde))
+    }
+
     private val reply = """
         Here is the comparison.
 

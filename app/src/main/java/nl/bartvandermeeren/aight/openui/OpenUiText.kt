@@ -1,5 +1,10 @@
 package nl.bartvandermeeren.aight.openui
 
+import org.commonmark.node.FencedCodeBlock
+import org.commonmark.node.Node
+import org.commonmark.parser.IncludeSourceSpans
+import org.commonmark.parser.Parser
+
 /**
  * OpenUI blocks as markdown, for everything that handles a reply as text: copy, share, the reply
  * notification and read-aloud. A table stays a table and steps stay a numbered list; buttons, forms
@@ -7,23 +12,43 @@ package nl.bartvandermeeren.aight.openui
  */
 object OpenUiText {
     private val fenceLanguages = setOf("openui-lang", "openui", "openuilang")
-
-    // An unclosed fence at the end is a block that is still streaming.
-    private val fence = Regex("```[ \\t]*(?:openui-lang|openuilang|openui)(?=[ \\t\\r\\n])[^\\n]*\\n([\\s\\S]*?)(?:\\n?```|$)", RegexOption.IGNORE_CASE)
+    private val markdownParser = Parser.builder().includeSourceSpans(IncludeSourceSpans.BLOCKS).build()
 
     /** True for the info string of a fenced block that holds OpenUI Lang. */
     fun isOpenUiFence(info: String?): Boolean =
         info?.trim()?.takeWhile { !it.isWhitespace() }?.lowercase() in fenceLanguages
 
-    fun containsOpenUi(markdown: String): Boolean = fence.containsMatchIn(markdown)
+    fun containsOpenUi(markdown: String): Boolean = openUiBlocks(markdown).isNotEmpty()
 
     /** [markdown] with every OpenUI block replaced by its markdown equivalent. */
     fun expand(markdown: String): String {
-        if (!markdown.contains("```")) return markdown
-        // A block that can't be converted stays as the code it is; speech skips code anyway.
-        return markdown.replace(fence) { match ->
-            runCatching { toMarkdown(match.groupValues[1]) }.getOrNull()?.takeIf { it.isNotBlank() } ?: match.value
+        val blocks = openUiBlocks(markdown)
+        if (blocks.isEmpty()) return markdown
+        val result = StringBuilder(markdown)
+        // Reverse order preserves source offsets as earlier blocks are replaced.
+        for (block in blocks.asReversed()) {
+            val spans = block.sourceSpans
+            if (spans.isEmpty()) continue
+            val replacement = runCatching { toMarkdown(block.literal.trimEnd('\r', '\n')) }.getOrNull()?.takeIf { it.isNotBlank() } ?: continue
+            val start = spans.first().inputIndex
+            val end = spans.last().let { it.inputIndex + it.length }
+            result.replace(start, end, replacement)
         }
+        return result.toString()
+    }
+
+    private fun openUiBlocks(markdown: String): List<FencedCodeBlock> {
+        val blocks = mutableListOf<FencedCodeBlock>()
+        fun visit(node: Node) {
+            if (node is FencedCodeBlock && isOpenUiFence(node.info)) blocks += node
+            var child = node.firstChild
+            while (child != null) {
+                visit(child)
+                child = child.next
+            }
+        }
+        visit(markdownParser.parse(markdown))
+        return blocks
     }
 
     fun toMarkdown(source: String): String {

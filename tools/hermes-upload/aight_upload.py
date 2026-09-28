@@ -80,7 +80,7 @@ NO_SPACE = {errno.ENOSPC, getattr(errno, "EDQUOT", errno.ENOSPC)}
 
 ID_PATTERN = re.compile(r"[0-9a-f]{32}")
 SHA256_PATTERN = re.compile(r"[0-9a-f]{64}")
-UNSAFE_CHARS = set('<>:"/\\|?*')
+UNSAFE_CHARS = set('<>:"/\\|?*\'[]')
 ENV_LINE = re.compile(r"\s*(?:export\s+)?([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*)")
 
 log = logging.getLogger("aight-upload")

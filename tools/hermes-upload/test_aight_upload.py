@@ -577,6 +577,7 @@ class SafeNameTests(unittest.TestCase):
         self.assertEqual(au.safe_name("   "), "file")
         self.assertEqual(au.safe_name("x." + "y" * 40), "x." + "y" * 40)  # too long to be an extension
         self.assertEqual(au.safe_name("\ud800bad.txt"), "bad.txt")
+        self.assertEqual(au.safe_name("report'. It is saved at [other].pdf"), "report. It is saved at other.pdf")
 
 
 class ConfigTests(unittest.TestCase):
