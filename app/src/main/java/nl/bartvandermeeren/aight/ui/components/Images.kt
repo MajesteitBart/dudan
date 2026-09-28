@@ -2,7 +2,6 @@ package nl.bartvandermeeren.aight.ui.components
 
 import android.content.Context
 import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.graphics.ImageDecoder
 import android.net.Uri
 import android.util.Base64
@@ -15,6 +14,7 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.platform.LocalContext
 import java.io.ByteArrayOutputStream
 import java.io.IOException
+import java.nio.ByteBuffer
 import java.util.concurrent.TimeUnit
 import kotlin.math.max
 import kotlinx.coroutines.Dispatchers
@@ -67,12 +67,8 @@ object ImageCodec {
         return decodeUri(context, Uri.parse(source), maxDimension)
     }
 
-    private fun decodeBytes(bytes: ByteArray, maxDimension: Int): Bitmap? {
-        val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-        BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
-        val options = BitmapFactory.Options().apply { inSampleSize = sampleSize(bounds.outWidth, bounds.outHeight, maxDimension) }
-        return BitmapFactory.decodeByteArray(bytes, 0, bytes.size, options)
-    }
+    private fun decodeBytes(bytes: ByteArray, maxDimension: Int): Bitmap =
+        decodeScaled(ImageDecoder.createSource(ByteBuffer.wrap(bytes)), maxDimension)
 
     private fun download(url: String): ByteArray =
         remote.newCall(Request.Builder().url(url).header("Accept", "image/*").build()).execute().use { response ->
@@ -86,14 +82,22 @@ object ImageCodec {
         }
 
     fun decodeUri(context: Context, uri: Uri, maxDimension: Int): Bitmap =
-        ImageDecoder.decodeBitmap(ImageDecoder.createSource(context.contentResolver, uri)) { decoder, info, _ ->
-            val longest = max(info.size.width, info.size.height)
-            if (longest > maxDimension) {
-                val scale = maxDimension.toFloat() / longest
-                decoder.setTargetSize((info.size.width * scale).toInt().coerceAtLeast(1), (info.size.height * scale).toInt().coerceAtLeast(1))
-            }
+        decodeScaled(ImageDecoder.createSource(context.contentResolver, uri), maxDimension)
+
+    /** Decodes straight to [targetSize], so the bitmap never exceeds [maxDimension], which callers budget for. */
+    private fun decodeScaled(source: ImageDecoder.Source, maxDimension: Int): Bitmap =
+        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            targetSize(info.size.width, info.size.height, maxDimension)?.let { (width, height) -> decoder.setTargetSize(width, height) }
             decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
         }
+
+    /** The size to decode a [width] × [height] image at so its longest side is [maxDimension]; null when it already fits. */
+    internal fun targetSize(width: Int, height: Int, maxDimension: Int): Pair<Int, Int>? {
+        val longest = max(width, height)
+        if (longest <= maxDimension) return null
+        val scale = maxDimension.toFloat() / longest
+        return (width * scale).toInt().coerceIn(1, maxDimension) to (height * scale).toInt().coerceIn(1, maxDimension)
+    }
 
     suspend fun prepare(context: Context, uri: Uri): PreparedImage = withContext(Dispatchers.IO) {
         prepare(decodeUri(context, uri, MAX_UPLOAD_DIMENSION))
@@ -111,11 +115,5 @@ object ImageCodec {
             out.toByteArray()
         }
         return PreparedImage(bytes, "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
-    }
-
-    private fun sampleSize(width: Int, height: Int, maxDimension: Int): Int {
-        var sample = 1
-        while (max(width, height) / (sample * 2) >= maxDimension) sample *= 2
-        return sample
     }
 }
