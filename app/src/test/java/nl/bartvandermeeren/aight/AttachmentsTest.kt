@@ -37,6 +37,7 @@ class SharedPhotoClassificationTest {
         assertTrue(isModelPhoto("application/octet-stream", "image/*"))
         assertTrue(isModelPhoto("application/octet-stream", "image/jpeg"))
         assertTrue(isModelPhoto("image/png", null))
+        assertTrue(isModelPhoto("image/avif", null))
         assertFalse(isModelPhoto("application/pdf", "image/*"))
         assertFalse(isModelPhoto("application/octet-stream", "video/*"))
     }

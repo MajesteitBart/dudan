@@ -178,6 +178,14 @@ class OpenUiModelSamplesTest {
 }
 
 class OpenUiTextTest {
+    @Test
+    fun keepsBlocksThatProduceNoExportableText() {
+        val unresolved = "```openui-lang\nroot = missing\n```"
+        val empty = "```openui-lang\n\n```"
+        assertEquals(unresolved, OpenUiText.expand(unresolved))
+        assertEquals(empty, OpenUiText.expand(empty))
+    }
+
     private val reply = """
         Here is the comparison.
 

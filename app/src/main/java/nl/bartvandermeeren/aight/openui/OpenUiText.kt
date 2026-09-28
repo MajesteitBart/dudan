@@ -21,7 +21,9 @@ object OpenUiText {
     fun expand(markdown: String): String {
         if (!markdown.contains("```")) return markdown
         // A block that can't be converted stays as the code it is; speech skips code anyway.
-        return markdown.replace(fence) { match -> runCatching { toMarkdown(match.groupValues[1]) }.getOrDefault(match.value) }
+        return markdown.replace(fence) { match ->
+            runCatching { toMarkdown(match.groupValues[1]) }.getOrNull()?.takeIf { it.isNotBlank() } ?: match.value
+        }
     }
 
     fun toMarkdown(source: String): String {

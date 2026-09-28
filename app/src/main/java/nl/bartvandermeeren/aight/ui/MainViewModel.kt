@@ -442,7 +442,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 }
 
 /** Photo formats Android decodes; these go to the model as pictures instead of being uploaded as files. */
-private val PHOTO_TYPES = setOf("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif", "image/bmp")
+private val PHOTO_TYPES = setOf("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif", "image/bmp", "image/avif")
 
 internal fun isModelPhoto(mime: String, shareMimeHint: String?): Boolean =
     mime in PHOTO_TYPES || (mime == "application/octet-stream" && shareMimeHint?.startsWith("image/") == true)

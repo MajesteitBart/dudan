@@ -666,6 +666,9 @@ private fun RepliesAndFilesSettings(vm: MainViewModel, settings: AppSettings) {
         placeholder = UploadClient.baseUrlFor(settings.serverUrl, "").ifBlank { null },
         keyboard = KeyboardType.Uri,
     )
+    if (address.isNotBlank() && isInsecureRemote(address)) {
+        Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
+    }
     Text(stringResource(R.string.upload_server_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     result?.let { Notice(it, if (failed) Palette.Danger else Palette.Success, ok = !failed, error = failed) }
     val ok = stringResource(R.string.upload_ok)
