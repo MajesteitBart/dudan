@@ -252,6 +252,9 @@ class UploadClient(
             val explicit = override.trim()
             if (explicit.isNotEmpty()) return HermesApi.normalizeBaseUrl(explicit)
             val server = HermesApi.normalizeBaseUrl(serverUrl).toHttpUrlOrNull() ?: return ""
+            // The bundled service speaks HTTP. HTTPS Hermes setups need an explicit service URL,
+            // since silently downgrading an arbitrary host would expose the API key.
+            if (server.isHttps) return ""
             return server.newBuilder().port(DEFAULT_PORT).encodedPath("/").build().toString().trimEnd('/')
         }
     }

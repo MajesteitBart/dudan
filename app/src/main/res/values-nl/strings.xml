@@ -236,7 +236,7 @@
     <string name="rich_replies">Rijke antwoorden</string>
     <string name="rich_replies_detail">Tabellen, grafieken, stappen, formulieren en vervolgvragen in antwoorden, getekend met OpenUI</string>
     <string name="upload_server">Uploadserver</string>
-    <string name="upload_server_detail">Bestanden tot 250 MB gaan naar de uploadservice van aight op de Hermes-server, en de agent leest ze daar. Laat dit leeg om poort 8645 op de Hermes-server te gebruiken.</string>
+    <string name="upload_server_detail">Bestanden tot 250 MB gaan naar de uploadservice van aight op de Hermes-server, en de agent leest ze daar. Laat dit leeg voor poort 8645 als Hermes HTTP gebruikt. Gebruikt Hermes HTTPS, vul dan het adres van de uploadservice in.</string>
     <string name="upload_check">Uploadservice controleren</string>
     <string name="upload_checking">Controleren…</string>
     <string name="upload_ok">De uploadservice werkt.</string>

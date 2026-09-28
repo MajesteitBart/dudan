@@ -355,9 +355,23 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun deleteFromHost(uploadId: String) {
         container.appScope.launch {
-            // The service holds a cancelled chunk's lock for a few seconds; try once more after that.
-            repeat(2) {
-                if (runCatching { container.uploads.delete(uploadId) }.isSuccess) return@launch
+            // A stalled chunk can hold the service lock for 120 seconds, plus the DELETE wait.
+            val deadline = android.os.SystemClock.elapsedRealtime() + 135_000
+            var attempts = 0
+            while (true) {
+                try {
+                    container.uploads.delete(uploadId)
+                    return@launch
+                } catch (e: CancellationException) {
+                    throw e
+                } catch (e: Exception) {
+                    attempts++
+                    if (e !is UploadClient.UploadException || e.code != "upload_busy") {
+                        if (attempts >= 2) return@launch
+                    } else if (android.os.SystemClock.elapsedRealtime() >= deadline) {
+                        return@launch
+                    }
+                }
                 delay(6_000)
             }
         }

@@ -182,8 +182,10 @@ class OpenUiTextTest {
     fun keepsBlocksThatProduceNoExportableText() {
         val unresolved = "```openui-lang\nroot = missing\n```"
         val empty = "```openui-lang\n\n```"
+        val scalar = "```openui-lang\nroot = \"hello\"\n```"
         assertEquals(unresolved, OpenUiText.expand(unresolved))
         assertEquals(empty, OpenUiText.expand(empty))
+        assertEquals(scalar, OpenUiText.expand(scalar))
     }
 
     private val reply = """

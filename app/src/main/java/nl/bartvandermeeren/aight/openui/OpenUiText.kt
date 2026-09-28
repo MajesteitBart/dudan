@@ -30,8 +30,10 @@ object OpenUiText {
         val program = OpenUiParser.parse(source)
         if (program.isEmpty) return ""
         val evaluator = OpenUiEvaluator(program, OpenUiEvaluator.stateDefaults(program))
+        val root = evaluator.root()
+        if (root !is UiNode && (root !is List<*> || root.isEmpty())) return ""
         val blocks = mutableListOf<String>()
-        write(evaluator.root(), blocks)
+        write(root, blocks)
         return blocks.filter { it.isNotBlank() }.joinToString("\n\n")
     }
 

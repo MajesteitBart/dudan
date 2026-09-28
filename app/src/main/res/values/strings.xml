@@ -238,7 +238,7 @@
     <string name="rich_replies">Rich replies</string>
     <string name="rich_replies_detail">Tables, charts, steps, forms and suggested follow-ups in replies, drawn with OpenUI</string>
     <string name="upload_server">Upload server</string>
-    <string name="upload_server_detail">Files up to 250 MB go to aight\'s upload service on the Hermes host, and the agent reads them there. Leave this empty to use port 8645 on the Hermes server.</string>
+    <string name="upload_server_detail">Files up to 250 MB go to aight\'s upload service on the Hermes host, and the agent reads them there. Leave this empty to use port 8645 when Hermes uses HTTP. If Hermes uses HTTPS, enter the upload service address.</string>
     <string name="upload_check">Check the upload service</string>
     <string name="upload_checking">Checking…</string>
     <string name="upload_ok">The upload service answers.</string>
