@@ -88,10 +88,9 @@ then run `systemctl --user daemon-reload && systemctl --user restart aight-uploa
 | `AIGHT_UPLOAD_MAX_BYTES` | `262144000` (250 MiB) | Largest file accepted. |
 | `AIGHT_UPLOAD_CHUNK_BYTES` | `8388608` (8 MiB) | Chunk size the service suggests to the app. At most 16 MiB. |
 | `AIGHT_UPLOAD_RETENTION_DAYS` | `30` | Days to keep finished files. `0` keeps them forever. |
-| `AIGHT_UPLOAD_KEY` | none | A separate key, if you don't want to reuse Hermes' key. |
 
-The key comes from the first of these that is set: `AIGHT_UPLOAD_KEY`, `API_SERVER_KEY`, or the
-`API_SERVER_KEY=` line in `~/.hermes/.env`. The service won't start without a key, or with one
+The service uses `API_SERVER_KEY` from its environment or the `API_SERVER_KEY=` line in
+`~/.hermes/.env`. It won't start without a key, or with one
 shorter than 16 characters. It reads the key once at startup, so restart it after you change the
 key in Hermes.
 

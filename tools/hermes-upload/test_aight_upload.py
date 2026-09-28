@@ -514,6 +514,23 @@ class PruneTests(ServerTestCase):
         self.assertEqual(self.store.prune(), 1)
         self.assertFalse(final.exists())
 
+    def test_immediate_retry_keeps_a_file_renamed_before_metadata_save(self):
+        data = b"safe after interrupted completion"
+        meta = self.store.create("retry.txt", len(data))
+        upload_id = meta["id"]
+        self.store._part_path(upload_id).write_bytes(data)
+        final = self.store.final_path(meta)
+        os.replace(self.store._part_path(upload_id), final)
+
+        status, body, _ = self.put(upload_id, 0, data)
+        self.assertEqual(status, 409)
+        self.assertEqual(body["error"]["code"], "offset_mismatch")
+        self.assertTrue(final.exists())
+        status, body, _ = self.request("GET", f"/uploads/{upload_id}")
+        self.assertEqual(status, 200)
+        self.assertTrue(body["complete"])
+        self.assertEqual(body["path"], str(final))
+
     def test_prune(self):
         partial = self.root / ".partial"
         old_id, old_done = self.upload("old.txt", b"old")
@@ -592,7 +609,7 @@ class ConfigTests(unittest.TestCase):
         self.assertEqual(au.load_key({"API_SERVER_KEY": "from-env-0123456789"}, self.env_file)[0],
                          "from-env-0123456789")
         environ = {"API_SERVER_KEY": "from-env-0123456789", "AIGHT_UPLOAD_KEY": "own-key-0123456789"}
-        self.assertEqual(au.load_key(environ, self.env_file), ("own-key-0123456789", "$AIGHT_UPLOAD_KEY"))
+        self.assertEqual(au.load_key(environ, self.env_file), ("from-env-0123456789", "$API_SERVER_KEY"))
         self.assertEqual(au.load_key({}, Path(self._tmp.name) / "missing"), (None, None))
 
     def test_config_from_env_and_flags(self):
@@ -615,7 +632,7 @@ class ConfigTests(unittest.TestCase):
         argv = ["--dir", str(Path(self._tmp.name) / "uploads"), "--host", "127.0.0.1", "--port", "0"]
         with mock.patch.object(au, "HERMES_ENV", missing), mock.patch.dict(os.environ, clean, clear=True):
             self.assertEqual(au.main(argv), 2)
-            os.environ["AIGHT_UPLOAD_KEY"] = "too-short"
+            os.environ["API_SERVER_KEY"] = "too-short"
             self.assertEqual(au.main(argv), 2)
         self.assertFalse((Path(self._tmp.name) / "uploads").exists())
 

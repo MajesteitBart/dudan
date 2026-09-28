@@ -18,8 +18,8 @@ Protocol (JSON; every request needs "Authorization: Bearer <key>"):
   PUT    /uploads/<id>?offset=N   raw bytes; the last chunk returns the absolute "path"
   DELETE /uploads/<id>            removes the upload and its file
 
-The key is Hermes' own API key, so aight needs no new secret. First found wins: AIGHT_UPLOAD_KEY,
-API_SERVER_KEY, then API_SERVER_KEY= in ~/.hermes/.env. The key is read once, at startup.
+The key is Hermes' own API key, so aight needs no new secret. It comes from API_SERVER_KEY
+or API_SERVER_KEY= in ~/.hermes/.env and is read once, at startup.
 
 Environment (a command-line flag, where there is one, wins):
   AIGHT_UPLOAD_HOST            --host  address to listen on (default 0.0.0.0; the Tailscale IP is better)
@@ -149,10 +149,9 @@ def read_env_file(path):
 
 def load_key(environ, env_file=None):
     """Returns (key, where it came from), or (None, None) when there is no key."""
-    for name in ("AIGHT_UPLOAD_KEY", "API_SERVER_KEY"):
-        value = (environ.get(name) or "").strip()
-        if value:
-            return value, f"${name}"
+    value = (environ.get("API_SERVER_KEY") or "").strip()
+    if value:
+        return value, "$API_SERVER_KEY"
     env_file = HERMES_ENV if env_file is None else Path(env_file)
     value = read_env_file(env_file).get("API_SERVER_KEY", "").strip()
     if value:
@@ -248,6 +247,25 @@ class Store:
         except (OSError, ValueError) as exc:
             log.error("upload %s: unreadable metadata: %s", upload_id, exc)
             return None
+
+    def recover_final(self, meta):
+        """Repair a crash after the final rename, while the caller holds this upload's lock."""
+        if meta.get("complete"):
+            return meta
+        final = self.final_path(meta)
+        if self._part_path(meta["id"]).exists() or not final.is_file():
+            return meta
+        stat = final.stat()
+        if stat.st_size != meta["size"]:
+            return meta
+        digest = sha256_file(final)
+        if meta.get("expected_sha256") and digest != meta["expected_sha256"]:
+            return meta
+        recovered = dict(meta, complete=True, offset=meta["size"], sha256=digest,
+                         path=str(final), completed_at=stat.st_mtime)
+        self.save(recovered)
+        log.info("upload %s recovered after interrupted completion", meta["id"])
+        return recovered
 
     def save(self, meta):
         """Replaces the metadata in one step, so a crash never leaves half a file behind."""
@@ -413,19 +431,7 @@ class Store:
                 meta = self.load(upload_id)
                 if meta is None:
                     continue
-                if not meta.get("complete"):
-                    final = self.final_path(meta)
-                    if final.is_file() and not self._part_path(upload_id).exists():
-                        if final.stat().st_size == meta["size"]:
-                            digest = sha256_file(final)
-                            if meta.get("expected_sha256") and digest != meta["expected_sha256"]:
-                                self._remove(meta)
-                                removed += 1
-                                continue
-                            meta = dict(meta, complete=True, offset=meta["size"], sha256=digest,
-                                        path=str(final), completed_at=final.stat().st_mtime)
-                            self.save(meta)
-                            log.info("upload %s recovered after interrupted completion", upload_id)
+                meta = self.recover_final(meta)
                 if meta.get("complete"):
                     if self.retention <= 0:
                         continue
@@ -585,6 +591,16 @@ class Handler(BaseHTTPRequestHandler):
         meta = self.store.load(upload_id)
         if meta is None:
             raise UploadError(404, "not_found", "No such upload.")
+        lock = self.store.lock_for(upload_id)
+        if not lock.acquire(blocking=False):
+            raise busy_error(meta)
+        try:
+            meta = self.store.load(upload_id)
+            if meta is None:
+                raise UploadError(404, "not_found", "No such upload.")
+            meta = self.store.recover_final(meta)
+        finally:
+            lock.release()
         self._send_json(200, describe(meta))
 
     def _check_put(self, upload_id):
@@ -615,6 +631,10 @@ class Handler(BaseHTTPRequestHandler):
         if not lock.acquire(blocking=False):
             raise busy_error(meta)
         try:
+            meta = self.store.load(upload_id)
+            if meta is None:
+                raise UploadError(404, "not_found", "No such upload.")
+            meta = self.store.recover_final(meta)
             meta, length = self._check_put(upload_id)  # again, now that no other request can change it
             # An empty PUT at the end of a finished upload repeats the final answer. A client whose
             # connection dropped before that answer arrived gets the path this way.
@@ -846,7 +866,7 @@ def main(argv=None):
                         format="%(levelname)s %(message)s", stream=sys.stderr)
     key, source = load_key(os.environ)
     if not key:
-        log.error("no API key: set API_SERVER_KEY in %s, or AIGHT_UPLOAD_KEY in the environment", HERMES_ENV)
+        log.error("no API key: set API_SERVER_KEY in %s or the environment", HERMES_ENV)
         return 2
     if len(key) < MIN_KEY_LENGTH:
         log.error("the API key from %s is shorter than %d characters; use a longer one", source, MIN_KEY_LENGTH)
