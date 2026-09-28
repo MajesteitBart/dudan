@@ -261,18 +261,21 @@ internal fun Render(value: Any?, modifier: Modifier = Modifier, topLevel: Boolea
 @Composable
 internal fun Children(items: List<*>, modifier: Modifier = Modifier, spacing: Dp = 14.dp) {
     val streaming = LocalStreaming.current
-    val visible = items.filter { item ->
-        when (val v = unbind(item)) {
-            null -> false
-            is Pending -> streaming
-            is String -> v.isNotBlank()
-            else -> true
-        }
-    }
+    val visible = items.filter { item -> drawable(item, streaming) }
     if (visible.isEmpty()) return
     Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(spacing)) {
         visible.forEach { Render(it) }
     }
+}
+
+/**
+ * Whether a child gets a place in a layout. While streaming, pending parts keep theirs for the
+ * placeholder; once the reply is complete, a part that draws nothing would only leave a gap.
+ */
+internal fun drawable(item: Any?, streaming: Boolean): Boolean = when (val v = unbind(item)) {
+    null -> false
+    is Pending -> streaming
+    else -> OpenUiText.hasRenderableRoot(v, ::hasOpenUiIcon) || (streaming && v !is String)
 }
 
 @Composable
@@ -347,7 +350,8 @@ private fun gap(name: String?): Dp = when (name) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun StackView(n: UiNode, modifier: Modifier) {
-    val children = n.list("children").filter { unbind(it) != null }
+    val streaming = LocalStreaming.current
+    val children = n.list("children").filter { drawable(it, streaming) }
     val spacing = gap(n.string("gap"))
     if (n.string("direction") == "row") {
         // A phone is too narrow for a row of cards; two to a line, wrapping.

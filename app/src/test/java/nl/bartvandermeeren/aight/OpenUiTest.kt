@@ -11,6 +11,7 @@ import nl.bartvandermeeren.aight.openui.Pending
 import nl.bartvandermeeren.aight.openui.UiNode
 import nl.bartvandermeeren.aight.ui.openui.OpenUiHost
 import nl.bartvandermeeren.aight.ui.openui.OpenUiScope
+import nl.bartvandermeeren.aight.ui.openui.drawable
 import nl.bartvandermeeren.aight.ui.openui.radialStrokePx
 import nl.bartvandermeeren.aight.voice.SpeechText
 import org.junit.Assert.assertEquals
@@ -287,6 +288,15 @@ class OpenUiTextTest {
 
         val fold = OpenUiEvaluator(OpenUiParser.parse("root = Accordion([AccordionItem(\"\", \" \", [missing]), AccordionItem(\"b\", \"Details\", [missing]), AccordionItem(\"\", \"\", [TextContent(\"Body\")])])"), emptyMap()).root() as UiNode
         assertEquals(listOf(false, true, true), fold.nodes("items").map { OpenUiText.hasSectionContent(it) })
+    }
+
+    @Test
+    fun layoutsDropEmptyChildrenOnceTheReplyIsComplete() {
+        val stack = OpenUiEvaluator(OpenUiParser.parse("root = Stack([missing, TextContent(missing), TextContent(\"Shown\"), \" \", null], \"row\")"), emptyMap()).root() as UiNode
+        val children = stack.list("children")
+        assertEquals(listOf(false, false, true, false, false), children.map { drawable(it, streaming = false) })
+        // While streaming, pending parts and components keep their place for the placeholder.
+        assertEquals(listOf(true, true, true, false, false), children.map { drawable(it, streaming = true) })
     }
 
     @Test
