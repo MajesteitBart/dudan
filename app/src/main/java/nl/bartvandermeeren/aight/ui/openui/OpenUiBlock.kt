@@ -34,6 +34,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.rounded.ArrowForward
 import androidx.compose.material.icons.automirrored.rounded.KeyboardArrowRight
+import androidx.compose.material.icons.outlined.BrokenImage
 import androidx.compose.material.icons.outlined.CheckCircle
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Info
@@ -852,10 +853,19 @@ private fun ListBlockView(n: UiNode, modifier: Modifier) {
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                val image = item.map("image")?.let { displayText(it["src"]) }?.takeIf { it.isNotBlank() }
-                if (withImages && image != null) {
-                    when (val loaded = rememberRemoteImage(image, 256)) {
+                val image = item.map("image")?.takeIf { withImages }
+                val src = image?.let { displayText(it["src"]) }?.takeIf { it.isNotBlank() }
+                val loaded = src?.let { rememberRemoteImage(it, 256) }
+                if (src != null) {
+                    when (loaded) {
                         is RemoteState.Loaded -> Image(loaded.image, null, contentScale = ContentScale.Crop, modifier = Modifier.size(44.dp).clip(RoundedCornerShape(10.dp)))
+                        // Offline or a dead link: a broken-image mark that still opens the source.
+                        RemoteState.Failed -> Box(
+                            Modifier.size(44.dp).pane(RoundedCornerShape(10.dp), Palette.Surface, outline = Palette.Hairline).clickable { scope?.host?.openUrl(src) },
+                            contentAlignment = Alignment.Center,
+                        ) {
+                            Icon(Icons.Outlined.BrokenImage, contentDescription = displayText(image["alt"]).ifBlank { null }, tint = Palette.TextSecondary, modifier = Modifier.size(20.dp))
+                        }
                         else -> Box(Modifier.size(44.dp).pane(RoundedCornerShape(10.dp), Palette.Surface))
                     }
                 } else {
@@ -864,7 +874,9 @@ private fun ListBlockView(n: UiNode, modifier: Modifier) {
                     }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-                    Text(title, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium), color = Palette.TextPrimary)
+                    // An image-only item whose image failed names the image instead of going blank.
+                    val shown = title.ifBlank { if (loaded == RemoteState.Failed) displayText(image?.get("alt")).ifBlank { src.orEmpty() } else "" }
+                    Text(shown, style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium), color = Palette.TextPrimary)
                     item.string("subtitle")?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary) }
                 }
                 if (tappable) {

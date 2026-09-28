@@ -323,6 +323,12 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun exportsShareChartValuesAsDrawn() {
+        val body = "root = PieChart([\"A\", \"B\", \"C\", \"D\"], [30, -5, \"x\"])"
+        assertEquals("- A: 30\n- B: 0\n- C: 0", OpenUiText.expand("```openui-lang\n$body\n```"))
+    }
+
+    @Test
     fun exportsListImagesAndHidesFallbackIds() {
         val list = "root = ListBlock([ListItem(\"Museum\", \"Open daily\", {src: \"https://example.com/m.jpg\", alt: \"Front\"}), ListItem(\"\", \"\", {src: \"https://example.com/p.jpg\"})], \"image\")"
         assertEquals(

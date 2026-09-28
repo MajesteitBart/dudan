@@ -198,9 +198,11 @@ object OpenUiText {
             "Table" -> table(n)?.let { out += it }
             "BarChart", "LineChart", "AreaChart", "HorizontalBarChart" -> seriesTable(n)?.let { out += it }
             "PieChart", "RadialChart", "SingleStackedBarChart" -> {
+                // As the chart draws them: missing or negative values count as 0, and only paired entries show.
                 val labels = n.list("labels")
-                val values = n.list("values")
-                if (labels.isNotEmpty()) out += labels.indices.joinToString("\n") { "- ${cellText(labels[it])}: ${cellText(values.getOrNull(it))}" }
+                val values = n.list("values").map { maxOf(0.0, toNumberOrNull(it) ?: 0.0) }
+                val count = minOf(labels.size, values.size)
+                if (count > 0) out += (0 until count).joinToString("\n") { "- ${cellText(labels[it])}: ${displayText(values[it])}" }
             }
             "Steps" -> n.nodes("items").mapIndexed { i, step ->
                 val details = step.string("details")
