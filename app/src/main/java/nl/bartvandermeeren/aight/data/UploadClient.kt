@@ -99,7 +99,7 @@ class UploadClient(
                         request(pinned, "uploads", id, query = mapOf("offset" to offset.toString()))
                             .put(buffer.toRequestBody(OCTETS, 0, length))
                             .build(),
-                    ).also { failures = 0 }
+                    ).also { failures = 0; busyWaits = 0 }
                 } catch (e: UploadException) {
                     val held = (e as? OffsetMismatch)?.serverOffset
                     if (held != null) {

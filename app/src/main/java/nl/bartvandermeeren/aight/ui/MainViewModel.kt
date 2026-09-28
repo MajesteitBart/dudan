@@ -81,6 +81,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val attachments = mutableStateListOf<Attachment>()
     private var attachmentIds = 0L
     private var draftGeneration = 0L
+    private var pendingPickerCount = 0
     private val uploadSlots = Semaphore(2)
 
     /** One-shot requests from intents (assist gesture, "open this chat") that the UI must act on. */
@@ -145,6 +146,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var pendingSend: Job? = null
 
     fun send(textOverride: String? = null) {
+        if (pendingPickerCount > 0) {
+            _notices.trySend(Notice(R.string.file_metadata_pending))
+            return
+        }
         val text = (textOverride ?: composerText).trim()
         val picked = attachments.toList()
         if (text.isEmpty() && picked.isEmpty()) return
@@ -240,20 +245,25 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun addPicked(uris: List<Uri>, mimeHint: String? = null) {
         if (uris.isEmpty()) return
         val generation = draftGeneration
+        pendingPickerCount++
         viewModelScope.launch {
-            // Asking a document provider about a file is IPC, and a cloud provider can take seconds.
-            val picked = withContext(Dispatchers.IO) {
-                uris.map { uri -> uri to runCatching { FileInfo.of(getApplication(), uri) } }
-            }
-            if (generation != draftGeneration) return@launch
-            if (picked.any { it.second.isFailure }) _notices.trySend(Notice(R.string.file_read_failed))
-            picked.forEach { (uri, result) ->
-                val info = result.getOrNull() ?: return@forEach
-                if (isModelPhoto(info.mime, mimeHint)) {
-                    addImage(uri)
-                } else {
-                    addFile(uri, info)
+            try {
+                // Asking a document provider about a file is IPC, and a cloud provider can take seconds.
+                val picked = withContext(Dispatchers.IO) {
+                    uris.map { uri -> uri to runCatching { FileInfo.of(getApplication(), uri) } }
                 }
+                if (generation != draftGeneration) return@launch
+                if (picked.any { it.second.isFailure }) _notices.trySend(Notice(R.string.file_read_failed))
+                picked.forEach { (uri, result) ->
+                    val info = result.getOrNull() ?: return@forEach
+                    if (isModelPhoto(info.mime, mimeHint)) {
+                        addImage(uri)
+                    } else {
+                        addFile(uri, info)
+                    }
+                }
+            } finally {
+                if (generation == draftGeneration) pendingPickerCount--
             }
         }
     }
@@ -379,6 +389,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     private fun clearAttachments() {
         draftGeneration++
+        pendingPickerCount = 0
         pendingSend?.cancel()
         attachments.forEach { forgetUpload(it.id) }
         attachments.clear()

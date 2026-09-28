@@ -181,6 +181,14 @@ class UploadClientTest {
     }
 
     @Test
+    fun eachChunkGetsItsOwnBusyWaitBudget() = runBlocking {
+        service.busyPuts = 12
+        service.busyPutsAfterFirstChunk = 12
+        client().upload(source(bytes))
+        assertTrue(service.stored.contentEquals(bytes))
+    }
+
+    @Test
     fun rejectsADamagedUpload() = runBlocking {
         service.corrupt = true
         try {
@@ -229,6 +237,7 @@ private class FakeUploadService : Dispatcher() {
     var dropPutNumber = 0
     var corrupt = false
     var busyPuts = 0
+    var busyPutsAfterFirstChunk = 0
     private var puts = 0
 
     override fun dispatch(request: RecordedRequest): MockResponse {
@@ -245,6 +254,10 @@ private class FakeUploadService : Dispatcher() {
                 puts++
                 val offset = request.requestUrl!!.queryParameter("offset")!!.toLong()
                 val chunk = request.body.readByteArray()
+                if (stored.size >= 262144 && busyPutsAfterFirstChunk > 0) {
+                    busyPuts = busyPutsAfterFirstChunk
+                    busyPutsAfterFirstChunk = 0
+                }
                 if (busyPuts > 0) {
                     busyPuts--
                     return json(409, """{"error":{"message":"busy","code":"upload_busy"},"offset":${stored.size}}""")
