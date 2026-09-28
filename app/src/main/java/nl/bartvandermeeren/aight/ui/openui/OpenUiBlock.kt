@@ -75,6 +75,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
@@ -471,12 +473,14 @@ private sealed interface RemoteState {
     data object Failed : RemoteState
 }
 
+private val remoteImageSlots = Semaphore(3)
+
 @Composable
 private fun rememberRemoteImage(src: String, maxDimension: Int): RemoteState {
     val context = LocalContext.current
     val state by produceState<RemoteState>(RemoteState.Loading, src) {
-        value = withContext(Dispatchers.IO) {
-            ImageCodec.decodeThumbnailCached(context, src, maxDimension)
+        value = remoteImageSlots.withPermit {
+            withContext(Dispatchers.IO) { ImageCodec.decodeThumbnailCached(context, src, maxDimension) }
         }?.let { RemoteState.Loaded(it) } ?: RemoteState.Failed
     }
     return state
