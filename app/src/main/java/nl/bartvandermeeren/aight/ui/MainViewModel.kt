@@ -78,6 +78,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     var composerText by mutableStateOf("")
     val attachments = mutableStateListOf<Attachment>()
     private var attachmentIds = 0L
+    private var draftGeneration = 0L
 
     /** One-shot requests from intents (assist gesture, "open this chat") that the UI must act on. */
     private val _voiceRequests = Channel<Boolean>(Channel.CONFLATED)
@@ -120,6 +121,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun openSession(id: String) {
+        clearAttachments()
+        composerText = ""
         _currentId.value = id
         engine.load(id)
         screen = Screen.Chat
@@ -231,12 +234,20 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * Adds what the user picked or shared. Photos the phone can decode go to the model as pictures,
      * as before; anything else (video, PDF, documents, archives) is uploaded to the Hermes host.
      */
-    fun addPicked(uris: List<Uri>) {
+    fun addPicked(uris: List<Uri>, mimeHint: String? = null) {
         if (uris.isEmpty()) return
+        val generation = draftGeneration
         viewModelScope.launch {
             // Asking a document provider about a file is IPC, and a cloud provider can take seconds.
             val picked = withContext(Dispatchers.IO) { uris.map { it to FileInfo.of(getApplication(), it) } }
-            picked.forEach { (uri, info) -> if (info.mime in PHOTO_TYPES) addImage(uri) else addFile(uri, info) }
+            if (generation != draftGeneration) return@launch
+            picked.forEach { (uri, info) ->
+                if (isModelPhoto(info.mime, mimeHint)) {
+                    addImage(uri)
+                } else {
+                    addFile(uri, info)
+                }
+            }
         }
     }
 
@@ -322,6 +333,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun retryUpload(attachment: Attachment) = startUpload(attachment.id)
 
     fun removeAttachment(attachment: Attachment) {
+        pendingSend?.cancel()
         attachments.removeAll { it.id == attachment.id }
         forgetUpload(attachment.id)
     }
@@ -343,6 +355,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     private fun clearAttachments() {
+        draftGeneration++
+        pendingSend?.cancel()
         attachments.forEach { forgetUpload(it.id) }
         attachments.clear()
     }
@@ -353,10 +367,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     /** Something shared to aight from another app: files, and the text that came with them. */
-    fun acceptShared(uris: List<Uri>, text: String?) {
+    fun acceptShared(uris: List<Uri>, text: String?, mimeHint: String? = null) {
         newChat()
         if (!text.isNullOrBlank()) composerText = text
-        addPicked(uris)
+        addPicked(uris, mimeHint)
     }
 
     /** Start dictation, or Live mode when [live] is true. */
@@ -420,6 +434,9 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
 /** Photo formats Android decodes; these go to the model as pictures instead of being uploaded as files. */
 private val PHOTO_TYPES = setOf("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif", "image/bmp")
+
+internal fun isModelPhoto(mime: String, shareMimeHint: String?): Boolean =
+    mime in PHOTO_TYPES || (mime == "application/octet-stream" && shareMimeHint?.startsWith("image/") == true)
 
 /** What a content URI says about itself. [size] is -1 when the provider doesn't know. */
 private class FileInfo(val name: String, val mime: String, val size: Long) {

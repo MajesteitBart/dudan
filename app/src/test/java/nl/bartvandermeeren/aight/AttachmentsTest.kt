@@ -16,6 +16,7 @@ import nl.bartvandermeeren.aight.data.HermesJson
 import nl.bartvandermeeren.aight.data.HermesMessage
 import nl.bartvandermeeren.aight.data.SessionSummary
 import nl.bartvandermeeren.aight.data.UploadClient
+import nl.bartvandermeeren.aight.ui.isModelPhoto
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
 import okhttp3.mockwebserver.MockResponse
@@ -24,10 +25,22 @@ import okhttp3.mockwebserver.RecordedRequest
 import okhttp3.mockwebserver.SocketPolicy
 import org.junit.After
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Assert.fail
 import org.junit.Before
 import org.junit.Test
+
+class SharedPhotoClassificationTest {
+    @Test
+    fun usesTheShareMimeWhenTheUriHasNoType() {
+        assertTrue(isModelPhoto("application/octet-stream", "image/*"))
+        assertTrue(isModelPhoto("application/octet-stream", "image/jpeg"))
+        assertTrue(isModelPhoto("image/png", null))
+        assertFalse(isModelPhoto("application/pdf", "image/*"))
+        assertFalse(isModelPhoto("application/octet-stream", "video/*"))
+    }
+}
 
 class AttachmentNotesTest {
     private val pdf = FileRef("Bart's offer v2.pdf", "application/pdf", 1234, "/home/bart/.hermes/uploads/aight/ab12cd34ef56_Bart's offer v2.pdf")

@@ -74,11 +74,11 @@ class MainActivity : ComponentActivity() {
             Intent.ACTION_SEND -> {
                 val stream = IntentCompat.getParcelableExtra(intent, Intent.EXTRA_STREAM, Uri::class.java)
                 val text = intent.getStringExtra(Intent.EXTRA_TEXT)
-                if (stream != null) vm.acceptShared(listOf(stream), text) else text?.let(vm::acceptSharedText)
+                if (stream != null) vm.acceptShared(listOf(stream), text, intent.type) else text?.let(vm::acceptSharedText)
             }
             Intent.ACTION_SEND_MULTIPLE -> {
                 val streams = IntentCompat.getParcelableArrayListExtra(intent, Intent.EXTRA_STREAM, Uri::class.java).orEmpty()
-                if (streams.isNotEmpty()) vm.acceptShared(streams, intent.getStringExtra(Intent.EXTRA_TEXT))
+                if (streams.isNotEmpty()) vm.acceptShared(streams, intent.getStringExtra(Intent.EXTRA_TEXT), intent.type)
             }
         }
         if (startVoice) vm.requestVoice()
