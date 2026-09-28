@@ -225,6 +225,8 @@ class OpenUiTextTest {
             "root = Card([EntityList([{left: \"\", right: \" \"}], \"sm\", {left: \" \"})])",
             "root = Card([FormControl(\" \", TextContent(missing))])",
             "root = Card([InlineHeader(\" \"), FollowUpBlock([FollowUpItem(\" \")])])",
+            "root = Carousel([[missing], []])",
+            "root = Card([Accordion([AccordionItem(\"\", \" \", [missing])]), SectionBlock([SectionItem(\"\", \"\", [])], false)])",
         )
         for (body in empty) {
             val source = "```openui-lang\n$body\n```"
@@ -242,6 +244,8 @@ class OpenUiTextTest {
             "root = TagBlock([\" \", \"urgent\"])",
             "root = EntityList([{left: \"Total\", right: 12}])",
             "root = FormControl(\"\", Input(\"email\"))",
+            "root = Carousel([[missing], [TextContent(\"Slide\")]])",
+            "root = Accordion([AccordionItem(\"a\", \"Details\", [missing])])",
         )
         for (body in visible) {
             val root = OpenUiEvaluator(OpenUiParser.parse(body), emptyMap()).root()

@@ -373,6 +373,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val app = getApplication<Application>()
         return when {
             e is UploadClient.UploadException && e.status in setOf(401, 403) -> app.getString(R.string.upload_rejected_key)
+            e is UploadClient.UploadException && e.code == UploadClient.NOT_UPLOAD_SERVICE -> app.getString(R.string.upload_not_service)
             e is java.net.ConnectException || e is java.net.UnknownHostException || e is java.net.SocketTimeoutException ->
                 app.getString(R.string.upload_unreachable)
             else -> e.message ?: e.toString()

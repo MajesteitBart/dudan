@@ -235,6 +235,7 @@
     <string name="upload_failed">Couldn\'t upload %1$s: %2$s</string>
     <string name="upload_rejected_key">The upload service rejected the API key.</string>
     <string name="upload_unreachable">Can\'t reach the upload service on the Hermes host. See Settings, Replies and files.</string>
+    <string name="upload_not_service">This address answers, but not as the aight upload service. Check the upload URL.</string>
 
     <!-- Replies and files settings -->
     <string name="section_replies_files">Replies and files</string>

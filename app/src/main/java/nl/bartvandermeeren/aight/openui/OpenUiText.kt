@@ -81,9 +81,11 @@ object OpenUiText {
             n.list("labels").isNotEmpty() && (series.all { unbind(it) is Number } || series.any { unbind(it) is UiNode })
         }
         "PieChart", "RadialChart", "SingleStackedBarChart" -> n.list("labels").isNotEmpty() && n.list("values").isNotEmpty()
-        "Steps", "Tabs", "Accordion", "ListBlock" -> n.nodes("items").isNotEmpty()
-        "SectionBlock" -> n.nodes("sections").isNotEmpty()
-        "Carousel" -> n.list("children").any { (unbind(it) as? List<*>)?.isNotEmpty() == true }
+        "Steps", "Tabs", "ListBlock" -> n.nodes("items").isNotEmpty()
+        // A fold is an outline around its titles and contents; with neither it is an empty frame.
+        "Accordion" -> n.nodes("items").any(::hasSection)
+        "SectionBlock" -> n.nodes("sections").any(::hasSection)
+        "Carousel" -> n.list("children").any { slide -> (unbind(slide) as? List<*>)?.let(::hasRenderableRoot) == true }
         "TagBlock" -> n.list("tags").any { tag ->
             when (val t = unbind(tag)) {
                 is UiNode -> drawsSomething(t)
@@ -113,6 +115,8 @@ object OpenUiText {
     }
 
     private fun UiNode.hasText(name: String): Boolean = string(name)?.isNotBlank() == true
+
+    private fun hasSection(item: UiNode): Boolean = item.hasText("trigger") || item.hasText("value") || hasRenderableRoot(item["content"])
 
     /** A Callout shows unless its `visible` prop is given and false. */
     fun calloutVisible(n: UiNode): Boolean = n.props["visible"] == null || truthy(n["visible"])

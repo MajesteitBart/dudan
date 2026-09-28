@@ -228,6 +228,28 @@ class UploadClientTest {
     }
 
     @Test
+    fun healthRefusesServicesThatAreNotTheUploadService() = runBlocking {
+        val other = MockWebServer()
+        other.start()
+        try {
+            val client = UploadClient(OkHttpClient(), busyWaitMs = 10) { UploadClient.Config(other.url("/").toString().trimEnd('/'), "secret-key-0123456789") }
+            for (body in listOf("""{"status": "ok"}""", "<html>Hermes</html>", """{"ok": true}""", """{"ok": false, "max_bytes": 1, "chunk_bytes": 1}""")) {
+                other.enqueue(MockResponse().setBody(body))
+                try {
+                    client.health()
+                    fail("expected $body to be refused")
+                } catch (e: UploadClient.UploadException) {
+                    assertEquals(body, UploadClient.NOT_UPLOAD_SERVICE, e.code)
+                }
+            }
+            other.enqueue(MockResponse().setBody("""{"ok": true, "version": "1", "max_bytes": 262144000, "chunk_bytes": 8388608}"""))
+            assertEquals(UploadClient.Health(262144000, 8388608), client.health())
+        } finally {
+            other.shutdown()
+        }
+    }
+
+    @Test
     fun derivesTheServiceAddressFromTheHermesServer() {
         assertEquals("http://clarkbox:8645", UploadClient.baseUrlFor("http://clarkbox:8642", ""))
         assertEquals("http://100.91.52.84:8645", UploadClient.baseUrlFor("100.91.52.84:8642/v1", ""))

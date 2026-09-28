@@ -233,6 +233,7 @@
     <string name="upload_failed">%1$s kon niet worden geüpload: %2$s</string>
     <string name="upload_rejected_key">De uploadservice weigert de API-sleutel.</string>
     <string name="upload_unreachable">De uploadservice op de Hermes-server is niet bereikbaar. Zie Instellingen, Antwoorden en bestanden.</string>
+    <string name="upload_not_service">Dit adres antwoordt, maar niet als de aight-uploadservice. Controleer de upload-URL.</string>
 
     <!-- Replies and files settings -->
     <string name="section_replies_files">Antwoorden en bestanden</string>

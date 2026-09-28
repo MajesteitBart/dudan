@@ -49,9 +49,18 @@ class UploadClient(
 
     data class Health(val maxBytes: Long, val chunkBytes: Int)
 
+    /**
+     * The service's limits. Hermes itself and other services also answer /health, so anything that
+     * doesn't report `ok` with positive limits is refused with code [NOT_UPLOAD_SERVICE].
+     */
     suspend fun health(): Health = withContext(Dispatchers.IO) {
         val o = send(request(config(), "health").get().build())
-        Health(o.dbl("max_bytes")?.toLong() ?: MAX_ATTACHMENT_BYTES, o.int("chunk_bytes") ?: DEFAULT_CHUNK)
+        val maxBytes = o.dbl("max_bytes")?.toLong()?.takeIf { it > 0 }
+        val chunkBytes = o.int("chunk_bytes")?.takeIf { it > 0 }
+        if (o.bool("ok") != true || maxBytes == null || chunkBytes == null) {
+            throw UploadException("This address doesn't answer like the aight upload service.", code = NOT_UPLOAD_SERVICE)
+        }
+        Health(maxBytes, chunkBytes)
     }
 
     /**
@@ -239,6 +248,7 @@ class UploadClient(
 
     companion object {
         const val DEFAULT_PORT = 8645
+        const val NOT_UPLOAD_SERVICE = "not_upload_service"
         private const val DEFAULT_CHUNK = 8 * 1024 * 1024
         private const val MAX_CHUNK = 16 * 1024 * 1024
         private const val MAX_RETRIES = 8
