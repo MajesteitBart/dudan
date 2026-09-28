@@ -9,6 +9,7 @@ import nl.bartvandermeeren.aight.openui.OpenUiParser
 import nl.bartvandermeeren.aight.openui.OpenUiText
 import nl.bartvandermeeren.aight.openui.Pending
 import nl.bartvandermeeren.aight.openui.UiNode
+import nl.bartvandermeeren.aight.ui.openui.ImageClaim
 import nl.bartvandermeeren.aight.ui.openui.OpenUiHost
 import nl.bartvandermeeren.aight.ui.openui.OpenUiScope
 import nl.bartvandermeeren.aight.ui.openui.drawable
@@ -288,6 +289,21 @@ class OpenUiTextTest {
 
         val fold = OpenUiEvaluator(OpenUiParser.parse("root = Accordion([AccordionItem(\"\", \" \", [missing]), AccordionItem(\"b\", \"Details\", [missing]), AccordionItem(\"\", \"\", [TextContent(\"Body\")])])"), emptyMap()).root() as UiNode
         assertEquals(listOf(false, true, true), fold.nodes("items").map { OpenUiText.hasSectionContent(it) })
+    }
+
+    @Test
+    fun imagesShareOneBudgetAndReturnItWhenTheyLeave() {
+        val budget = java.util.concurrent.Semaphore(100)
+        val first = ImageClaim(budget, 60)
+        val second = ImageClaim(budget, 60)
+        assertTrue(first.held)
+        assertFalse(second.held)
+        second.onForgotten()
+        assertEquals(40, budget.availablePermits())
+        first.onForgotten()
+        assertTrue(ImageClaim(budget, 60).held)
+        ImageClaim(budget, 60).onAbandoned()
+        assertEquals(40, budget.availablePermits())
     }
 
     @Test

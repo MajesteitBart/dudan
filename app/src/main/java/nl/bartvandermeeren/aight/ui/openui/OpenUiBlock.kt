@@ -45,6 +45,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.RememberObserver
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
@@ -481,10 +482,30 @@ private sealed interface RemoteState {
 
 private val remoteImageSlots = Semaphore(3)
 
+/**
+ * Kilobytes of decoded OpenUI images the screen may hold at once. Every image, wherever it sits,
+ * claims its worst case while it is composed; one that doesn't fit shows its fallback instead.
+ */
+private val imageBudget = java.util.concurrent.Semaphore(64 * 1024)
+
+/** A claim on [budget] that lasts as long as the image stays in the composition. */
+internal class ImageClaim(private val budget: java.util.concurrent.Semaphore, private val kilobytes: Int) : RememberObserver {
+    val held = budget.tryAcquire(kilobytes)
+    override fun onRemembered() = Unit
+    override fun onForgotten() = release()
+    override fun onAbandoned() = release()
+    private fun release() {
+        if (held) budget.release(kilobytes)
+    }
+}
+
 @Composable
 private fun rememberRemoteImage(src: String, maxDimension: Int): RemoteState {
     val context = LocalContext.current
-    val state by produceState<RemoteState>(RemoteState.Loading, src) {
+    // A decoded ARGB image is at most maxDimension² × 4 bytes.
+    val claim = remember(src, maxDimension) { ImageClaim(imageBudget, maxDimension * maxDimension / 256) }
+    val state by produceState<RemoteState>(if (claim.held) RemoteState.Loading else RemoteState.Failed, src, claim) {
+        if (!claim.held) return@produceState
         value = remoteImageSlots.withPermit {
             withContext(Dispatchers.IO) { ImageCodec.decodeThumbnailCached(context, src, maxDimension) }
         }?.let { RemoteState.Loaded(it) } ?: RemoteState.Failed
