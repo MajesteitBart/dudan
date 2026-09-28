@@ -51,12 +51,21 @@ object OpenUiText {
         return blocks
     }
 
+    /** The same root shapes that the on-screen dispatcher can actually render. */
+    fun hasRenderableRoot(value: Any?): Boolean = when (val v = unbind(value)) {
+        is UiNode -> true
+        is List<*> -> v.any(::hasRenderableRoot)
+        is String -> v.isNotBlank()
+        is Double, is Boolean -> true
+        else -> false
+    }
+
     fun toMarkdown(source: String): String {
         val program = OpenUiParser.parse(source)
         if (program.isEmpty) return ""
         val evaluator = OpenUiEvaluator(program, OpenUiEvaluator.stateDefaults(program))
         val root = evaluator.root()
-        if (root !is UiNode && (root !is List<*> || root.isEmpty())) return ""
+        if (root !is UiNode && (root !is List<*> || !hasRenderableRoot(root))) return ""
         val blocks = mutableListOf<String>()
         write(root, blocks)
         return blocks.filter { it.isNotBlank() }.joinToString("\n\n")
@@ -67,6 +76,7 @@ object OpenUiText {
             is List<*> -> v.forEach { write(it, out) }
             is UiNode -> node(v, out)
             is String -> if (v.isNotBlank()) out += v
+            is Double, is Boolean -> out += displayText(v)
             else -> Unit
         }
     }

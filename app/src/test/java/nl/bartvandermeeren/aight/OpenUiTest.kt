@@ -189,6 +189,18 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun fallsBackForListsWithoutRenderableMembers() {
+        for (body in listOf("root = [missing]", "root = [{label: \"x\"}]", "root = [[null]]")) {
+            val source = "```openui-lang\n$body\n```"
+            val root = OpenUiEvaluator(OpenUiParser.parse(body), emptyMap()).root()
+            assertFalse(OpenUiText.hasRenderableRoot(root))
+            assertEquals(source, OpenUiText.expand(source))
+        }
+        val nested = OpenUiEvaluator(OpenUiParser.parse("root = [[TextContent(\"visible\")]]"), emptyMap()).root()
+        assertTrue(OpenUiText.hasRenderableRoot(nested))
+    }
+
+    @Test
     fun leavesUnsupportedOpenUiFenceLanguagesAsCode() {
         val source = "```openui-json\nroot = TextContent(\"Visible source\")\n```"
         assertEquals(source, OpenUiText.expand(source))

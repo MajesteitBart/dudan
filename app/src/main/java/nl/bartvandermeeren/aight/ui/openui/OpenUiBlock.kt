@@ -192,7 +192,7 @@ fun OpenUiBlock(source: String, modifier: Modifier = Modifier) {
     CompositionLocalProvider(LocalOpenUiScope provides scope) {
         Box(modifier.fillMaxWidth()) {
             when {
-                root is UiNode || (root is List<*> && root.isNotEmpty()) -> Render(root, topLevel = true)
+                root is UiNode || (root is List<*> && OpenUiText.hasRenderableRoot(root)) -> Render(root, topLevel = true)
                 streaming -> Skeleton()
                 source.isNotBlank() -> CodeBlock("openui-lang", source.trimEnd())
             }

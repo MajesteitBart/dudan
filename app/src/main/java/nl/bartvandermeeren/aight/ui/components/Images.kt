@@ -27,11 +27,13 @@ private val thumbnailCache = object : LruCache<String, ImageBitmap>(24 * 1024 * 
     override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
 }
 
+internal fun thumbnailKey(source: String, maxDimension: Int) = "$maxDimension:$source"
+
 /** Loads a data: URL, content:// URI or http(s) URL as a downsampled bitmap, off the main thread. */
 @Composable
 fun rememberImageBitmap(source: String, maxDimension: Int = 1024): State<ImageBitmap?> {
     val context = LocalContext.current
-    val key = "${source.hashCode()}:${source.length}:$maxDimension"
+    val key = thumbnailKey(source, maxDimension)
     return produceState(initialValue = thumbnailCache.get(key), key) {
         if (value != null) return@produceState
         value = withContext(Dispatchers.IO) { ImageCodec.decodeThumbnailCached(context, source, maxDimension) }
@@ -53,7 +55,7 @@ object ImageCodec {
 
     /** Shared by chat images and OpenUI, so a disposed chat row can reuse its decoded thumbnail. */
     fun decodeThumbnailCached(context: Context, source: String, maxDimension: Int): ImageBitmap? {
-        val key = "${source.hashCode()}:${source.length}:$maxDimension"
+        val key = thumbnailKey(source, maxDimension)
         thumbnailCache.get(key)?.let { return it }
         return runCatching { decodeThumbnail(context, source, maxDimension) }.getOrNull()?.asImageBitmap()
             ?.also { thumbnailCache.put(key, it) }
