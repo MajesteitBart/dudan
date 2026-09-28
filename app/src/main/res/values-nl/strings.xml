@@ -69,6 +69,8 @@
     <string name="image_prepare_failed">Een van de afbeeldingen kon niet worden gelezen. Voeg hem opnieuw toe.</string>
     <string name="file_read_failed">Kan een of meer geselecteerde bestanden niet lezen.</string>
     <string name="file_metadata_pending">Wacht tot de geselecteerde bestanden verschijnen voordat je verzendt.</string>
+    <string name="too_many_attachments">Voeg maximaal %1$d bijlagen toe aan één bericht.</string>
+    <string name="images_too_large">Deze foto\'s zijn te groot voor één bericht. Verwijder er enkele en probeer het opnieuw.</string>
     <string name="work_running">Aan het werk</string>
     <string name="work_running_tool">Gebruikt %1$s</string>
     <string name="work_done">Stappen tonen</string>

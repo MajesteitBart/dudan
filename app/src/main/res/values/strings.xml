@@ -71,6 +71,8 @@
     <string name="image_prepare_failed">Couldn\'t read one of the images. Try attaching it again.</string>
     <string name="file_read_failed">Couldn\'t read one or more selected files.</string>
     <string name="file_metadata_pending">Wait for the selected files to appear before sending.</string>
+    <string name="too_many_attachments">Add up to %1$d attachments to one message.</string>
+    <string name="images_too_large">These photos are too large for one message. Remove some and try again.</string>
     <string name="work_running">Working</string>
     <string name="work_running_tool">Using %1$s</string>
     <string name="work_done">Show steps</string>

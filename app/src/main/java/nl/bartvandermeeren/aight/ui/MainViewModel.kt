@@ -39,6 +39,7 @@ import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.appContainer
 import nl.bartvandermeeren.aight.chat.ChatEngine
 import nl.bartvandermeeren.aight.chat.Conversation
+import nl.bartvandermeeren.aight.chat.PreparedImage
 import nl.bartvandermeeren.aight.chat.userMessage
 import nl.bartvandermeeren.aight.data.AppSettings
 import nl.bartvandermeeren.aight.data.FileRef
@@ -82,6 +83,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private var attachmentIds = 0L
     private var draftGeneration = 0L
     private var pendingPickerCount = 0
+    private var pendingPickerUris = 0
     private val uploadSlots = Semaphore(2)
 
     /** One-shot requests from intents (assist gesture, "open this chat") that the UI must act on. */
@@ -169,8 +171,10 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             try {
                 // Files upload as soon as they're picked; wait for the ones still on their way.
                 val files = awaitUploads(picked.filter { it.file != null }.map { it.id }) ?: return@launch
-                val images = picked.filter { it.file == null }.map { attachment ->
-                    try {
+                val images = mutableListOf<PreparedImage>()
+                var imageBytes = 0L
+                for (attachment in picked.filter { it.file == null }) {
+                    val prepared = try {
                         when {
                             attachment.bitmap != null -> ImageCodec.prepare(attachment.bitmap)
                             attachment.uri != null -> ImageCodec.prepare(getApplication(), attachment.uri)
@@ -181,15 +185,21 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     } catch (_: Exception) {
                         null
                     }
-                }
-                if (images.any { it == null }) {
-                    // Keep the draft and attachments so the user can fix it instead of losing the photo.
-                    _notices.trySend(Notice(R.string.image_prepare_failed))
-                    return@launch
+                    if (prepared == null) {
+                        // Keep the draft and attachments so the user can fix it instead of losing the photo.
+                        _notices.trySend(Notice(R.string.image_prepare_failed))
+                        return@launch
+                    }
+                    imageBytes += prepared.bytes.size
+                    if (imageBytes > MAX_IMAGE_BYTES_PER_TURN) {
+                        _notices.trySend(Notice(R.string.images_too_large))
+                        return@launch
+                    }
+                    images += prepared
                 }
                 // Stop may have come in while a photo was being encoded.
                 ensureActive()
-                if (engine.send(sessionId, text, images.filterNotNull(), files)) {
+                if (engine.send(sessionId, text, images, files)) {
                     val sent = picked.map { it.id }.toSet()
                     sent.forEach { uploadIds.remove(it) }
                     if (_currentId.value == sessionId) {
@@ -231,10 +241,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun resolveApproval(choice: String) = engine.resolveApproval(_currentId.value, choice)
 
     fun addImage(uri: Uri) {
+        if (attachments.size >= MAX_DRAFT_ATTACHMENTS) {
+            _notices.trySend(Notice(R.string.too_many_attachments, listOf(MAX_DRAFT_ATTACHMENTS)))
+            return
+        }
         attachments += Attachment(++attachmentIds, uri = uri)
     }
 
     fun addImage(bitmap: Bitmap) {
+        if (attachments.size >= MAX_DRAFT_ATTACHMENTS) {
+            _notices.trySend(Notice(R.string.too_many_attachments, listOf(MAX_DRAFT_ATTACHMENTS)))
+            return
+        }
         attachments += Attachment(++attachmentIds, bitmap = bitmap)
     }
 
@@ -244,13 +262,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      */
     fun addPicked(uris: List<Uri>, mimeHint: String? = null) {
         if (uris.isEmpty()) return
+        val available = (MAX_DRAFT_ATTACHMENTS - attachments.size - pendingPickerUris).coerceAtLeast(0)
+        val accepted = uris.take(available)
+        if (accepted.size < uris.size) _notices.trySend(Notice(R.string.too_many_attachments, listOf(MAX_DRAFT_ATTACHMENTS)))
+        if (accepted.isEmpty()) return
         val generation = draftGeneration
         pendingPickerCount++
+        pendingPickerUris += accepted.size
         viewModelScope.launch {
             try {
                 // Asking a document provider about a file is IPC, and a cloud provider can take seconds.
                 val picked = withContext(Dispatchers.IO) {
-                    uris.map { uri -> uri to runCatching { FileInfo.of(getApplication(), uri) } }
+                    accepted.map { uri -> uri to runCatching { FileInfo.of(getApplication(), uri) } }
                 }
                 if (generation != draftGeneration) return@launch
                 if (picked.any { it.second.isFailure }) _notices.trySend(Notice(R.string.file_read_failed))
@@ -263,12 +286,19 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     }
                 }
             } finally {
-                if (generation == draftGeneration) pendingPickerCount--
+                if (generation == draftGeneration) {
+                    pendingPickerCount--
+                    pendingPickerUris -= accepted.size
+                }
             }
         }
     }
 
     private fun addFile(uri: Uri, info: FileInfo) {
+        if (attachments.size >= MAX_DRAFT_ATTACHMENTS) {
+            _notices.trySend(Notice(R.string.too_many_attachments, listOf(MAX_DRAFT_ATTACHMENTS)))
+            return
+        }
         if (info.size > MAX_ATTACHMENT_BYTES) {
             _notices.trySend(Notice(R.string.file_too_large, listOf(info.name, MAX_ATTACHMENT_BYTES / (1024 * 1024))))
             return
@@ -390,6 +420,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun clearAttachments() {
         draftGeneration++
         pendingPickerCount = 0
+        pendingPickerUris = 0
         pendingSend?.cancel()
         attachments.forEach { forgetUpload(it.id) }
         attachments.clear()
@@ -468,6 +499,8 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
 /** Photo formats Android decodes; these go to the model as pictures instead of being uploaded as files. */
 private val PHOTO_TYPES = setOf("image/jpeg", "image/png", "image/webp", "image/heic", "image/heif", "image/gif", "image/bmp", "image/avif")
+private const val MAX_DRAFT_ATTACHMENTS = 8
+private const val MAX_IMAGE_BYTES_PER_TURN = 5L * 1024 * 1024
 
 internal fun isModelPhoto(mime: String, shareMimeHint: String?): Boolean =
     mime in PHOTO_TYPES || (mime == "application/octet-stream" && shareMimeHint?.startsWith("image/") == true)
