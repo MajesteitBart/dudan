@@ -295,8 +295,8 @@ private fun Node(n: UiNode, modifier: Modifier, topLevel: Boolean) {
         "PieChart", "RadialChart", "SingleStackedBarChart" -> ShareChart(n, modifier)
         "Steps" -> StepsView(n, modifier)
         "Tabs" -> TabsView(n, modifier)
-        "Accordion" -> FoldView(n.nodes("items"), openByDefault = false, foldable = true, modifier)
-        "SectionBlock" -> FoldView(n.nodes("sections"), openByDefault = true, foldable = n.bool("isFoldable") != false, modifier)
+        "Accordion" -> FoldView(drawableSections(n.nodes("items")), openByDefault = false, foldable = true, modifier)
+        "SectionBlock" -> FoldView(drawableSections(n.nodes("sections")), openByDefault = true, foldable = n.bool("isFoldable") != false, modifier)
         "Carousel" -> CarouselView(n, modifier)
         "TagBlock" -> TagBlockView(n, modifier)
         "Tag" -> TagView(n.string("text").orEmpty(), n.string("variant"))
@@ -657,6 +657,11 @@ private fun TabsView(n: UiNode, modifier: Modifier) {
     }
 }
 
+/** Once the reply is complete, sections without a title or content are left out instead of drawn as empty rows. */
+@Composable
+private fun drawableSections(items: List<UiNode>): List<UiNode> =
+    if (LocalStreaming.current) items else items.filter { OpenUiText.hasSectionContent(it, ::hasOpenUiIcon) }
+
 /** Accordion and SectionBlock: titled sections that fold open. */
 @Composable
 private fun FoldView(items: List<UiNode>, openByDefault: Boolean, foldable: Boolean, modifier: Modifier) {
@@ -693,7 +698,10 @@ private fun FoldView(items: List<UiNode>, openByDefault: Boolean, foldable: Bool
 
 @Composable
 private fun CarouselView(n: UiNode, modifier: Modifier) {
-    val slides = n.list("children").mapNotNull { unbind(it) as? List<*> }.filter { it.isNotEmpty() }
+    val streaming = LocalStreaming.current
+    // Once the reply is complete, a slide that draws nothing is left out instead of shown as an empty card.
+    val slides = n.list("children").mapNotNull { unbind(it) as? List<*> }
+        .filter { if (streaming) it.isNotEmpty() else OpenUiText.hasRenderableRoot(it, ::hasOpenUiIcon) }
     if (slides.isEmpty()) return
     LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(10.dp)) {
         itemsIndexed(slides) { _, slide ->

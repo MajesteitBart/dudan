@@ -281,6 +281,15 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun mixedSlidesAndSectionsKeepOnlyTheOnesWithContent() {
+        val carousel = OpenUiEvaluator(OpenUiParser.parse("root = Carousel([[missing], [TextContent(\"Slide\")]])"), emptyMap()).root() as UiNode
+        assertEquals(listOf(false, true), carousel.list("children").map { OpenUiText.hasRenderableRoot(it) })
+
+        val fold = OpenUiEvaluator(OpenUiParser.parse("root = Accordion([AccordionItem(\"\", \" \", [missing]), AccordionItem(\"b\", \"Details\", [missing]), AccordionItem(\"\", \"\", [TextContent(\"Body\")])])"), emptyMap()).root() as UiNode
+        assertEquals(listOf(false, true, true), fold.nodes("items").map { OpenUiText.hasSectionContent(it) })
+    }
+
+    @Test
     fun onlyIconsTheScreenCanDrawCountAsContent() {
         val known = { name: String -> name == "star" }
         for (body in listOf("root = Icon(\"unlisted-icon\")", "root = Card([Icon(\"unlisted-icon\"), TagBlock([Tag(\" \")])])")) {

@@ -68,8 +68,6 @@ object OpenUiText {
     /** Mirrors the early returns of each component's view in ui/openui. [hasIcon] is the screen's icon set. */
     private fun drawsSomething(n: UiNode, hasIcon: (String) -> Boolean): Boolean {
         val visible = { value: Any? -> hasRenderableRoot(value, hasIcon) }
-        // A fold is an outline around its titles and contents; with neither it is an empty frame.
-        fun section(item: UiNode) = item.hasText("trigger") || item.hasText("value") || visible(item["content"])
         return when (n.type) {
             "Card" -> visible(n["children"]) || cardSources(n).isNotEmpty()
             "Stack" -> visible(n["children"])
@@ -88,8 +86,8 @@ object OpenUiText {
             }
             "PieChart", "RadialChart", "SingleStackedBarChart" -> n.list("labels").isNotEmpty() && n.list("values").isNotEmpty()
             "Steps", "Tabs", "ListBlock" -> n.nodes("items").isNotEmpty()
-            "Accordion" -> n.nodes("items").any(::section)
-            "SectionBlock" -> n.nodes("sections").any(::section)
+            "Accordion" -> n.nodes("items").any { hasSectionContent(it, hasIcon) }
+            "SectionBlock" -> n.nodes("sections").any { hasSectionContent(it, hasIcon) }
             "Carousel" -> n.list("children").any { slide -> (unbind(slide) as? List<*>)?.let(visible) == true }
             "TagBlock" -> n.list("tags").any { tag ->
                 when (val t = unbind(tag)) {
@@ -124,6 +122,10 @@ object OpenUiText {
     }
 
     private fun UiNode.hasText(name: String): Boolean = string(name)?.isNotBlank() == true
+
+    /** True when an Accordion or SectionBlock item has a title or content; without either it is an empty row. */
+    fun hasSectionContent(item: UiNode, hasIcon: (String) -> Boolean = { true }): Boolean =
+        item.hasText("trigger") || item.hasText("value") || hasRenderableRoot(item["content"], hasIcon)
 
     /** A Callout shows unless its `visible` prop is given and false. */
     fun calloutVisible(n: UiNode): Boolean = n.props["visible"] == null || truthy(n["visible"])
