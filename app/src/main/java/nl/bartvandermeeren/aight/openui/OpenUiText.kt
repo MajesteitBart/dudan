@@ -67,14 +67,13 @@ object OpenUiText {
     private fun drawsSomething(n: UiNode): Boolean = when (n.type) {
         "Card" -> hasRenderableRoot(n["children"]) || cardSources(n).isNotEmpty()
         "Stack" -> hasRenderableRoot(n["children"])
-        "CardHeader" -> n.string("title") != null || n.string("subtitle") != null
-        "InlineHeader" -> n.string("heading") != null || n.string("description") != null
-        "TextContent", "Label" -> n.string("text") != null
-        "Tag" -> n.string("text").orEmpty().isNotBlank()
-        "MarkDownRenderer" -> n.string("textMarkdown") != null
+        "CardHeader" -> n.hasText("title") || n.hasText("subtitle")
+        "InlineHeader" -> n.hasText("heading") || n.hasText("description")
+        "TextContent", "Label", "Tag" -> n.hasText("text")
+        "MarkDownRenderer" -> n.hasText("textMarkdown")
         "Callout", "TextCallout" -> calloutVisible(n)
         "CodeBlock", "Separator", "Form" -> true
-        "Image", "ImageBlock" -> n.string("src") != null
+        "Image", "ImageBlock" -> n.hasText("src")
         "ImageGallery" -> n.list("images").any { displayText((unbind(it) as? Map<*, *>)?.get("src")).isNotBlank() }
         "Table" -> n.nodes("columns").isNotEmpty()
         "BarChart", "LineChart", "AreaChart", "HorizontalBarChart" -> {
@@ -85,12 +84,22 @@ object OpenUiText {
         "Steps", "Tabs", "Accordion", "ListBlock" -> n.nodes("items").isNotEmpty()
         "SectionBlock" -> n.nodes("sections").isNotEmpty()
         "Carousel" -> n.list("children").any { (unbind(it) as? List<*>)?.isNotEmpty() == true }
-        "TagBlock" -> n.list("tags").any { unbind(it) != null }
-        "EntityList" -> n.map("header") != null || n.list("rows").any { unbind(it) is Map<*, *> }
-        "FollowUpBlock" -> n.nodes("items").any { it.string("text") != null }
+        "TagBlock" -> n.list("tags").any { tag ->
+            when (val t = unbind(tag)) {
+                is UiNode -> drawsSomething(t)
+                else -> cellText(t).isNotBlank()
+            }
+        }
+        "EntityList" -> {
+            val rows = n.list("rows").mapNotNull { unbind(it) as? Map<*, *> }
+            val header = n.map("header")
+            (rows.isNotEmpty() || header != null) &&
+                (listOfNotNull(header, n.map("footer")) + rows).any { cellText(it["left"]).isNotBlank() || cellText(it["right"]).isNotBlank() }
+        }
+        "FollowUpBlock" -> n.nodes("items").any { it.hasText("text") }
         "Buttons" -> n.nodes("buttons").any { it.string("label") != null }
         "Button" -> n.string("label") != null
-        "FormControl" -> n.string("label") != null || n.node("input") != null || n.string("hint") != null
+        "FormControl" -> n.hasText("label") || n.hasText("hint") || n.node("input")?.type in OpenUiLibrary.inputs
         "Icon" -> n.string("name") != null
         in OpenUiLibrary.inputs -> true
         // Components aight doesn't draw show their text and child components; ids stay hidden.
@@ -102,6 +111,8 @@ object OpenUiText {
             }
         }
     }
+
+    private fun UiNode.hasText(name: String): Boolean = string(name)?.isNotBlank() == true
 
     /** A Callout shows unless its `visible` prop is given and false. */
     fun calloutVisible(n: UiNode): Boolean = n.props["visible"] == null || truthy(n["visible"])

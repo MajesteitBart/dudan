@@ -221,6 +221,10 @@ class OpenUiTextTest {
             "root = Card([BarChart([], [1, 2]), PieChart([\"A\"], [])])",
             "root = Card([Buttons([Button(missing)]), Carousel([[]])])",
             "root = Unknown(\"just-an-id\", [missing])",
+            "root = TagBlock([\" \", Tag(\" \"), missing])",
+            "root = Card([EntityList([{left: \"\", right: \" \"}], \"sm\", {left: \" \"})])",
+            "root = Card([FormControl(\" \", TextContent(missing))])",
+            "root = Card([InlineHeader(\" \"), FollowUpBlock([FollowUpItem(\" \")])])",
         )
         for (body in empty) {
             val source = "```openui-lang\n$body\n```"
@@ -235,6 +239,9 @@ class OpenUiTextTest {
             "root = Card([BarChart([\"A\"], [1])])",
             "root = Card([Buttons([Button(\"Go\")])])",
             "root = Unknown(\"A readable line\")",
+            "root = TagBlock([\" \", \"urgent\"])",
+            "root = EntityList([{left: \"Total\", right: 12}])",
+            "root = FormControl(\"\", Input(\"email\"))",
         )
         for (body in visible) {
             val root = OpenUiEvaluator(OpenUiParser.parse(body), emptyMap()).root()
