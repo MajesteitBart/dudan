@@ -229,6 +229,8 @@ class OpenUiTextTest {
             "root = Card([FormControl(\" \", TextContent(missing))])",
             "root = Card([InlineHeader(\" \"), FollowUpBlock([FollowUpItem(\" \")])])",
             "root = Carousel([[missing], []])",
+            "root = RadioGroup(\"choice\", [])",
+            "root = Card([CheckBoxGroup(\"c\", []), SwitchGroup(\"s\", []), OptionCards(\"o\", \"single\", []), FormControl(\"\", Chips(\"x\", \"multi\", []))])",
             "root = Card([Accordion([AccordionItem(\"\", \" \", [missing])]), SectionBlock([SectionItem(\"\", \"\", [])], false)])",
         )
         for (body in empty) {
@@ -248,6 +250,8 @@ class OpenUiTextTest {
             "root = EntityList([{left: \"Total\", right: 12}])",
             "root = FormControl(\"\", Input(\"email\"))",
             "root = Carousel([[missing], [TextContent(\"Slide\")]])",
+            "root = RadioGroup(\"choice\", [RadioItem(\"Yes\")])",
+            "root = Select(\"pick\", [])",
             "root = Accordion([AccordionItem(\"a\", \"Details\", [missing])])",
         )
         for (body in visible) {

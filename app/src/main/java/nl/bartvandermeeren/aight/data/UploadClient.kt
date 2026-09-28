@@ -103,12 +103,13 @@ class UploadClient(
                 if (offset + length == source.size && stream.read() != -1) {
                     throw UploadException("${source.name} changed while it was uploading. Pick it again.", code = "changed")
                 }
+                val chunkPut = request(pinned, "uploads", id, query = mapOf("offset" to offset.toString()))
+                    .put(buffer.toRequestBody(OCTETS, 0, length))
+                // After a dropped chunk the service may still hold the upload's lock. Asking first lets
+                // it say so, or name its offset, before the whole chunk crosses the network again.
+                if (failures > 0 || busyWaits > 0) chunkPut.header("Expect", "100-continue")
                 val result = try {
-                    send(
-                        request(pinned, "uploads", id, query = mapOf("offset" to offset.toString()))
-                            .put(buffer.toRequestBody(OCTETS, 0, length))
-                            .build(),
-                    ).also { failures = 0; busyWaits = 0 }
+                    send(chunkPut.build()).also { failures = 0; busyWaits = 0 }
                 } catch (e: UploadException) {
                     val held = (e as? OffsetMismatch)?.serverOffset
                     if (held != null) {

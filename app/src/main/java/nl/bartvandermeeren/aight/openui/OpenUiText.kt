@@ -106,8 +106,11 @@ object OpenUiText {
             "FollowUpBlock" -> n.nodes("items").any { it.hasText("text") }
             "Buttons" -> n.nodes("buttons").any { it.string("label") != null }
             "Button" -> n.string("label") != null
-            "FormControl" -> n.hasText("label") || n.hasText("hint") || n.node("input")?.type in OpenUiLibrary.inputs
+            "FormControl" -> n.hasText("label") || n.hasText("hint") ||
+                n.node("input")?.let { it.type in OpenUiLibrary.inputs && drawsSomething(it, hasIcon) } == true
             "Icon" -> n.string("name")?.let(hasIcon) == true
+            // These draw one control per item; the other inputs always draw their field.
+            "RadioGroup", "CheckBoxGroup", "SwitchGroup", "Chips", "OptionCards" -> n.nodes("items").isNotEmpty()
             in OpenUiLibrary.inputs -> true
             // Components aight doesn't draw show their text and child components; ids stay hidden.
             else -> n.args.any { arg ->

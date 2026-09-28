@@ -184,10 +184,23 @@ class UploadClientTest {
     }
 
     @Test
+    fun retriesAfterAServerErrorAskBeforeSendingTheChunk() = runBlocking {
+        service.failPutNumber = 2
+        client().upload(source(bytes))
+        assertTrue(service.stored.contentEquals(bytes))
+        // Only the retry asks first; the chunks before and after go straight out.
+        val expects = service.requests.filter { it.method == "PUT" }.map { it.getHeader("Expect") }
+        assertEquals(listOf(null, null, "100-continue", null), expects)
+    }
+
+    @Test
     fun waitsWhileTheServiceStillHoldsADroppedUpload() = runBlocking {
         service.busyPuts = 2
         client().upload(source(bytes))
         assertTrue(service.stored.contentEquals(bytes))
+        // Retries ask before sending the chunk; a fresh chunk after success goes straight out.
+        val expects = service.requests.filter { it.method == "PUT" }.map { it.getHeader("Expect") }
+        assertEquals(listOf(null, "100-continue", "100-continue", null, null), expects)
     }
 
     @Test
@@ -293,10 +306,14 @@ private class FakeUploadService : Dispatcher() {
     var lastId = ""
     var skipAheadOnce = 0
     var dropPutNumber = 0
+    var failPutNumber = 0
     var corrupt = false
     var busyPuts = 0
     var busyPutsAfterFirstChunk = 0
     private var puts = 0
+
+    // Answers "Expect: 100-continue" the way the real service does when it accepts the chunk.
+    override fun peek(): MockResponse = MockResponse().setSocketPolicy(SocketPolicy.EXPECT_CONTINUE)
 
     override fun dispatch(request: RecordedRequest): MockResponse {
         requests += request
@@ -320,10 +337,11 @@ private class FakeUploadService : Dispatcher() {
                     busyPuts--
                     return json(409, """{"error":{"message":"busy","code":"upload_busy"},"offset":${stored.size}}""")
                 }
+                if (puts == failPutNumber) return json(503, """{"error":{"message":"restarting","code":"unavailable"}}""")
                 if (puts == dropPutNumber) {
-                    // Store the chunk, then lose the response: the client must ask where things stand.
+                    // Store the chunk, then drop the connection before answering: the client must find out where things stand.
                     stored += chunk
-                    return MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AT_START)
+                    return MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST)
                 }
                 if (skipAheadOnce > 0 && offset == 0L) {
                     stored = chunk.copyOf(skipAheadOnce)
