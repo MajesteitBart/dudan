@@ -254,6 +254,17 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun onlyIconsTheScreenCanDrawCountAsContent() {
+        val known = { name: String -> name == "star" }
+        for (body in listOf("root = Icon(\"unlisted-icon\")", "root = Card([Icon(\"unlisted-icon\"), TagBlock([Tag(\" \")])])")) {
+            val root = OpenUiEvaluator(OpenUiParser.parse(body), emptyMap()).root()
+            assertFalse(body, OpenUiText.hasRenderableRoot(root, known))
+        }
+        val star = OpenUiEvaluator(OpenUiParser.parse("root = Card([Icon(\"star\")])"), emptyMap()).root()
+        assertTrue(OpenUiText.hasRenderableRoot(star, known))
+    }
+
+    @Test
     fun exportsCardSourcesAsNumberedLinks() {
         val body = "root = Card([TextContent(\"Answer [1]\")], [{title: \"Docs\", url: \"https://example.com/docs\", sourceName: \"Example\"}, {url: \"https://example.com/raw\"}, {title: \"No link\"}])"
         val expanded = OpenUiText.expand("```openui-lang\n$body\n```")

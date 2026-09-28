@@ -612,6 +612,9 @@ private val icons: Map<String, ImageVector> = mapOf(
     "target" to Icons.Outlined.TrackChanges,
 )
 
+/** True when [OpenUiIcon] can draw [name]; other names draw nothing. */
+internal fun hasOpenUiIcon(name: String): Boolean = name.lowercase() in icons
+
 @Composable
 internal fun OpenUiIcon(name: String?, modifier: Modifier = Modifier, tint: androidx.compose.ui.graphics.Color = Palette.TextSecondary) {
     val icon = icons[name?.lowercase()] ?: return
