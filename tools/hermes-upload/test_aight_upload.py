@@ -196,6 +196,11 @@ class AccessTests(ServerTestCase):
 
 
 class CreateTests(ServerTestCase):
+    def test_metadata_replacement_syncs_its_directory(self):
+        with mock.patch.object(au, "fsync_dir", wraps=au.fsync_dir) as sync:
+            self.store.create("durable.txt", 1)
+        sync.assert_any_call(self.store.partial_dir)
+
     def test_create(self):
         body = self.create(name="report.pdf", size=1234)
         self.assertRegex(body["id"], r"^[0-9a-f]{32}$")

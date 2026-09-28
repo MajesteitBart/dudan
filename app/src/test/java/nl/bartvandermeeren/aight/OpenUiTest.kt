@@ -207,6 +207,15 @@ class OpenUiTextTest {
         assertEquals("Before\n\nConverted\n\nAfter", OpenUiText.expand(tilde))
     }
 
+    @Test
+    fun exportsBareNumericChartSeriesAlongsideOtherText() {
+        val source = "```openui-lang\nroot = Card([TextContent(\"Sales\"), BarChart([\"A\", \"B\"], [1, 2])])\n```"
+        val expanded = OpenUiText.expand(source)
+        assertTrue(expanded.contains("Sales"))
+        assertTrue(expanded.contains("| A | 1 |"))
+        assertTrue(expanded.contains("| B | 2 |"))
+    }
+
     private val reply = """
         Here is the comparison.
 

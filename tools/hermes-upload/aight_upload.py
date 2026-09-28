@@ -278,6 +278,7 @@ class Store:
                 handle.flush()
                 os.fsync(handle.fileno())
             os.replace(temp, target)
+            fsync_dir(self.partial_dir)
         except BaseException:
             temp.unlink(missing_ok=True)
             raise

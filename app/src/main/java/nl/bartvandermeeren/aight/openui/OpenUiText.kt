@@ -151,10 +151,15 @@ object OpenUiText {
 
     private fun seriesTable(n: UiNode): String? {
         val labels = n.list("labels")
-        val series = n.nodes("series")
+        val rawSeries = n.list("series")
+        val series = if (rawSeries.isNotEmpty() && rawSeries.all { unbind(it) is Number }) {
+            listOf("" to rawSeries)
+        } else {
+            n.nodes("series").map { it.string("category").orEmpty() to it.list("values") }
+        }
         if (labels.isEmpty() || series.isEmpty()) return null
-        val headers = listOf(n.string("xLabel").orEmpty()) + series.map { it.string("category").orEmpty() }
-        val rows = labels.indices.map { i -> listOf(cellText(labels[i])) + series.map { cellText(it.list("values").getOrNull(i)) } }
+        val headers = listOf(n.string("xLabel").orEmpty()) + series.mapIndexed { i, (name, _) -> name.ifBlank { "${i + 1}" } }
+        val rows = labels.indices.map { i -> listOf(cellText(labels[i])) + series.map { cellText(it.second.getOrNull(i)) } }
         return markdownTable(headers, rows)
     }
 
