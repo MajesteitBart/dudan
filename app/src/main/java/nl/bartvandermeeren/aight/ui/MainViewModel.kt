@@ -32,6 +32,8 @@ import kotlinx.coroutines.flow.flatMapLatest
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withPermit
 import kotlinx.coroutines.withContext
 import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.appContainer
@@ -79,6 +81,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val attachments = mutableStateListOf<Attachment>()
     private var attachmentIds = 0L
     private var draftGeneration = 0L
+    private val uploadSlots = Semaphore(2)
 
     /** One-shot requests from intents (assist gesture, "open this chat") that the UI must act on. */
     private val _voiceRequests = Channel<Boolean>(Channel.CONFLATED)
@@ -239,9 +242,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         val generation = draftGeneration
         viewModelScope.launch {
             // Asking a document provider about a file is IPC, and a cloud provider can take seconds.
-            val picked = withContext(Dispatchers.IO) { uris.map { it to FileInfo.of(getApplication(), it) } }
+            val picked = withContext(Dispatchers.IO) {
+                uris.map { uri -> uri to runCatching { FileInfo.of(getApplication(), uri) } }
+            }
             if (generation != draftGeneration) return@launch
-            picked.forEach { (uri, info) ->
+            if (picked.any { it.second.isFailure }) _notices.trySend(Notice(R.string.file_read_failed))
+            picked.forEach { (uri, result) ->
+                val info = result.getOrNull() ?: return@forEach
                 if (isModelPhoto(info.mime, mimeHint)) {
                     addImage(uri)
                 } else {
@@ -296,15 +303,17 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     )
                 }
                 val source = UriSource(getApplication(), uri, picked.name, picked.mime, size)
-                val ref = container.uploads.upload(
-                    source,
-                    onCreated = { uploadId -> uploadIds[id] = uploadId },
-                    onProgress = { sent ->
-                        viewModelScope.launch {
-                            updateFile(id) { file -> if (file.upload is UploadState.Uploading) file.copy(upload = UploadState.Uploading(sent)) else file }
-                        }
-                    },
-                )
+                val ref = uploadSlots.withPermit {
+                    container.uploads.upload(
+                        source,
+                        onCreated = { uploadId -> uploadIds[id] = uploadId },
+                        onProgress = { sent ->
+                            viewModelScope.launch {
+                                updateFile(id) { file -> if (file.upload is UploadState.Uploading) file.copy(upload = UploadState.Uploading(sent)) else file }
+                            }
+                        },
+                    )
+                }
                 updateFile(id) { it.copy(upload = UploadState.Done(ref)) }
             } catch (e: CancellationException) {
                 throw e

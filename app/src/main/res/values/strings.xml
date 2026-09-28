@@ -69,6 +69,7 @@
     <string name="status_stopped">Stopped</string>
     <string name="status_stopping">Stopping</string>
     <string name="image_prepare_failed">Couldn\'t read one of the images. Try attaching it again.</string>
+    <string name="file_read_failed">Couldn\'t read one or more selected files.</string>
     <string name="work_running">Working</string>
     <string name="work_running_tool">Using %1$s</string>
     <string name="work_done">Show steps</string>
