@@ -65,14 +65,14 @@ object OpenUiText {
 
     /** Mirrors the early returns of each component's view in ui/openui. */
     private fun drawsSomething(n: UiNode): Boolean = when (n.type) {
-        "Card" -> hasRenderableRoot(n["children"]) || n.list("sources").any { displayText((unbind(it) as? Map<*, *>)?.get("url")).isNotBlank() }
+        "Card" -> hasRenderableRoot(n["children"]) || cardSources(n).isNotEmpty()
         "Stack" -> hasRenderableRoot(n["children"])
         "CardHeader" -> n.string("title") != null || n.string("subtitle") != null
         "InlineHeader" -> n.string("heading") != null || n.string("description") != null
         "TextContent", "Label" -> n.string("text") != null
         "Tag" -> n.string("text").orEmpty().isNotBlank()
         "MarkDownRenderer" -> n.string("textMarkdown") != null
-        "Callout", "TextCallout" -> n.props["visible"] == null || truthy(n["visible"])
+        "Callout", "TextCallout" -> calloutVisible(n)
         "CodeBlock", "Separator", "Form" -> true
         "Image", "ImageBlock" -> n.string("src") != null
         "ImageGallery" -> n.list("images").any { displayText((unbind(it) as? Map<*, *>)?.get("src")).isNotBlank() }
@@ -103,6 +103,13 @@ object OpenUiText {
         }
     }
 
+    /** A Callout shows unless its `visible` prop is given and false. */
+    fun calloutVisible(n: UiNode): Boolean = n.props["visible"] == null || truthy(n["visible"])
+
+    /** The sources a Card lists under its content: the ones with a link. */
+    fun cardSources(n: UiNode): List<Map<*, *>> =
+        n.list("sources").mapNotNull { unbind(it) as? Map<*, *> }.filter { displayText(it["url"]).isNotBlank() }
+
     /** Ids such as "revenue" or "art-museums" in a card item's first slot are for the program, not the reader. */
     fun looksLikeId(text: String): Boolean = text.length <= 40 && !text.contains(' ') && text.all { it.isLowerCase() || it.isDigit() || it == '-' || it == '_' }
 
@@ -129,7 +136,16 @@ object OpenUiText {
 
     private fun node(n: UiNode, out: MutableList<String>) {
         when (n.type) {
-            "Card", "Stack" -> write(n["children"], out)
+            "Card" -> {
+                write(n["children"], out)
+                // Numbered like on screen, so citations such as [1] still point somewhere.
+                cardSources(n).mapIndexed { i, source ->
+                    val url = displayText(source["url"])
+                    val name = displayText(source["sourceName"])
+                    "${i + 1}. [${displayText(source["title"]).ifBlank { url }}]($url)" + (if (name.isNotBlank()) " – $name" else "")
+                }.takeIf { it.isNotEmpty() }?.let { out += it.joinToString("\n") }
+            }
+            "Stack" -> write(n["children"], out)
             "CardHeader" -> {
                 n.string("title")?.let { out += "## $it" }
                 n.string("subtitle")?.let { out += it }
@@ -141,7 +157,7 @@ object OpenUiText {
             "TextContent" -> n.string("text")?.let { out += it }
             "MarkDownRenderer" -> n.string("textMarkdown")?.let { out += it }
             "Label" -> n.string("text")?.let { out += it }
-            "Callout", "TextCallout" -> {
+            "Callout", "TextCallout" -> if (calloutVisible(n)) {
                 val title = n.string("title")
                 val description = n.string("description")
                 if (title != null || description != null) {

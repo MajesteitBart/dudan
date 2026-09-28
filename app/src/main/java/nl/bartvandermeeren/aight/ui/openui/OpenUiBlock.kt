@@ -96,7 +96,6 @@ import nl.bartvandermeeren.aight.openui.OpenUiText
 import nl.bartvandermeeren.aight.openui.Pending
 import nl.bartvandermeeren.aight.openui.UiNode
 import nl.bartvandermeeren.aight.openui.displayText
-import nl.bartvandermeeren.aight.openui.truthy
 import nl.bartvandermeeren.aight.openui.unbind
 import nl.bartvandermeeren.aight.ui.components.CodeBlock
 import nl.bartvandermeeren.aight.ui.components.ImageCodec
@@ -282,7 +281,7 @@ private fun Node(n: UiNode, modifier: Modifier, topLevel: Boolean) {
         "TextContent" -> TextContentView(n, modifier)
         "MarkDownRenderer" -> MarkdownView(n, modifier)
         "Label" -> n.string("text")?.let { Text(it, style = MaterialTheme.typography.labelLarge, color = Palette.TextSecondary, modifier = modifier) }
-        "Callout", "TextCallout" -> if (n.props["visible"] == null || truthy(n["visible"])) CalloutView(n, modifier)
+        "Callout", "TextCallout" -> if (OpenUiText.calloutVisible(n)) CalloutView(n, modifier)
         "CodeBlock" -> CodeBlock(n.string("language"), n.string("codeString").orEmpty())
         "Separator" -> HorizontalDivider(color = Palette.Hairline, modifier = modifier.padding(vertical = 2.dp))
         "Image", "ImageBlock" -> n.string("src")?.let { RemoteImage(it, n.string("alt"), modifier) }
@@ -319,7 +318,7 @@ private val INPUT_TYPES = nl.bartvandermeeren.aight.openui.OpenUiLibrary.inputs
 private fun CardView(n: UiNode, modifier: Modifier, topLevel: Boolean) {
     val content: @Composable () -> Unit = {
         Children(n.list("children"))
-        Sources(n.list("sources"))
+        Sources(OpenUiText.cardSources(n))
     }
     if (topLevel) {
         Column(modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(14.dp)) { content() }
@@ -436,8 +435,7 @@ private fun CalloutView(n: UiNode, modifier: Modifier) {
 }
 
 @Composable
-private fun Sources(sources: List<*>) {
-    val items = sources.mapNotNull { unbind(it) as? Map<*, *> }.filter { displayText(it["url"]).isNotBlank() }
+private fun Sources(items: List<Map<*, *>>) {
     if (items.isEmpty()) return
     val scope = LocalOpenUiScope.current
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -502,9 +500,15 @@ private fun RemoteImage(src: String, alt: String?, modifier: Modifier) {
                 .clickable { scope?.host?.openUrl(src) },
         )
         RemoteState.Loading -> Box(modifier.fillMaxWidth().height(180.dp).pane(shape, Palette.Surface))
-        RemoteState.Failed -> alt?.let {
-            Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary, modifier = modifier.pane(shape, Palette.Surface, outline = Palette.Hairline).padding(14.dp))
-        }
+        // Offline or a dead link: the alt text, or else the link itself, so the reply never goes blank.
+        RemoteState.Failed -> Text(
+            alt ?: src,
+            style = MaterialTheme.typography.bodyMedium,
+            color = Palette.TextSecondary,
+            maxLines = 3,
+            overflow = TextOverflow.Ellipsis,
+            modifier = modifier.pane(shape, Palette.Surface, outline = Palette.Hairline).clickable { scope?.host?.openUrl(src) }.padding(14.dp),
+        )
     }
 }
 

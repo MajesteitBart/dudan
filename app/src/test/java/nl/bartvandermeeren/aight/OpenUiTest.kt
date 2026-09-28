@@ -243,6 +243,20 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun exportsCardSourcesAsNumberedLinks() {
+        val body = "root = Card([TextContent(\"Answer [1]\")], [{title: \"Docs\", url: \"https://example.com/docs\", sourceName: \"Example\"}, {url: \"https://example.com/raw\"}, {title: \"No link\"}])"
+        val expanded = OpenUiText.expand("```openui-lang\n$body\n```")
+        assertEquals("Answer [1]\n\n1. [Docs](https://example.com/docs) – Example\n2. [https://example.com/raw](https://example.com/raw)", expanded)
+    }
+
+    @Test
+    fun leavesHiddenCalloutsOutOfTheExport() {
+        val body = "root = Card([TextContent(\"Shown\"), Callout(\"info\", \"Secret\", \"Hidden text\", false), Callout(\"info\", \"Tip\", \"Visible text\")])"
+        val expanded = OpenUiText.expand("```openui-lang\n$body\n```")
+        assertEquals("Shown\n\n> **Tip** Visible text", expanded)
+    }
+
+    @Test
     fun leavesUnsupportedOpenUiFenceLanguagesAsCode() {
         val source = "```openui-json\nroot = TextContent(\"Visible source\")\n```"
         assertEquals(source, OpenUiText.expand(source))
