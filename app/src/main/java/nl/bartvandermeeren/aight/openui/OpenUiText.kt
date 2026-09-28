@@ -261,7 +261,9 @@ object OpenUiText {
 
     /** One table cell or list value: a string or number, or the text a component in that spot shows. */
     fun cellText(value: Any?): String = when (val v = unbind(value)) {
-        is UiNode -> listOf("text", "label", "title", "heading").firstNotNullOfOrNull { v.string(it) }.orEmpty()
+        // A container such as Card([TextContent("hello")]) has no text of its own; use what it exports.
+        is UiNode -> listOf("text", "label", "title", "heading").firstNotNullOfOrNull { v.string(it) }
+            ?: mutableListOf<String>().also { node(v, it) }.filter { it.isNotBlank() }.joinToString(" ") { it.replace('\n', ' ') }
         is Map<*, *> -> listOf("label", "text", "title", "value").firstNotNullOfOrNull { key -> v[key]?.let(::displayText)?.takeIf { it.isNotEmpty() } }.orEmpty()
         else -> displayText(v)
     }

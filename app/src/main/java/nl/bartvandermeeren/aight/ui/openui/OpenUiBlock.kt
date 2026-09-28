@@ -512,28 +512,41 @@ private fun RemoteImage(src: String, alt: String?, modifier: Modifier) {
     }
 }
 
+/** Galleries up to this size sit in a grid; larger ones scroll sideways. */
+private const val GALLERY_GRID = 4
+
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun GalleryView(n: UiNode, modifier: Modifier) {
     val images = n.list("images").mapNotNull { unbind(it) as? Map<*, *> }.filter { displayText(it["src"]).isNotBlank() }
     if (images.isEmpty()) return
+    if (images.size <= GALLERY_GRID) {
+        FlowRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxItemsInEachRow = 2) {
+            images.forEach { GalleryTile(it, Modifier.weight(1f)) }
+        }
+    } else {
+        // A lazy row lets go of thumbnails that scroll out of view; a grid would hold every decoded image.
+        LazyRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            itemsIndexed(images) { _, image -> GalleryTile(image, Modifier.width(160.dp)) }
+        }
+    }
+}
+
+@Composable
+private fun GalleryTile(image: Map<*, *>, modifier: Modifier) {
     val scope = LocalOpenUiScope.current
-    FlowRow(modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp), maxItemsInEachRow = 2) {
-        images.forEach { image ->
-            val src = displayText(image["src"])
-            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                val shape = RoundedCornerShape(14.dp)
-                when (val loaded = rememberRemoteImage(src, 640)) {
-                    is RemoteState.Loaded -> Image(
-                        loaded.image, contentDescription = displayText(image["alt"]), contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(shape).clickable { scope?.host?.openUrl(src) },
-                    )
-                    else -> Box(Modifier.fillMaxWidth().aspectRatio(1f).pane(shape, Palette.Surface))
-                }
-                displayText(image["details"] ?: image["alt"]).takeIf { it.isNotBlank() }?.let {
-                    Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                }
-            }
+    val src = displayText(image["src"])
+    Column(modifier, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        val shape = RoundedCornerShape(14.dp)
+        when (val loaded = rememberRemoteImage(src, 640)) {
+            is RemoteState.Loaded -> Image(
+                loaded.image, contentDescription = displayText(image["alt"]), contentScale = ContentScale.Crop,
+                modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(shape).clickable { scope?.host?.openUrl(src) },
+            )
+            else -> Box(Modifier.fillMaxWidth().aspectRatio(1f).pane(shape, Palette.Surface))
+        }
+        displayText(image["details"] ?: image["alt"]).takeIf { it.isNotBlank() }?.let {
+            Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
     }
 }

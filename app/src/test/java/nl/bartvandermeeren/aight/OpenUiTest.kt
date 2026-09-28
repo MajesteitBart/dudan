@@ -265,6 +265,13 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun exportsComponentTableCellsAsText() {
+        val body = "root = Table([Col(\"Item\", [Card([TextContent(\"hello\")]), ImageBlock(\"https://example.com/a.png\", \"Chart\")]), Col(\"Status\", [Tag(\"done\"), Stack([TextContent(\"two\"), TextContent(\"lines\")])])])"
+        val expanded = OpenUiText.expand("```openui-lang\n$body\n```")
+        assertEquals("| Item | Status |\n| --- | --- |\n| hello | done |\n| ![Chart](https://example.com/a.png) | two lines |", expanded)
+    }
+
+    @Test
     fun exportsCardSourcesAsNumberedLinks() {
         val body = "root = Card([TextContent(\"Answer [1]\")], [{title: \"Docs\", url: \"https://example.com/docs\", sourceName: \"Example\"}, {url: \"https://example.com/raw\"}, {title: \"No link\"}])"
         val expanded = OpenUiText.expand("```openui-lang\n$body\n```")
