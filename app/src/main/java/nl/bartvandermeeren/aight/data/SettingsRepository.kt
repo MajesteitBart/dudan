@@ -92,9 +92,16 @@ data class AppSettings(
     val phoneControl: Boolean = false,
     /** The bearer token Hermes sends to that server. Created when phone control is first turned on. */
     val phoneToken: String = "",
+    /** Ask Hermes for OpenUI blocks (tables, charts, forms) in replies; see openui/OpenUiPrompt. */
+    val richReplies: Boolean = true,
+    /** The upload service for attachments; empty means the Hermes host on port 8645. */
+    val uploadUrl: String = "",
 ) {
     val isConfigured: Boolean get() = serverUrl.isNotBlank() && apiKey.isNotBlank()
     val server: HermesApi.ServerConfig get() = HermesApi.ServerConfig(serverUrl, apiKey)
+
+    /** The upload service runs next to Hermes and takes the same API key. */
+    val uploads: UploadClient.Config get() = UploadClient.Config(UploadClient.baseUrlFor(serverUrl, uploadUrl), apiKey)
 
     fun modelFor(profile: ModelProfile): ModelChoice = when (profile) {
         ModelProfile.Chats -> model
@@ -141,6 +148,8 @@ class SettingsRepository(private val context: Context) {
         val sttEngine = stringPreferencesKey("stt_engine")
         val phoneControl = booleanPreferencesKey("phone_control")
         val phoneToken = stringPreferencesKey("phone_token_enc")
+        val richReplies = booleanPreferencesKey("rich_replies")
+        val uploadUrl = stringPreferencesKey("upload_url")
     }
 
     private fun keysFor(profile: ModelProfile) = when (profile) {
@@ -181,6 +190,8 @@ class SettingsRepository(private val context: Context) {
         sttEngine = this[Keys.sttEngine]?.let { runCatching { SttEngine.valueOf(it) }.getOrNull() } ?: SttEngine.Orukeet,
         phoneControl = this[Keys.phoneControl] ?: false,
         phoneToken = this[Keys.phoneToken]?.let(SecretBox::decrypt).orEmpty(),
+        richReplies = this[Keys.richReplies] ?: true,
+        uploadUrl = this[Keys.uploadUrl].orEmpty(),
     )
 
     /**
@@ -223,6 +234,11 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDutchTtsEngine(value: DutchTtsEngine) = context.dataStore.edit { it[Keys.dutchTtsEngine] = value.name }
     suspend fun setSupertonicVoice(value: String) = context.dataStore.edit { it[Keys.supertonicVoice] = value }
     suspend fun setSttEngine(value: SttEngine) = context.dataStore.edit { it[Keys.sttEngine] = value.name }
+    suspend fun setRichReplies(value: Boolean) = context.dataStore.edit { it[Keys.richReplies] = value }
+    suspend fun setUploadUrl(value: String) = context.dataStore.edit {
+        val url = value.trim()
+        if (url.isEmpty()) it.remove(Keys.uploadUrl) else it[Keys.uploadUrl] = HermesApi.normalizeBaseUrl(url)
+    }
 
     suspend fun setPhoneControl(enabled: Boolean) = context.dataStore.edit {
         it[Keys.phoneControl] = enabled

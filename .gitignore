@@ -13,3 +13,4 @@ captures/
 .research/
 /artifacts/
 /app/libs/
+__pycache__/

@@ -45,6 +45,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableLongStateOf
@@ -71,7 +72,10 @@ import nl.bartvandermeeren.aight.chat.Step
 import nl.bartvandermeeren.aight.chat.StepKind
 import nl.bartvandermeeren.aight.chat.UiMessage
 import nl.bartvandermeeren.aight.data.ApprovalRequest
+import nl.bartvandermeeren.aight.openui.OpenUiText
+import nl.bartvandermeeren.aight.ui.components.FileBadge
 import nl.bartvandermeeren.aight.ui.components.Markdown
+import nl.bartvandermeeren.aight.ui.openui.LocalStreaming
 import nl.bartvandermeeren.aight.ui.components.PlainIconButton
 import nl.bartvandermeeren.aight.ui.components.AightMark
 import nl.bartvandermeeren.aight.ui.components.copyToClipboard
@@ -99,6 +103,7 @@ fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
                 message.images.take(4).forEach { MessageImage(it) }
             }
         }
+        message.files.forEach { FileBadge(it) }
         if (message.text.isNotBlank()) {
             var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
             val long = message.text.length > 420 || message.text.count { it == '\n' } > 6
@@ -188,7 +193,9 @@ fun AssistantMessageItem(
         }
         message.approval?.let { ApprovalCard(it, onApproval) }
         if (message.text.isNotBlank()) {
-            SelectionContainer { Markdown(message.text) }
+            CompositionLocalProvider(LocalStreaming provides message.isStreaming) {
+                SelectionContainer { Markdown(message.text) }
+            }
         }
         when (message.state) {
             MessageState.Failed -> ErrorRow(message.error ?: stringResource(R.string.error_generic), onRetry = if (isLast) onRetry else null)
@@ -480,8 +487,10 @@ private fun ErrorRow(message: String, onRetry: (() -> Unit)?) {
 }
 
 @Composable
-private fun ActionRow(text: String, speaking: Boolean, onSpeak: () -> Unit) {
+private fun ActionRow(reply: String, speaking: Boolean, onSpeak: () -> Unit) {
     val context = LocalContext.current
+    // OpenUI blocks are copied and shared as the markdown they stand for.
+    val text = remember(reply) { OpenUiText.expand(reply) }
     var copied by remember { mutableStateOf(false) }
     LaunchedEffect(copied) {
         if (copied) {

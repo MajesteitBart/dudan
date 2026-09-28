@@ -59,8 +59,11 @@ import nl.bartvandermeeren.aight.R
 import nl.bartvandermeeren.aight.ui.theme.LocalAccent
 import nl.bartvandermeeren.aight.ui.theme.Palette
 
-/** A picked image waiting in the composer. Exactly one of [uri] or [bitmap] is set. */
-data class Attachment(val id: Long, val uri: Uri? = null, val bitmap: Bitmap? = null)
+/**
+ * Something waiting in the composer. A photo has [uri] or [bitmap] and goes to the model as a
+ * picture; any other file has [uri] and [file] and is uploaded to the Hermes host as soon as it's picked.
+ */
+data class Attachment(val id: Long, val uri: Uri? = null, val bitmap: Bitmap? = null, val file: PickedFile? = null)
 
 private enum class TrailingMode { Idle, Content, Listening, Busy }
 
@@ -97,6 +100,7 @@ fun Composer(
     focusRequester: FocusRequester? = null,
     modelPicker: (@Composable () -> Unit)? = null,
     addMenu: @Composable () -> Unit = {},
+    onRetryAttachment: (Attachment) -> Unit = {},
 ) {
     val hasContent = text.isNotBlank() || attachments.isNotEmpty()
     val mode = when {
@@ -114,7 +118,11 @@ fun Composer(
                 modifier = Modifier.padding(start = 10.dp, end = 8.dp, bottom = 4.dp, top = 8.dp),
             ) {
                 items(attachments, key = { it.id }) { attachment ->
-                    AttachmentThumb(attachment, onRemove = { onRemoveAttachment(attachment) })
+                    if (attachment.file != null) {
+                        FileChip(attachment.file, onRemove = { onRemoveAttachment(attachment) }, onRetry = { onRetryAttachment(attachment) })
+                    } else {
+                        AttachmentThumb(attachment, onRemove = { onRemoveAttachment(attachment) })
+                    }
                 }
             }
         }

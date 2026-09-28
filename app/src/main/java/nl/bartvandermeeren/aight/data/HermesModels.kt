@@ -39,8 +39,8 @@ data class SessionSummary(
     val messageCount: Int,
 ) {
     val displayTitle: String
-        get() = title?.trim()?.takeIf { it.isNotEmpty() }
-            ?: preview?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }?.take(80)
+        get() = title?.let(AttachmentNotes::clean)?.trim()?.takeIf { it.isNotEmpty() }
+            ?: preview?.let(AttachmentNotes::clean)?.lineSequence()?.map { it.trim() }?.firstOrNull { it.isNotEmpty() }?.take(80)
             ?: ""
 
     companion object {

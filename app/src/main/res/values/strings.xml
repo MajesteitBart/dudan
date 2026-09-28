@@ -60,7 +60,7 @@
     <string name="action_scroll_down">Scroll to bottom</string>
     <string name="attach_photos">Photos</string>
     <string name="attach_camera">Camera</string>
-    <string name="attach_photos_detail">Pick from your gallery</string>
+    <string name="attach_photos_detail">Photos and videos</string>
     <string name="attach_camera_detail">Take a photo</string>
 
     <!-- Agent work -->
@@ -69,6 +69,10 @@
     <string name="status_stopped">Stopped</string>
     <string name="status_stopping">Stopping</string>
     <string name="image_prepare_failed">Couldn\'t read one of the images. Try attaching it again.</string>
+    <string name="file_read_failed">Couldn\'t read one or more selected files.</string>
+    <string name="file_metadata_pending">Wait for the selected files to appear before sending.</string>
+    <string name="too_many_attachments">Add up to %1$d attachments to one message.</string>
+    <string name="images_too_large">These photos are too large for one message. Remove some and try again.</string>
     <string name="work_running">Working</string>
     <string name="work_running_tool">Using %1$s</string>
     <string name="work_done">Show steps</string>
@@ -220,4 +224,48 @@
     <string name="phone_control_notification_text">To open apps and links when you ask. Tap to change.</string>
     <string name="phone_action_title">%1$s wants to open something</string>
     <string name="phone_action_tap_to_open">Tap to open %1$s</string>
+
+    <!-- Files -->
+    <string name="attach_files">Files</string>
+    <string name="attach_files_detail">Any file up to 250 MB</string>
+    <string name="upload_progress">%1$d%% of %2$s</string>
+    <string name="upload_failed_retry">Upload failed. Tap to retry</string>
+    <string name="upload_fix_first">One of the files didn\'t upload. Tap it to retry, or remove it.</string>
+    <string name="file_too_large">%1$s is larger than %2$d MB.</string>
+    <string name="upload_failed">Couldn\'t upload %1$s: %2$s</string>
+    <string name="upload_rejected_key">The upload service rejected the API key.</string>
+    <string name="upload_unreachable">Can\'t reach the upload service on the Hermes host. See Settings, Replies and files.</string>
+    <string name="upload_not_service">This address answers, but not as the aight upload service. Check the upload URL.</string>
+
+    <!-- Replies and files settings -->
+    <string name="section_replies_files">Replies and files</string>
+    <string name="rich_replies">Rich replies</string>
+    <string name="rich_replies_detail">Tables, charts, steps, forms and suggested follow-ups in replies, drawn with OpenUI</string>
+    <string name="upload_server">Upload server</string>
+    <string name="upload_server_detail">Files up to 250 MB go to aight\'s upload service on the Hermes host, and the agent reads them there. Leave this empty to use port 8645 when Hermes uses HTTP. If Hermes uses HTTPS, enter the upload service address.</string>
+    <string name="upload_check">Check the upload service</string>
+    <string name="upload_checking">Checking…</string>
+    <string name="upload_ok">The upload service answers.</string>
+
+    <!-- OpenUI replies -->
+    <string name="openui_busy">Wait until the reply is finished.</string>
+    <string name="openui_sources">Sources</string>
+    <plurals name="openui_show_more_rows">
+        <item quantity="one">Show %d more row</item>
+        <item quantity="other">Show %d more rows</item>
+    </plurals>
+    <string name="openui_show_table">Table</string>
+    <string name="openui_show_chart">Chart</string>
+    <string name="openui_chart_hint">Tap the chart to read its values</string>
+    <string name="openui_choose">Choose…</string>
+    <string name="openui_pick_date">Pick a date</string>
+    <string name="openui_error_required">Fill this in</string>
+    <string name="openui_error_email">Enter an email address</string>
+    <string name="openui_error_url">Enter a web address that starts with https://</string>
+    <string name="openui_error_number">Enter a number</string>
+    <string name="openui_error_min_length">Use at least %s characters</string>
+    <string name="openui_error_max_length">Use at most %s characters</string>
+    <string name="openui_error_min">Enter %s or more</string>
+    <string name="openui_error_max">Enter %s or less</string>
+    <string name="openui_error_pattern">This isn\'t in the right format</string>
 </resources>

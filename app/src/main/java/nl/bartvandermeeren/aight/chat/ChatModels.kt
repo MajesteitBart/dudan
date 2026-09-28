@@ -1,6 +1,7 @@
 package nl.bartvandermeeren.aight.chat
 
 import nl.bartvandermeeren.aight.data.ApprovalRequest
+import nl.bartvandermeeren.aight.data.FileRef
 import nl.bartvandermeeren.aight.data.SessionSummary
 
 enum class Role { User, Assistant }
@@ -28,6 +29,8 @@ data class UiMessage(
     val role: Role,
     val text: String = "",
     val images: List<ImageRef> = emptyList(),
+    /** Files the user attached; they are on the Hermes host, see data/AttachmentNotes. */
+    val files: List<FileRef> = emptyList(),
     val steps: List<Step> = emptyList(),
     val reasoning: String = "",
     val state: MessageState = MessageState.Done,

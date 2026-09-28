@@ -2,13 +2,26 @@
 // Mirrors the wire contract of gateway/platforms/api_server.py (Hermes 0.21): sessions, runs with
 // SSE events, session chat stream, approvals, model options, skills and jobs.
 //
-// Usage: node tools/mock-hermes/server.mjs [port]   (API key: dev-key-aight-0000000000)
+// Usage: node tools/mock-hermes/server.mjs [port] [upload-port]
+//   port         the Hermes API (default 8642)
+//   upload-port  the file upload service, same protocol as tools/hermes-upload/aight_upload.py
+//                (default 8645). Files go to <OS temp dir>/aight-mock-uploads; upload state lives
+//                in memory and is gone after a restart.
+// API key for both: dev-key-aight-0000000000 (or set MOCK_KEY).
+// With Rich replies on, questions with "vergelijk", "formulier", "grafiek" or "stappen" get OpenUI
+// replies (see openui-demo.mjs), and turns with attached files get a reply that names them.
 // From the Android emulator the host is http://10.0.2.2:<port>.
 
 import http from "node:http";
-import { randomUUID } from "node:crypto";
+import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createReadStream, mkdirSync } from "node:fs";
+import { open, rename, rm, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { fileReply, openUiReply } from "./openui-demo.mjs";
 
 const PORT = Number(process.argv[2] ?? 8642);
+const UPLOAD_PORT = Number(process.argv[3] ?? 8645);
 const KEY = process.env.MOCK_KEY ?? "dev-key-aight-0000000000";
 
 const sessions = new Map(); // id -> { meta, messages }
@@ -92,7 +105,7 @@ function textOf(content) {
 }
 
 // Runs the scripted agent turn, calling emit(name, payload) for every event.
-async function agentTurn(session, input, emit, control) {
+async function agentTurn(session, input, emit, control, instructions) {
   const question = textOf(input);
   const hasImage = Array.isArray(input) && input.some((p) => p.type === "image_url");
   const t0 = now();
@@ -129,7 +142,7 @@ async function agentTurn(session, input, emit, control) {
     emit("tool.completed", { tool: "terminal", duration: 0.6, error: false, preview: "exit 0" });
   }
 
-  const out = (hasImage ? "Ik zie een afbeelding. " : "") + answer(question);
+  const out = (hasImage ? "Ik zie een afbeelding. " : "") + (fileReply(question) ?? openUiReply(question, instructions) ?? answer(question));
   for (const piece of out.match(/[\s\S]{1,8}/g)) {
     if (control.stopped) return { status: "cancelled", output: "" };
     emit("message.delta", { delta: piece });
@@ -244,7 +257,7 @@ const server = http.createServer(async (req, res) => {
         res.write(`event: ${map[name] ?? name}\ndata: ${JSON.stringify(out)}\n\n`);
       };
       emit("run.started", { user_message: { role: "user", content: body.message } });
-      const result = await agentTurn(s, body.message, emit, control);
+      const result = await agentTurn(s, body.message, emit, control, body.system_message ?? body.instructions);
       emit("assistant.completed", { content: result.output ?? "" });
       emit(`run.${result.status}`, { messages: [] });
       emit("done", {});
@@ -269,7 +282,7 @@ const server = http.createServer(async (req, res) => {
     };
     (async () => {
       await sleep(300);
-      const result = await agentTurn(s, body.input, emit, run.control);
+      const result = await agentTurn(s, body.input, emit, run.control, body.instructions);
       run.status = result.status;
       run.output = result.output ?? null;
       emit(`run.${result.status}`, { output: result.output ?? "" });
@@ -308,3 +321,159 @@ const server = http.createServer(async (req, res) => {
 });
 
 server.listen(PORT, "0.0.0.0", () => console.log(`mock hermes on http://0.0.0.0:${PORT} key=${KEY}`));
+
+// Upload service ---------------------------------------------------------------------------------
+// Stand-in for tools/hermes-upload/aight_upload.py with the same endpoints, status codes and error
+// codes. It skips fsync, the free-space check and pruning.
+
+const UPLOAD_DIR = join(tmpdir(), "aight-mock-uploads");
+const UPLOAD_MAX_BYTES = 250 * 1024 * 1024;
+const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
+const UPLOAD_MAX_CHUNK = 16 * 1024 * 1024;
+const uploads = new Map(); // id -> { id, name, safe_name, mime, size, offset, complete, expected, sha256, path, part, busy }
+
+const uploadError = (res, status, code, message, extra = {}, headers = {}) =>
+  send(res, status, { error: { message, code }, ...extra }, headers);
+const notAllowed = (res, methods) =>
+  uploadError(res, 405, "method_not_allowed", `Use ${methods.join(" or ")} here.`, {}, { Allow: methods.join(", ") });
+const megabytes = (n) => `${+(n / 1048576).toPrecision(4)} MB`;
+
+// Same rules as safe_name() in aight_upload.py.
+function safeName(name) {
+  let base = name.split(/[\\/]/).pop();
+  base = base.replace(/\s+/gu, " ").replace(/[\p{Cc}\p{Cf}\p{Cs}<>:"/\\|?*]/gu, "").replace(/ {2,}/g, " ");
+  base = base.replace(/^[\s.]+|[\s.]+$/gu, "");
+  const dot = base.lastIndexOf(".");
+  let ext = dot > 0 ? base.slice(dot) : "";
+  if (ext.length > 16) ext = "";
+  const stem = [...(ext ? base.slice(0, -ext.length) : base)].slice(0, 120 - ext.length);
+  while (stem.length && Buffer.byteLength(stem.join("") + ext) > 200) stem.pop();
+  const clean = stem.join("").replace(/[ .]+$/, "");
+  return clean ? clean + ext : "file";
+}
+
+const sha256File = (file) => new Promise((resolve, reject) => {
+  const hash = createHash("sha256");
+  createReadStream(file).on("data", (d) => hash.update(d)).on("error", reject).on("end", () => resolve(hash.digest("hex")));
+});
+
+const completion = (u) => ({
+  offset: u.size, complete: true, path: u.path, name: u.name, safe_name: u.safe_name, mime: u.mime, size: u.size, sha256: u.sha256,
+});
+
+const describeUpload = (u) => ({
+  id: u.id, name: u.name, mime: u.mime, size: u.size, offset: u.offset, complete: u.complete,
+  ...(u.complete ? { path: u.path, sha256: u.sha256 } : {}),
+});
+
+async function createUpload(req, res) {
+  if (req.headers["content-length"] === undefined) return uploadError(res, 411, "length_required", "Content-Length is required.");
+  if (Number(req.headers["content-length"]) > 64 * 1024) return uploadError(res, 413, "request_too_large", "The request body is over 64 KiB.");
+  const body = await readBody(req);
+  if (!body || typeof body !== "object" || Array.isArray(body)) return uploadError(res, 400, "invalid_request", "The body must be a JSON object.");
+  const { name, size, mime, sha256 } = body;
+  if (typeof name !== "string" || !name.trim()) return uploadError(res, 400, "invalid_request", "name must be a non-empty string.");
+  if (!Number.isInteger(size) || size <= 0) return uploadError(res, 400, "invalid_request", "size must be a positive whole number of bytes.");
+  if (size > UPLOAD_MAX_BYTES) return uploadError(res, 413, "too_large", `The file is ${megabytes(size)}; the limit is ${megabytes(UPLOAD_MAX_BYTES)}.`);
+  if (mime != null && (typeof mime !== "string" || mime.length > 255)) return uploadError(res, 400, "invalid_request", "mime must be a string of at most 255 characters.");
+  if (sha256 != null && (typeof sha256 !== "string" || !/^[0-9a-f]{64}$/i.test(sha256))) return uploadError(res, 400, "invalid_request", "sha256 must be 64 hexadecimal characters.");
+  const id = randomBytes(16).toString("hex");
+  const u = {
+    id, name, safe_name: safeName(name), mime: mime?.trim() || "application/octet-stream", size, offset: 0, complete: false,
+    expected: sha256?.toLowerCase() ?? null, sha256: null, path: null, part: join(UPLOAD_DIR, ".partial", `${id}.part`), busy: false,
+  };
+  await writeFile(u.part, "");
+  uploads.set(id, u);
+  console.log(`  upload ${id} created: ${JSON.stringify(name)}, ${size} bytes`);
+  return send(res, 201, { id, offset: 0, size, chunk_bytes: UPLOAD_CHUNK_BYTES });
+}
+
+async function putChunk(req, res, u, url) {
+  const offsetParam = url.searchParams.getAll("offset");
+  if (offsetParam.length !== 1 || !/^\d+$/.test(offsetParam[0])) return uploadError(res, 400, "invalid_request", "Pass the chunk's position as ?offset=<bytes>.");
+  const rawLength = req.headers["content-length"];
+  if (rawLength === undefined) return uploadError(res, 411, "length_required", "Content-Length is required.");
+  const length = Number(rawLength);
+  if (length > UPLOAD_MAX_CHUNK) return uploadError(res, 413, "chunk_too_large", `A chunk can be at most ${UPLOAD_MAX_CHUNK} bytes; this one is ${length}.`, {}, { Connection: "close" });
+  const offset = Number(offsetParam[0]);
+  if (offset !== u.offset) return uploadError(res, 409, "offset_mismatch", `The upload is at offset ${u.offset}, not ${offset}.`, { offset: u.offset });
+  if (offset + length > u.size) return uploadError(res, 400, "invalid_request", `The chunk runs past the end of the file (${u.size} bytes).`);
+  if (u.busy) return uploadError(res, 409, "upload_busy", "Another request is still sending a chunk for this upload. Try again in a few seconds.", { offset: u.offset });
+  // An empty PUT at the end of a finished upload repeats the final answer, for a client that lost it.
+  if (u.complete) return send(res, 200, completion(u));
+
+  u.busy = true;
+  let received = 0;
+  try {
+    const fh = await open(u.part, "r+");
+    try {
+      await fh.truncate(u.offset); // bytes past the committed offset come from an interrupted chunk
+      try {
+        for await (const chunk of req) {
+          await fh.write(chunk, 0, chunk.length, u.offset + received);
+          received += chunk.length;
+        }
+      } catch {
+        // the client went away; handled below
+      }
+      if (received !== length) {
+        await fh.truncate(u.offset);
+        console.log(`  upload ${u.id}: connection lost after ${received} of ${length} bytes; rolled back to offset ${u.offset}`);
+        return;
+      }
+    } finally {
+      await fh.close();
+    }
+    u.offset += length;
+    if (u.offset < u.size) return send(res, 200, { offset: u.offset, complete: false });
+
+    const digest = await sha256File(u.part);
+    if (u.expected && digest !== u.expected) {
+      await rm(u.part, { force: true });
+      uploads.delete(u.id);
+      return uploadError(res, 422, "checksum_mismatch", `The received file has SHA-256 ${digest}, not ${u.expected}. The upload was removed; send the file again.`);
+    }
+    const final = join(UPLOAD_DIR, `${u.id.slice(0, 12)}_${u.safe_name}`);
+    await rename(u.part, final);
+    Object.assign(u, { complete: true, sha256: digest, path: final });
+    console.log(`  upload ${u.id} complete: ${final}`);
+    return send(res, 200, completion(u));
+  } finally {
+    u.busy = false;
+  }
+}
+
+const uploadServer = http.createServer(async (req, res) => {
+  const url = new URL(req.url, "http://x");
+  const route = url.pathname.replace(/\/+$/, "");
+  console.log("upload", req.method, route + url.search);
+
+  if (req.headers.origin !== undefined) return uploadError(res, 403, "browser_refused", "Browsers can't use this service.");
+  if (!authorized(req)) return uploadError(res, 401, "unauthorized", "Missing or wrong API key.");
+
+  if (route === "/health") {
+    if (req.method !== "GET") return notAllowed(res, ["GET"]);
+    return send(res, 200, { ok: true, version: 1, max_bytes: UPLOAD_MAX_BYTES, chunk_bytes: UPLOAD_CHUNK_BYTES });
+  }
+  if (route === "/uploads") {
+    if (req.method !== "POST") return notAllowed(res, ["POST"]);
+    return createUpload(req, res);
+  }
+  const match = route.match(/^\/uploads\/([^/]+)$/);
+  if (!match || !/^[0-9a-f]{32}$/.test(match[1])) return uploadError(res, 404, "not_found", match ? "No such upload." : "No such endpoint.");
+  if (!["GET", "PUT", "DELETE"].includes(req.method)) return notAllowed(res, ["GET", "PUT", "DELETE"]);
+  const u = uploads.get(match[1]);
+  if (!u) return uploadError(res, 404, "not_found", "No such upload.");
+
+  if (req.method === "GET") return send(res, 200, describeUpload(u));
+  if (req.method === "PUT") return putChunk(req, res, u, url);
+  if (u.busy) return uploadError(res, 409, "upload_busy", "A chunk for this upload is still being written. Try again shortly.", { offset: u.offset });
+  uploads.delete(u.id);
+  await rm(u.complete ? u.path : u.part, { force: true });
+  console.log(`  upload ${u.id} deleted`);
+  res.writeHead(204);
+  res.end();
+});
+
+mkdirSync(join(UPLOAD_DIR, ".partial"), { recursive: true });
+uploadServer.listen(UPLOAD_PORT, "0.0.0.0", () => console.log(`mock upload service on http://0.0.0.0:${UPLOAD_PORT}, files in ${UPLOAD_DIR}`));

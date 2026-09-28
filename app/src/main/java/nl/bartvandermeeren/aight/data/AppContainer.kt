@@ -44,6 +44,16 @@ class AppContainer(context: Context) {
     /** A client bound to unsaved credentials, for the connection test in setup. */
     fun apiFor(config: HermesApi.ServerConfig) = HermesApi(http) { config }
 
+    // An 8 MB chunk over a weak mobile connection can take a minute on its own.
+    private val uploadHttp = http.newBuilder()
+        .writeTimeout(3, TimeUnit.MINUTES)
+        .readTimeout(3, TimeUnit.MINUTES)
+        .retryOnConnectionFailure(false)
+        .build()
+
+    /** Attachments go to the upload service next to Hermes; see tools/hermes-upload. */
+    val uploads = UploadClient(uploadHttp) { settings.current().uploads }
+
     val engine = ChatEngine(api, appScope) { settings.current() }
 
     val kokoroModel = ModelPackage(appContext, http, appScope, ModelPackage.KOKORO)
