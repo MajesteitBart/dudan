@@ -488,15 +488,29 @@ private val remoteImageSlots = Semaphore(3)
  */
 private val imageBudget = java.util.concurrent.Semaphore(64 * 1024)
 
-/** A claim on [budget] that lasts as long as the image stays in the composition. */
-internal class ImageClaim(private val budget: java.util.concurrent.Semaphore, private val kilobytes: Int) : RememberObserver {
+/**
+ * A claim on [budget] for one image. It starts at the worst case, shrinks to the decoded size once
+ * that is known, and goes back to the budget when the image leaves the composition.
+ */
+internal class ImageClaim(private val budget: java.util.concurrent.Semaphore, kilobytes: Int) : RememberObserver {
     val held = budget.tryAcquire(kilobytes)
-    override fun onRemembered() = Unit
-    override fun onForgotten() = release()
-    override fun onAbandoned() = release()
-    private fun release() {
-        if (held) budget.release(kilobytes)
+    private val holding = java.util.concurrent.atomic.AtomicInteger(if (held) kilobytes else 0)
+
+    /** Keeps at most [kilobytes] of the claim and returns the rest; 0 returns all of it, once. */
+    fun shrinkTo(kilobytes: Int) {
+        while (true) {
+            val current = holding.get()
+            val keep = kilobytes.coerceIn(0, current)
+            if (holding.compareAndSet(current, keep)) {
+                if (current > keep) budget.release(current - keep)
+                return
+            }
+        }
     }
+
+    override fun onRemembered() = Unit
+    override fun onForgotten() = shrinkTo(0)
+    override fun onAbandoned() = shrinkTo(0)
 }
 
 @Composable
@@ -506,9 +520,12 @@ private fun rememberRemoteImage(src: String, maxDimension: Int): RemoteState {
     val claim = remember(src, maxDimension) { ImageClaim(imageBudget, maxDimension * maxDimension / 256) }
     val state by produceState<RemoteState>(if (claim.held) RemoteState.Loading else RemoteState.Failed, src, claim) {
         if (!claim.held) return@produceState
-        value = remoteImageSlots.withPermit {
+        val image = remoteImageSlots.withPermit {
             withContext(Dispatchers.IO) { ImageCodec.decodeThumbnailCached(context, src, maxDimension) }
-        }?.let { RemoteState.Loaded(it) } ?: RemoteState.Failed
+        }
+        // Keep only what the decoded image uses; a failed load uses nothing.
+        claim.shrinkTo(image?.let { (it.width * it.height + 255) / 256 } ?: 0)
+        value = image?.let { RemoteState.Loaded(it) } ?: RemoteState.Failed
     }
     return state
 }

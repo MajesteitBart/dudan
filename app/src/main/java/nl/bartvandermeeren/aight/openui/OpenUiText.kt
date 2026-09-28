@@ -215,14 +215,29 @@ object OpenUiText {
                 val rows = listOfNotNull(n.map("header")) + n.list("rows").filterIsInstance<Map<*, *>>() + listOfNotNull(n.map("footer"))
                 if (rows.isNotEmpty()) out += rows.joinToString("\n") { "- ${cellText(it["left"])}: ${cellText(it["right"])}" }
             }
-            "ListBlock" -> n.nodes("items").mapIndexed { i, item ->
-                val subtitle = item.string("subtitle")
-                "${i + 1}. ${item.string("title").orEmpty()}" + (subtitle?.let { " – $it" } ?: "")
-            }.takeIf { it.isNotEmpty() }?.let { out += it.joinToString("\n") }
+            "ListBlock" -> {
+                // The screen shows item images only in the "image" variant.
+                val withImages = n.string("variant") == "image"
+                n.nodes("items").mapIndexed { i, item ->
+                    val subtitle = item.string("subtitle")
+                    val text = item.string("title").orEmpty() + (subtitle?.let { " – $it" } ?: "")
+                    val image = item.map("image")?.takeIf { withImages }?.let { image ->
+                        displayText(image["src"]).takeIf { it.isNotBlank() }?.let { "![${displayText(image["alt"])}]($it)" }
+                    }
+                    "${i + 1}. " + listOfNotNull(text, image).filter { it.isNotBlank() }.joinToString(" ")
+                }.takeIf { it.isNotEmpty() }?.let { out += it.joinToString("\n") }
+            }
             // Interactive parts only work on screen.
             "FollowUpBlock", "FollowUpItem", "Buttons", "Button", "Form", "FormControl", "Icon" -> Unit
             in OpenUiLibrary.inputs -> Unit
-            else -> n.args.forEach { write(it, out) }
+            // Like the on-screen fallback: text and child components, without ids, numbers or flags.
+            else -> n.args.forEach { arg ->
+                when (val part = unbind(arg)) {
+                    is String -> if (part.isNotBlank() && !looksLikeId(part)) out += part
+                    is UiNode, is List<*> -> write(part, out)
+                    else -> Unit
+                }
+            }
         }
     }
 

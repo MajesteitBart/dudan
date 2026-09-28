@@ -307,6 +307,36 @@ class OpenUiTextTest {
     }
 
     @Test
+    fun imageClaimsShrinkToWhatTheDecodeUsed() {
+        val budget = java.util.concurrent.Semaphore(100)
+        val small = ImageClaim(budget, 60)
+        small.shrinkTo(10)
+        assertEquals(90, budget.availablePermits())
+        val failed = ImageClaim(budget, 60)
+        failed.shrinkTo(0)
+        assertEquals(90, budget.availablePermits())
+        // Disposal after a shrink returns only what is still held, never more.
+        failed.onForgotten()
+        small.onForgotten()
+        small.onForgotten()
+        assertEquals(100, budget.availablePermits())
+    }
+
+    @Test
+    fun exportsListImagesAndHidesFallbackIds() {
+        val list = "root = ListBlock([ListItem(\"Museum\", \"Open daily\", {src: \"https://example.com/m.jpg\", alt: \"Front\"}), ListItem(\"\", \"\", {src: \"https://example.com/p.jpg\"})], \"image\")"
+        assertEquals(
+            "1. Museum – Open daily ![Front](https://example.com/m.jpg)\n2. ![](https://example.com/p.jpg)",
+            OpenUiText.expand("```openui-lang\n$list\n```"),
+        )
+        val plain = list.replace(", \"image\")", ")")
+        assertEquals("1. Museum – Open daily\n2.", OpenUiText.expand("```openui-lang\n$plain\n```").trimEnd())
+
+        val mystery = "root = Card([Mystery(\"record-id\", [TextContent(\"Shown\")], 42, true)])"
+        assertEquals("Shown", OpenUiText.expand("```openui-lang\n$mystery\n```"))
+    }
+
+    @Test
     fun layoutsDropEmptyChildrenOnceTheReplyIsComplete() {
         val stack = OpenUiEvaluator(OpenUiParser.parse("root = Stack([missing, TextContent(missing), TextContent(\"Shown\"), \" \", null], \"row\")"), emptyMap()).root() as UiNode
         val children = stack.list("children")
