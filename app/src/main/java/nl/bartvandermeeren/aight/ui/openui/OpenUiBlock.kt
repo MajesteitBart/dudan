@@ -547,7 +547,21 @@ private fun GalleryTile(image: Map<*, *>, modifier: Modifier) {
                 loaded.image, contentDescription = displayText(image["alt"]), contentScale = ContentScale.Crop,
                 modifier = Modifier.fillMaxWidth().aspectRatio(1f).clip(shape).clickable { scope?.host?.openUrl(src) },
             )
-            else -> Box(Modifier.fillMaxWidth().aspectRatio(1f).pane(shape, Palette.Surface))
+            RemoteState.Loading -> Box(Modifier.fillMaxWidth().aspectRatio(1f).pane(shape, Palette.Surface))
+            // Offline or a dead link: the alt text, or else the link itself, in a tile that opens it.
+            RemoteState.Failed -> Box(
+                Modifier.fillMaxWidth().aspectRatio(1f).pane(shape, Palette.Surface, outline = Palette.Hairline).clickable { scope?.host?.openUrl(src) }.padding(10.dp),
+                contentAlignment = Alignment.Center,
+            ) {
+                Text(
+                    displayText(image["alt"]).ifBlank { src },
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.TextSecondary,
+                    textAlign = TextAlign.Center,
+                    maxLines = 4,
+                    overflow = TextOverflow.Ellipsis,
+                )
+            }
         }
         displayText(image["details"] ?: image["alt"]).takeIf { it.isNotBlank() }?.let {
             Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, maxLines = 2, overflow = TextOverflow.Ellipsis)
