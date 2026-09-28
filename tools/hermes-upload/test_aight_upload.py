@@ -494,6 +494,26 @@ class PruneTests(ServerTestCase):
         for path in paths:
             os.utime(path, (when, when))
 
+    def test_recovers_a_final_file_renamed_before_metadata_save(self):
+        data = b"finished before metadata"
+        meta = self.store.create("recovered.txt", len(data))
+        upload_id = meta["id"]
+        part = self.store._part_path(upload_id)
+        part.write_bytes(data)
+        final = self.store.final_path(meta)
+        os.replace(part, final)
+
+        self.assertEqual(self.store.prune(), 0)
+        recovered = self.store.load(upload_id)
+        self.assertTrue(recovered["complete"])
+        self.assertEqual(recovered["path"], str(final))
+        self.assertEqual(recovered["offset"], len(data))
+        self.assertEqual(self.request("GET", f"/uploads/{upload_id}")[1]["path"], str(final))
+
+        self.age_by(31 * 86400, final, self.store._meta_path(upload_id))
+        self.assertEqual(self.store.prune(), 1)
+        self.assertFalse(final.exists())
+
     def test_prune(self):
         partial = self.root / ".partial"
         old_id, old_done = self.upload("old.txt", b"old")

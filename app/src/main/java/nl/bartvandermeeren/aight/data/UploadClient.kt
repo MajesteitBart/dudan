@@ -35,6 +35,7 @@ class UploadClient(
     private val config: suspend () -> Config,
 ) {
     data class Config(val baseUrl: String, val apiKey: String)
+    data class UploadHandle(val id: String, val config: Config)
 
     open class UploadException(message: String, val status: Int = 0, val code: String? = null) : IOException(message)
 
@@ -49,20 +50,21 @@ class UploadClient(
     data class Health(val maxBytes: Long, val chunkBytes: Int)
 
     suspend fun health(): Health = withContext(Dispatchers.IO) {
-        val o = send(request("health").get().build())
+        val o = send(request(config(), "health").get().build())
         Health(o.dbl("max_bytes")?.toLong() ?: MAX_ATTACHMENT_BYTES, o.int("chunk_bytes") ?: DEFAULT_CHUNK)
     }
 
     /**
      * Uploads [source] and returns where it landed. [onProgress] gets the bytes the service has
-     * stored so far. [onCreated] gets the upload id as soon as there is one, so a cancelled upload
+     * stored so far. [onCreated] gets the upload id and its pinned server as soon as there is one, so a cancelled upload
      * can be deleted.
      */
-    suspend fun upload(source: Source, onCreated: (String) -> Unit = {}, onProgress: (Long) -> Unit = {}): FileRef = withContext(Dispatchers.IO) {
+    suspend fun upload(source: Source, onCreated: (UploadHandle) -> Unit = {}, onProgress: (Long) -> Unit = {}): FileRef = withContext(Dispatchers.IO) {
         if (source.size <= 0) throw UploadException("${source.name} is empty.")
         if (source.size > MAX_ATTACHMENT_BYTES) throw UploadException("${source.name} is larger than ${MAX_ATTACHMENT_BYTES / (1024 * 1024)} MB.", code = "too_large")
+        val pinned = config()
         val created = send(
-            request("uploads").post(
+            request(pinned, "uploads").post(
                 buildJsonObject {
                     put("name", source.name)
                     put("size", source.size)
@@ -71,7 +73,8 @@ class UploadClient(
             ).build(),
         )
         val id = created.str("id") ?: throw UploadException("The upload service didn't return an upload id.")
-        onCreated(id)
+        val handle = UploadHandle(id, pinned)
+        onCreated(handle)
         val chunk = (created.int("chunk_bytes") ?: DEFAULT_CHUNK).coerceIn(256 * 1024, MAX_CHUNK)
 
         val digest = MessageDigest.getInstance("SHA-256")
@@ -93,7 +96,7 @@ class UploadClient(
                 }
                 val result = try {
                     send(
-                        request("uploads", id, query = mapOf("offset" to offset.toString()))
+                        request(pinned, "uploads", id, query = mapOf("offset" to offset.toString()))
                             .put(buffer.toRequestBody(OCTETS, 0, length))
                             .build(),
                     ).also { failures = 0 }
@@ -114,7 +117,7 @@ class UploadClient(
                         stream.close()
                         stream = null
                         delay(busyWaitMs)
-                        offset = rehash(source, digest, serverOffset(id) ?: offset)
+                        offset = rehash(source, digest, serverOffset(handle) ?: offset)
                         continue
                     }
                     // 4xx and a full disk won't get better by trying again.
@@ -124,7 +127,7 @@ class UploadClient(
                     stream.close()
                     stream = null
                     delay(backoff(failures))
-                    offset = rehash(source, digest, serverOffset(id) ?: offset)
+                    offset = rehash(source, digest, serverOffset(handle) ?: offset)
                     continue
                 } catch (e: IOException) {
                     failures++
@@ -132,7 +135,7 @@ class UploadClient(
                     stream.close()
                     stream = null
                     delay(backoff(failures))
-                    offset = rehash(source, digest, serverOffset(id) ?: offset)
+                    offset = rehash(source, digest, serverOffset(handle) ?: offset)
                     continue
                 }
                 digest.update(buffer, 0, length)
@@ -143,7 +146,7 @@ class UploadClient(
                     val expected = digest.digest().joinToString("") { "%02x".format(it) }
                     val stored = result.str("sha256")
                     if (stored != null && !stored.equals(expected, ignoreCase = true)) {
-                        runCatching { delete(id) }
+                        runCatching { delete(handle) }
                         throw UploadException("${source.name} arrived damaged. Try again.", code = "checksum_mismatch")
                     }
                     landed = FileRef(source.name, source.mime, source.size, path)
@@ -157,17 +160,17 @@ class UploadClient(
         landed
     }
 
-    suspend fun delete(id: String) = withContext(Dispatchers.IO) {
+    suspend fun delete(handle: UploadHandle) = withContext(Dispatchers.IO) {
         try {
-            send(request("uploads", id).delete().build())
+            send(request(handle.config, "uploads", handle.id).delete().build())
         } catch (e: UploadException) {
             if (e.status != 404) throw e
         }
         Unit
     }
 
-    private suspend fun serverOffset(id: String): Long? =
-        runCatching { send(request("uploads", id).get().build()).dbl("offset")?.toLong() }.getOrNull()
+    private suspend fun serverOffset(handle: UploadHandle): Long? =
+        runCatching { send(request(handle.config, "uploads", handle.id).get().build()).dbl("offset")?.toLong() }.getOrNull()
 
     /** Resets [digest] to cover the first [offset] bytes, the part the service already holds. */
     private fun rehash(source: Source, digest: MessageDigest, offset: Long): Long {
@@ -199,8 +202,7 @@ class UploadClient(
 
     private class OffsetMismatch(message: String, val serverOffset: Long) : UploadException(message, 409, "offset_mismatch")
 
-    private suspend fun request(vararg segments: String, query: Map<String, String> = emptyMap()): Request.Builder {
-        val c = config()
+    private fun request(c: Config, vararg segments: String, query: Map<String, String> = emptyMap()): Request.Builder {
         val base: HttpUrl = c.baseUrl.toHttpUrlOrNull() ?: throw UploadException("The upload server address isn't valid.")
         val url = base.newBuilder().apply {
             segments.forEach { addPathSegment(it) }

@@ -387,11 +387,11 @@ class Store:
         """Deletes an upload's files. Call with its lock held."""
         upload_id = meta["id"]
         paths = [self._part_path(upload_id)]
-        if meta.get("complete"):
-            try:
-                paths.append(self.final_path(meta))
-            except UploadError:
-                pass
+        try:
+            # The rename may have succeeded before completion metadata was saved.
+            paths.append(self.final_path(meta))
+        except UploadError:
+            pass
         paths.append(self._meta_path(upload_id))  # last, so the upload stays findable if a delete fails
         for path in paths:
             path.unlink(missing_ok=True)
@@ -413,6 +413,19 @@ class Store:
                 meta = self.load(upload_id)
                 if meta is None:
                     continue
+                if not meta.get("complete"):
+                    final = self.final_path(meta)
+                    if final.is_file() and not self._part_path(upload_id).exists():
+                        if final.stat().st_size == meta["size"]:
+                            digest = sha256_file(final)
+                            if meta.get("expected_sha256") and digest != meta["expected_sha256"]:
+                                self._remove(meta)
+                                removed += 1
+                                continue
+                            meta = dict(meta, complete=True, offset=meta["size"], sha256=digest,
+                                        path=str(final), completed_at=final.stat().st_mtime)
+                            self.save(meta)
+                            log.info("upload %s recovered after interrupted completion", upload_id)
                 if meta.get("complete"):
                     if self.retention <= 0:
                         continue

@@ -274,7 +274,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
      * The upload service's id per attachment, so a removed file can be deleted from the Hermes host.
      * The upload client sets it from its own thread.
      */
-    private val uploadIds = ConcurrentHashMap<Long, String>()
+    private val uploadIds = ConcurrentHashMap<Long, UploadClient.UploadHandle>()
 
     private fun updateFile(id: Long, transform: (PickedFile) -> PickedFile) {
         val index = attachments.indexOfFirst { it.id == id }
@@ -306,7 +306,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val ref = uploadSlots.withPermit {
                     container.uploads.upload(
                         source,
-                        onCreated = { uploadId -> uploadIds[id] = uploadId },
+                        onCreated = { handle -> uploadIds[id] = handle },
                         onProgress = { sent ->
                             viewModelScope.launch {
                                 updateFile(id) { file -> if (file.upload is UploadState.Uploading) file.copy(upload = UploadState.Uploading(sent)) else file }
@@ -353,14 +353,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         uploadIds.remove(id)?.let(::deleteFromHost)
     }
 
-    private fun deleteFromHost(uploadId: String) {
+    private fun deleteFromHost(handle: UploadClient.UploadHandle) {
         container.appScope.launch {
             // A stalled chunk can hold the service lock for 120 seconds, plus the DELETE wait.
             val deadline = android.os.SystemClock.elapsedRealtime() + 135_000
             var attempts = 0
             while (true) {
                 try {
-                    container.uploads.delete(uploadId)
+                    container.uploads.delete(handle)
                     return@launch
                 } catch (e: CancellationException) {
                     throw e

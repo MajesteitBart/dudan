@@ -141,6 +141,22 @@ class UploadClientTest {
     }
 
     @Test
+    fun uploadAndCleanupStayOnTheStartingServerAfterSettingsChange() = runBlocking {
+        val original = UploadClient.Config(server.url("/").toString().trimEnd('/'), "secret-key-0123456789")
+        var current = original
+        val client = UploadClient(OkHttpClient(), busyWaitMs = 10) { current }
+        var handle: UploadClient.UploadHandle? = null
+        client.upload(source(bytes), onCreated = {
+            handle = it
+            current = UploadClient.Config("http://127.0.0.1:1", "wrong-key")
+        })
+        client.delete(handle!!)
+        assertTrue(service.stored.contentEquals(bytes))
+        assertTrue(service.requests.any { it.method == "DELETE" })
+        assertTrue(service.requests.all { it.getHeader("Authorization") == "Bearer ${original.apiKey}" })
+    }
+
+    @Test
     fun resumesFromTheServiceOffsetAfterAConflict() = runBlocking {
         // The service already holds more than the client thinks, as after a lost response.
         service.skipAheadOnce = 262144
