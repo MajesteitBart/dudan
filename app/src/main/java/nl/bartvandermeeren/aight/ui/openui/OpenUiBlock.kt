@@ -63,7 +63,6 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
-import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.pluralStringResource
@@ -477,7 +476,7 @@ private fun rememberRemoteImage(src: String, maxDimension: Int): RemoteState {
     val context = LocalContext.current
     val state by produceState<RemoteState>(RemoteState.Loading, src) {
         value = withContext(Dispatchers.IO) {
-            runCatching { ImageCodec.decodeThumbnail(context, src, maxDimension) }.getOrNull()?.asImageBitmap()
+            ImageCodec.decodeThumbnailCached(context, src, maxDimension)
         }?.let { RemoteState.Loaded(it) } ?: RemoteState.Failed
     }
     return state

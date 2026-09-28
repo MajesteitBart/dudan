@@ -34,9 +34,7 @@ fun rememberImageBitmap(source: String, maxDimension: Int = 1024): State<ImageBi
     val key = "${source.hashCode()}:${source.length}:$maxDimension"
     return produceState(initialValue = thumbnailCache.get(key), key) {
         if (value != null) return@produceState
-        value = withContext(Dispatchers.IO) {
-            runCatching { ImageCodec.decodeThumbnail(context, source, maxDimension) }.getOrNull()?.asImageBitmap()
-        }?.also { thumbnailCache.put(key, it) }
+        value = withContext(Dispatchers.IO) { ImageCodec.decodeThumbnailCached(context, source, maxDimension) }
     }
 }
 
@@ -51,6 +49,14 @@ object ImageCodec {
             .connectTimeout(15, TimeUnit.SECONDS)
             .readTimeout(30, TimeUnit.SECONDS)
             .build()
+    }
+
+    /** Shared by chat images and OpenUI, so a disposed chat row can reuse its decoded thumbnail. */
+    fun decodeThumbnailCached(context: Context, source: String, maxDimension: Int): ImageBitmap? {
+        val key = "${source.hashCode()}:${source.length}:$maxDimension"
+        thumbnailCache.get(key)?.let { return it }
+        return runCatching { decodeThumbnail(context, source, maxDimension) }.getOrNull()?.asImageBitmap()
+            ?.also { thumbnailCache.put(key, it) }
     }
 
     fun decodeThumbnail(context: Context, source: String, maxDimension: Int): Bitmap? {
