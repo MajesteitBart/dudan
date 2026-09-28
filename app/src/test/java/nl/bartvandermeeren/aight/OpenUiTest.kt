@@ -8,6 +8,7 @@ import nl.bartvandermeeren.aight.openui.OpenUiParser
 import nl.bartvandermeeren.aight.openui.OpenUiText
 import nl.bartvandermeeren.aight.openui.Pending
 import nl.bartvandermeeren.aight.openui.UiNode
+import nl.bartvandermeeren.aight.ui.openui.radialStrokePx
 import nl.bartvandermeeren.aight.voice.SpeechText
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -178,6 +179,16 @@ class OpenUiModelSamplesTest {
 }
 
 class OpenUiTextTest {
+    @Test
+    fun crowdedRadialChartKeepsEveryRingInsideTheCanvas() {
+        val count = 44
+        val radius = 88f
+        val slot = radius / (count + 1)
+        val stroke = radialStrokePx(slot, 14f)
+        assertTrue(stroke > 0f)
+        assertTrue(stroke / 2f + (count - 1) * slot < radius)
+    }
+
     @Test
     fun keepsBlocksThatProduceNoExportableText() {
         val unresolved = "```openui-lang\nroot = missing\n```"

@@ -508,9 +508,10 @@ private fun RingCanvas(values: List<Double>, radial: Boolean, donut: Boolean, se
         if (radial) {
             // One ring per value, longest for the largest, from twelve o'clock.
             val maxValue = values.maxOrNull()?.takeIf { it > 0 } ?: 1.0
-            val stroke = min(14.dp.toPx(), size.minDimension / 2f / (values.size + 1) - 2.dp.toPx())
+            val slot = size.minDimension / 2f / (values.size + 1)
+            val stroke = radialStrokePx(slot, 14.dp.toPx())
             values.forEachIndexed { i, v ->
-                val inset = stroke / 2f + i * (stroke + 3.dp.toPx())
+                val inset = stroke / 2f + i * slot
                 val topLeft = Offset(inset, inset)
                 val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
                 if (arcSize.width <= 0f) return@forEachIndexed
@@ -535,6 +536,8 @@ private fun RingCanvas(values: List<Double>, radial: Boolean, donut: Boolean, se
         }
     }
 }
+
+internal fun radialStrokePx(slot: Float, maxStroke: Float): Float = min(maxStroke, slot * 0.7f).coerceAtLeast(0.1f)
 
 // ---- Numbers ----------------------------------------------------------------------------------------
 
