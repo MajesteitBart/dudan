@@ -180,7 +180,7 @@ const server = http.createServer(async (req, res) => {
   if (path === "/health" || path === "/v1/health") return send(res, 200, { status: "ok", platform: "hermes-agent", version: "mock" });
   if (!authorized(req)) return send(res, 401, { error: { message: "Invalid API key", code: "invalid_api_key" } });
 
-  if (path === "/v1/capabilities") return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "clark", features: { run_submission: true } });
+  if (path === "/v1/capabilities") return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "hermes-agent", features: { run_submission: true } });
   if (path === "/api/model/options") {
     return send(res, 200, {
       current_provider: "openrouter",

@@ -21,7 +21,7 @@ For attachments other than photos, also run the upload service on the Hermes hos
 ## Phone setup
 
 1. Install the APK. On the build PC, `node tools/serve-apk.mjs <tailscale-ip> 8787` serves everything in `artifacts/`, so the phone can open `http://<tailscale-ip>:8787/` and download it. Taildrop works too.
-2. Enter the server URL (`http://clarkbox:8642`), the API key, your name and the assistant's name, then tap Connect.
+2. Enter the server URL (`http://my-server:8642`), the API key, your name and the assistant's name, then tap Connect.
 3. Make dudan the assistant: Settings > Apps > Choose default apps > Digital assistant app > Device assistance app > dudan. The in-app Settings screen has a shortcut and shows whether it worked.
 4. On Samsung, set Settings > Advanced features > Side button > Press and hold to "Digital assistant".
 5. For "Ask about screen", enable "Use screenshot" in the same Digital assistant settings.

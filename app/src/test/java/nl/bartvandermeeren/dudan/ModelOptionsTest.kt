@@ -11,7 +11,7 @@ import org.junit.Assert.assertNull
 import org.junit.Test
 
 class ModelOptionsTest {
-    // The shape clarkbox's Hermes 0.21.5 returns from /api/model/options, trimmed.
+    // The shape Hermes 0.21.5 returns from /api/model/options, trimmed.
     private val catalog = ModelCatalogParser.parse(
         HermesJson.parseToJsonElement(
             """

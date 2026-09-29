@@ -290,9 +290,9 @@ class UploadClientTest {
 
     @Test
     fun derivesTheServiceAddressFromTheHermesServer() {
-        assertEquals("http://clarkbox:8645", UploadClient.baseUrlFor("http://clarkbox:8642", ""))
-        assertEquals("http://100.91.52.84:8645", UploadClient.baseUrlFor("100.91.52.84:8642/v1", ""))
-        assertEquals("http://files.example:9000", UploadClient.baseUrlFor("http://clarkbox:8642", "files.example:9000/"))
+        assertEquals("http://my-server:8645", UploadClient.baseUrlFor("http://my-server:8642", ""))
+        assertEquals("http://100.88.12.34:8645", UploadClient.baseUrlFor("100.88.12.34:8642/v1", ""))
+        assertEquals("http://files.example:9000", UploadClient.baseUrlFor("http://my-server:8642", "files.example:9000/"))
         assertEquals("", UploadClient.baseUrlFor("https://hermes.example.com", ""))
         assertEquals("https://files.example.com", UploadClient.baseUrlFor("https://hermes.example.com", "https://files.example.com"))
     }
