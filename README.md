@@ -6,6 +6,12 @@ Your Hermes agent, one side-button press away.
 
 dudan brings your own [Hermes agent](https://github.com/NousResearch/hermes-agent) to Android. Chat, talk hands-free, ask about what's on your screen, or send a file for the agent to work on. Your conversations live in Hermes, so you can pick them up in its dashboard or CLI too.
 
+<p align="center">
+  <img src="docs/screenshots/overlay.jpg" alt="The assistant overlay over the home screen, with a spoken question and its answer" width="260">
+  <img src="docs/screenshots/rich-reply.jpg" alt="A reply comparing three energy contracts in a table and a bar chart" width="260">
+  <img src="docs/screenshots/files.jpg" alt="A PDF, a spreadsheet, a recording and a video sent to the agent in one message" width="260">
+</p>
+
 ## Press, speak, done
 
 Make dudan your phone's digital assistant and hold the side button to start talking. The overlay opens over the app you're using, listens to your question and reads the answer aloud. Tap **Ask about screen** to include a screenshot, or take the conversation into the full app.
@@ -42,9 +48,15 @@ Choose from the models your Hermes server offers, adjust the thinking level, and
 
 Six backgrounds, eight accent colors, frosted glass and a layout that adapts to a foldable's inner and cover screens. Reduce transparency switches the glass to solid panels. The interface is available in English and Dutch.
 
+<p align="center">
+  <img src="docs/screenshots/approval.jpg" alt="The agent's steps and an approval request before it deletes a folder" height="420">
+  <img src="docs/screenshots/model-picker.jpg" alt="The model picker with thinking level and fast mode" height="420">
+  <img src="docs/screenshots/foldable.jpg" alt="The chat list and a chart reply side by side on a foldable's inner screen" height="420">
+</p>
+
 ## Get started
 
-You'll need Android 12 or later, your own Hermes API server, and Tailscale connecting the phone and server.
+You'll need Android 12 or later on a 64-bit ARM phone, your own Hermes API server, and Tailscale connecting the phone and server. Download the APK from the [latest release](https://github.com/MajesteitBart/dudan/releases/latest), or build it yourself.
 
 - [Connect Hermes and set up your phone](docs/setup.md)
 - [Build the APK and develop locally](docs/development.md)

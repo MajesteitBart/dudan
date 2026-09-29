@@ -10,6 +10,8 @@
 // API key for both: dev-key-dudan-0000000000 (or set MOCK_KEY).
 // With Rich replies on, questions with "vergelijk", "formulier", "grafiek" or "stappen" get OpenUI
 // replies (see openui-demo.mjs), and turns with attached files get a reply that names them.
+// MOCK_LANG=en switches the seeded chats and scripted replies from Dutch to English, as used for
+// the README screenshots.
 // From the Android emulator the host is http://10.0.2.2:<port>.
 
 import http from "node:http";
@@ -23,28 +25,72 @@ import { fileReply, openUiReply } from "./openui-demo.mjs";
 const PORT = Number(process.argv[2] ?? 8642);
 const UPLOAD_PORT = Number(process.argv[3] ?? 8645);
 const KEY = process.env.MOCK_KEY ?? "dev-key-dudan-0000000000";
+const LANG = process.env.MOCK_LANG === "en" ? "en" : "nl";
+
+// What the scripted agent says around its tool calls.
+const TURN_TEXT = {
+  nl: {
+    thinking: "De gebruiker wil een antwoord. Ik zoek eerst even op.",
+    interim: "Ik heb resultaten gevonden, nu lees ik je notities.",
+    denied: "Oké, ik heb niets verwijderd.",
+    image: "Ik zie een afbeelding. ",
+    cleanupThinking: "Eerst kijken wat er in de exportmap staat voordat ik iets weghaal.",
+    cleanupInterim: "Alles in die map is ouder dan zes maanden. Ik verwijder de hele map.",
+    cleanedUp: "Klaar. Ik heb `~/tmp/old-exports` verwijderd; dat maakt 2,1 GB vrij.",
+  },
+  en: {
+    thinking: "The user wants an answer. I'll look it up first.",
+    interim: "Found a few results. Now I'll read your notes.",
+    denied: "OK, I didn't delete anything.",
+    image: "I can see an image. ",
+    cleanupThinking: "Let me check what's in the exports folder before I remove anything.",
+    cleanupInterim: "Everything in there is more than six months old. I'll remove the whole folder.",
+    cleanedUp: "Done. I removed `~/tmp/old-exports` and freed 2.1 GB.",
+  },
+}[LANG];
 
 const sessions = new Map(); // id -> { meta, messages }
 const runs = new Map(); // id -> { status, output, error, events: [], listeners: Set, approval, stop }
 const now = () => Date.now() / 1000;
 
+const SEED_TEXT = {
+  nl: {
+    holidayTitle: "Herfstvakantie regio Midden",
+    holidayQuestion: "Wanneer is de herfstvakantie 2026 in regio Midden?",
+    holidayQuery: "herfstvakantie 2026 regio midden",
+    holidayResult: "rijksoverheid.nl: regio Midden 17 t/m 25 oktober 2026",
+    holidayAnswer: "De herfstvakantie voor **regio Midden** loopt van **zaterdag 17 oktober** tot en met **zondag 25 oktober 2026**.\n\nZal ik hem in je agenda zetten?",
+    codeTitle: "Drizzle schema voor doos",
+    codeQuestion: "Schrijf een Drizzle schema voor accounts en threads",
+  },
+  en: {
+    holidayTitle: "Autumn school break",
+    holidayQuestion: "When is the autumn school break this year?",
+    holidayQuery: "autumn school break 2026",
+    holidayResult: "rijksoverheid.nl: region Central, 17 to 25 October 2026",
+    holidayAnswer: "The autumn break for **region Central** runs from **Saturday 17 October** to **Sunday 25 October 2026**.\n\nShall I put it in your calendar?",
+    codeTitle: "Drizzle schema for the inbox",
+    codeQuestion: "Write a Drizzle schema for accounts and threads",
+  },
+}[LANG];
+
 function seed() {
   const id = "dudan_seed_herfst";
   const t = now() - 3600;
   sessions.set(id, {
-    meta: { id, source: "api_server", title: "Herfstvakantie regio Midden", started_at: t, last_active: t + 60, pinned: true, message_count: 4 },
+    meta: { id, source: "api_server", title: SEED_TEXT.holidayTitle, started_at: t, last_active: t + 60, pinned: true, message_count: 4 },
     messages: [
-      { id: 1, role: "user", content: "Wanneer is de herfstvakantie 2026 in regio Midden?", timestamp: t },
-      { id: 2, role: "assistant", content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "web_search", arguments: JSON.stringify({ query: "herfstvakantie 2026 regio midden" }) } }], timestamp: t + 5 },
-      { id: 3, role: "tool", tool_call_id: "c1", content: "rijksoverheid.nl: regio Midden 17 t/m 25 oktober 2026", timestamp: t + 9 },
-      { id: 4, role: "assistant", content: "De herfstvakantie voor **regio Midden** loopt van **zaterdag 17 oktober** tot en met **zondag 25 oktober 2026**.\n\nZal ik hem in je agenda zetten?", timestamp: t + 14 },
+      { id: 1, role: "user", content: SEED_TEXT.holidayQuestion, timestamp: t },
+      { id: 2, role: "assistant", content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "web_search", arguments: JSON.stringify({ query: SEED_TEXT.holidayQuery }) } }], timestamp: t + 5 },
+      { id: 3, role: "tool", tool_call_id: "c1", content: SEED_TEXT.holidayResult, timestamp: t + 9 },
+      { id: 4, role: "assistant", content: SEED_TEXT.holidayAnswer, timestamp: t + 14 },
     ],
   });
   const id2 = "dudan_seed_code";
   sessions.set(id2, {
-    meta: { id: id2, source: "api_server", title: "Drizzle schema voor doos", started_at: t - 86400, last_active: t - 86000, pinned: false, message_count: 2 },
+    meta: { id: id2, source: "api_server", title: SEED_TEXT.codeTitle, started_at: t - 86400, last_active: t - 86000, pinned: false, message_count: 2 },
     messages: [
-      { id: 5, role: "user", content: "Schrijf een Drizzle schema voor accounts en threads", timestamp: t - 86400 },
+      { id: 5, role: "user", content: SEED_TEXT.codeQuestion, timestamp: t - 86400 },
       { id: 6, role: "assistant", content: "```typescript\nimport { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';\n\nexport const accounts = sqliteTable('accounts', {\n  id: text('id').primaryKey(),\n  email: text('email').notNull(),\n});\n```", timestamp: t - 86380 },
     ],
   });
@@ -52,7 +98,7 @@ function seed() {
 seed();
 
 // Questions containing "english" get a short English answer, for testing the English voice.
-const answer = (question) => /english/i.test(question)
+const answer = (question) => LANG === "en" || /english/i.test(question)
   ? "Sure. This quarter has three priorities: ship the assistant, close two new clients, and take a proper week off."
   : `Goede vraag. Dit is een **testantwoord** van de mock-server op: _${question.slice(0, 80)}_
 
@@ -110,21 +156,31 @@ async function agentTurn(session, input, emit, control, instructions) {
   const hasImage = Array.isArray(input) && input.some((p) => p.type === "image_url");
   const t0 = now();
   session.messages.push({ id: session.messages.length + 100, role: "user", content: input, timestamp: t0 });
-  emit("reasoning.available", { text: "De gebruiker wil een antwoord. Ik zoek eerst even op." });
+  // A request to delete something looks around the folder first, then asks for approval.
+  const cleanup = /verwijder|delete|\brm\s/i.test(question);
+  emit("reasoning.available", { text: cleanup ? TURN_TEXT.cleanupThinking : TURN_TEXT.thinking });
   await sleep(500);
   if (control.stopped) return { status: "cancelled" };
 
-  emit("tool.started", { tool: "web_search", preview: `web_search: "${question.slice(0, 40)}"` });
-  await sleep(1200);
-  emit("tool.completed", { tool: "web_search", duration: 1.2, error: false, preview: "3 results" });
-  if (control.stopped) return { status: "cancelled" };
+  if (cleanup) {
+    emit("tool.started", { tool: "terminal", preview: "du -sh ~/tmp/old-exports" });
+    await sleep(900);
+    emit("tool.completed", { tool: "terminal", duration: 0.9, error: false, preview: "2.1G" });
+    if (control.stopped) return { status: "cancelled" };
+    emit("message.interim", { text: TURN_TEXT.cleanupInterim, already_streamed: false });
+  } else {
+    emit("tool.started", { tool: "web_search", preview: `web_search: "${question.slice(0, 40)}"` });
+    await sleep(1200);
+    emit("tool.completed", { tool: "web_search", duration: 1.2, error: false, preview: "3 results" });
+    if (control.stopped) return { status: "cancelled" };
 
-  emit("message.interim", { text: "Ik heb resultaten gevonden, nu lees ik je notities.", already_streamed: false });
-  emit("tool.started", { tool: "read_file", preview: "notes.md" });
-  await sleep(700);
-  emit("tool.completed", { tool: "read_file", duration: 0.7, error: false, preview: "42 lines" });
+    emit("message.interim", { text: TURN_TEXT.interim, already_streamed: false });
+    emit("tool.started", { tool: "read_file", preview: "notes.md" });
+    await sleep(700);
+    emit("tool.completed", { tool: "read_file", duration: 0.7, error: false, preview: "42 lines" });
+  }
 
-  if (/verwijder|delete|rm /i.test(question)) {
+  if (cleanup) {
     const approval = { command: "rm -rf ~/tmp/old-exports", description: "Dangerous command: recursive delete", choices: ["once", "session", "always", "deny"] };
     control.approval = approval;
     emit("approval.request", approval);
@@ -132,7 +188,7 @@ async function agentTurn(session, input, emit, control, instructions) {
     emit("approval.responded", { choice: control.decision });
     control.approval = null;
     if (control.decision === "deny") {
-      const out = "Oké, ik heb niets verwijderd.";
+      const out = TURN_TEXT.denied;
       for (const ch of out.match(/.{1,6}/g)) { emit("message.delta", { delta: ch }); await sleep(30); }
       finish(session, out, t0);
       return { status: "completed", output: out };
@@ -142,7 +198,8 @@ async function agentTurn(session, input, emit, control, instructions) {
     emit("tool.completed", { tool: "terminal", duration: 0.6, error: false, preview: "exit 0" });
   }
 
-  const out = (hasImage ? "Ik zie een afbeelding. " : "") + (fileReply(question) ?? openUiReply(question, instructions) ?? answer(question));
+  const out = (hasImage ? TURN_TEXT.image : "") +
+    (fileReply(question, LANG) ?? openUiReply(question, instructions, LANG) ?? (cleanup ? TURN_TEXT.cleanedUp : answer(question)));
   for (const piece of out.match(/[\s\S]{1,8}/g)) {
     if (control.stopped) return { status: "cancelled", output: "" };
     emit("message.delta", { delta: piece });
