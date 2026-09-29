@@ -1,0 +1,72 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>dudan app icon</title>
+  <defs>
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="0" y1="200" x2="0" y2="446">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.6" stop-color="#f3f3fb"/>
+      <stop offset="1" stop-color="#d6d6f2"/>
+    </linearGradient>
+    <radialGradient id="hole" gradientUnits="userSpaceOnUse" cx="419" cy="360" r="46.5">
+      <stop offset="0.6" stop-color="#1a2a9a"/>
+      <stop offset="1" stop-color="#0c1a66"/>
+    </radialGradient>
+    <linearGradient id="orb" gradientUnits="userSpaceOnUse" x1="395" y1="385" x2="455" y2="340">
+      <stop offset="0" stop-color="#1f86ff"/>
+      <stop offset="0.45" stop-color="#4a55fb"/>
+      <stop offset="1" stop-color="#a24cff"/>
+    </linearGradient>
+    <radialGradient id="orbHi" gradientUnits="userSpaceOnUse" cx="432" cy="340" r="30">
+      <stop offset="0" stop-color="#e3c6ff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#e3c6ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="floor" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#2f63ff" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#1a3fd6" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#0b1a66" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#081334"/>
+      <stop offset="0.6" stop-color="#040a1c"/>
+      <stop offset="1" stop-color="#01030a"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#0b1330"/>
+      <stop offset="1" stop-color="#050918"/>
+    </linearGradient>
+    <linearGradient id="rim" x1="0" y1="1" x2="1" y2="0">
+      <stop offset="0" stop-color="#3a6cff"/>
+      <stop offset="0.5" stop-color="#5a74ff"/>
+      <stop offset="1" stop-color="#9a5cff"/>
+    </linearGradient>
+    <radialGradient id="tileGlow" cx="50%" cy="55%" r="55%">
+      <stop offset="0" stop-color="#2a4cff" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#2a4cff" stop-opacity="0"/>
+    </radialGradient>
+    <clipPath id="tileClip"><rect x="32" y="32" width="448" height="448" rx="104"/></clipPath>
+  </defs>
+  <rect x="32" y="32" width="448" height="448" rx="104" fill="#3d5cff" opacity="0.45" filter="url(#glow)"/>
+  <rect x="32" y="32" width="448" height="448" rx="104" fill="url(#tile)"/>
+  <g clip-path="url(#tileClip)">
+    <rect x="32" y="32" width="448" height="448" fill="url(#tileGlow)"/>
+    <g transform="translate(256 262) scale(1.05) translate(-419 -324)">
+      <g opacity="0.55" filter="url(#glow)">
+      <g><circle cx="419" cy="360" r="66" fill="none" stroke="#3d62ff" stroke-width="40"/>
+      <path d="M466 360 V236 Q466 230 471 227 L506 203 V360 Z" fill="#3d62ff"/></g>
+    </g>
+    <g>
+      <circle cx="419" cy="360" r="66" fill="none" stroke="url(#ink)" stroke-width="40"/>
+      <path d="M466 360 V236 Q466 230 471 227 L506 203 V360 Z" fill="url(#ink)"/>
+      <circle cx="419" cy="360" r="46.5" fill="url(#hole)"/>
+      <circle cx="424" cy="362" r="31" fill="url(#orb)"/>
+      <circle cx="424" cy="362" r="31" fill="url(#orbHi)"/>
+    </g>
+    </g>
+  </g>
+  <rect x="33.5" y="33.5" width="445" height="445" rx="102.5" fill="none" stroke="url(#rim)" stroke-width="3"/>
+</svg>

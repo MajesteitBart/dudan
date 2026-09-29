@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "aight"
+rootProject.name = "dudan"
 include(":app")

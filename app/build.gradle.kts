@@ -40,10 +40,11 @@ val fetchSherpa by tasks.registering {
 tasks.named("preBuild") { dependsOn(fetchSherpa) }
 
 android {
-    namespace = "nl.bartvandermeeren.aight"
+    namespace = "nl.bartvandermeeren.dudan"
     compileSdk = 36
 
     defaultConfig {
+        // Keep the installed identity so updates retain app data and permissions.
         applicationId = "nl.bartvandermeeren.aight"
         minSdk = 31
         targetSdk = 36

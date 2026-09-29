@@ -107,7 +107,7 @@
 
     <!-- Voice -->
     <string name="speech_unavailable">Dit toestel heeft geen spraakherkenning.</string>
-    <string name="mic_permission_needed">aight heeft de microfoon nodig voor spraakinvoer.</string>
+    <string name="mic_permission_needed">dudan heeft de microfoon nodig voor spraakinvoer.</string>
     <string name="live_listening">Luisteren</string>
     <string name="live_thinking">Aan het nadenken</string>
     <string name="live_speaking">%1$s praat. Tik om te onderbreken.</string>
@@ -122,11 +122,11 @@
     <string name="screen_attached">Scherm toegevoegd</string>
     <string name="open_full_chat">Volledig gesprek openen</string>
     <string name="notification_channel_replies">Antwoorden</string>
-    <string name="assist_not_configured">aight is nog niet verbonden met Hermes. Tik om het in te stellen.</string>
+    <string name="assist_not_configured">dudan is nog niet verbonden met Hermes. Tik om het in te stellen.</string>
 
     <!-- Settings -->
     <string name="setup_title">Verbinden met Hermes</string>
-    <string name="setup_intro">Laat aight naar je Hermes Agent API-server wijzen. Via Tailscale gebruik je de MagicDNS-naam, bijvoorbeeld http://clarkbox:8642.</string>
+    <string name="setup_intro">Laat dudan naar je Hermes Agent API-server wijzen. Via Tailscale gebruik je de MagicDNS-naam, bijvoorbeeld http://clarkbox:8642.</string>
     <string name="section_connection">Verbinding</string>
     <string name="section_assistant">Assistent</string>
     <string name="section_history">Geschiedenis</string>
@@ -171,9 +171,9 @@
     <string name="connection_ok">Verbonden met %1$s</string>
     <string name="connection_failed">Verbinding mislukt: %1$s</string>
     <string name="insecure_url_warning">Dit http://-adres valt buiten je tailnet. Je API-sleutel gaat dan onversleuteld over het netwerk. Gebruik een Tailscale-adres of https.</string>
-    <string name="default_assistant_on">aight is je standaardassistent</string>
-    <string name="default_assistant_off">aight is nog niet je standaardassistent</string>
-    <string name="default_assistant_detail">Kies aight bij Standaardapps, App voor digitale assistent. Zet op een Samsung ook Zijtoets, Ingedrukt houden, op Digitale assistent.</string>
+    <string name="default_assistant_on">dudan is je standaardassistent</string>
+    <string name="default_assistant_off">dudan is nog niet je standaardassistent</string>
+    <string name="default_assistant_detail">Kies dudan bij Standaardapps, App voor digitale assistent. Zet op een Samsung ook Zijtoets, Ingedrukt houden, op Digitale assistent.</string>
     <string name="open_assistant_settings">Assistentinstellingen openen</string>
     <string name="listen_on_invoke">Direct luisteren</string>
     <string name="listen_on_invoke_detail">Begin met luisteren zodra je de assistent opent met de zijtoets of een gebaar</string>
@@ -210,7 +210,7 @@
     <string name="phone_control_no_tailscale">Tailscale is niet verbonden op deze telefoon, dus Hermes kan hem niet bereiken.</string>
     <string name="phone_control_starting">Telefoonbediening starten…</string>
     <string name="phone_control_failed">Telefoonbediening is niet gestart: %1$s</string>
-    <string name="phone_control_background">Hermes kan alleen apps openen als aight in beeld is. Maak aight hierboven je standaardassistent, of sta Weergeven boven andere apps toe. Tot die tijd toont de telefoon een melding om op te tikken.</string>
+    <string name="phone_control_background">Hermes kan alleen apps openen als dudan in beeld is. Maak dudan hierboven je standaardassistent, of sta Weergeven boven andere apps toe. Tot die tijd toont de telefoon een melding om op te tikken.</string>
     <string name="phone_control_background_allow">Weergeven boven andere apps toestaan</string>
     <string name="phone_control_copy">Hermes-instellingen kopiëren</string>
     <string name="phone_control_copied">Gekopieerd. Plak het op de Hermes-server; bij elk deel staat waar het hoort.</string>
@@ -233,14 +233,14 @@
     <string name="upload_failed">%1$s kon niet worden geüpload: %2$s</string>
     <string name="upload_rejected_key">De uploadservice weigert de API-sleutel.</string>
     <string name="upload_unreachable">De uploadservice op de Hermes-server is niet bereikbaar. Zie Instellingen, Antwoorden en bestanden.</string>
-    <string name="upload_not_service">Dit adres antwoordt, maar niet als de aight-uploadservice. Controleer de upload-URL.</string>
+    <string name="upload_not_service">Dit adres antwoordt, maar niet als de dudan-uploadservice. Controleer de upload-URL.</string>
 
     <!-- Replies and files settings -->
     <string name="section_replies_files">Antwoorden en bestanden</string>
     <string name="rich_replies">Rijke antwoorden</string>
     <string name="rich_replies_detail">Tabellen, grafieken, stappen, formulieren en vervolgvragen in antwoorden, getekend met OpenUI</string>
     <string name="upload_server">Uploadserver</string>
-    <string name="upload_server_detail">Bestanden tot 250 MB gaan naar de uploadservice van aight op de Hermes-server, en de agent leest ze daar. Laat dit leeg voor poort 8645 als Hermes HTTP gebruikt. Gebruikt Hermes HTTPS, vul dan het adres van de uploadservice in.</string>
+    <string name="upload_server_detail">Bestanden tot 250 MB gaan naar de uploadservice van dudan op de Hermes-server, en de agent leest ze daar. Laat dit leeg voor poort 8645 als Hermes HTTP gebruikt. Gebruikt Hermes HTTPS, vul dan het adres van de uploadservice in.</string>
     <string name="upload_check">Uploadservice controleren</string>
     <string name="upload_checking">Controleren…</string>
     <string name="upload_ok">De uploadservice werkt.</string>

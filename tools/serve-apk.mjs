@@ -17,7 +17,7 @@ http.createServer((req, res) => {
       .map((f) => `<li><a href="/${encodeURIComponent(f)}">${f}</a> (${(statSync(join(dir, f)).size / 1e6).toFixed(1)} MB)</li>`)
       .join("");
     res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
-    res.end(`<!doctype html><meta name=viewport content="width=device-width"><body style="font-family:sans-serif;background:#000;color:#eee;padding:24px"><h2>aight</h2><ul>${links}</ul></body>`);
+    res.end(`<!doctype html><meta name=viewport content="width=device-width"><body style="font-family:sans-serif;background:#000;color:#eee;padding:24px"><h2>dudan</h2><ul>${links}</ul></body>`);
     return;
   }
   if (!apks().includes(name)) {

@@ -1,0 +1,119 @@
+package nl.bartvandermeeren.dudan.ui.components
+
+import android.content.Context
+import android.graphics.Bitmap
+import android.graphics.ImageDecoder
+import android.net.Uri
+import android.util.Base64
+import android.util.LruCache
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.State
+import androidx.compose.runtime.produceState
+import androidx.compose.ui.graphics.ImageBitmap
+import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
+import java.io.ByteArrayOutputStream
+import java.io.IOException
+import java.nio.ByteBuffer
+import java.util.concurrent.TimeUnit
+import kotlin.math.max
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import nl.bartvandermeeren.dudan.chat.PreparedImage
+import okhttp3.OkHttpClient
+import okhttp3.Request
+
+private val thumbnailCache = object : LruCache<String, ImageBitmap>(24 * 1024 * 1024) {
+    override fun sizeOf(key: String, value: ImageBitmap) = value.width * value.height * 4
+}
+
+internal fun thumbnailKey(source: String, maxDimension: Int) = "$maxDimension:$source"
+
+/** Loads a data: URL, content:// URI or http(s) URL as a downsampled bitmap, off the main thread. */
+@Composable
+fun rememberImageBitmap(source: String, maxDimension: Int = 1024): State<ImageBitmap?> {
+    val context = LocalContext.current
+    val key = thumbnailKey(source, maxDimension)
+    return produceState(initialValue = thumbnailCache.get(key), key) {
+        if (value != null) return@produceState
+        value = withContext(Dispatchers.IO) { ImageCodec.decodeThumbnailCached(context, source, maxDimension) }
+    }
+}
+
+object ImageCodec {
+    private const val MAX_UPLOAD_DIMENSION = 1600
+
+    /** Images in agent replies come from the web; anything bigger than this isn't worth a phone's data. */
+    private const val MAX_REMOTE_BYTES = 12L * 1024 * 1024
+
+    private val remote by lazy {
+        OkHttpClient.Builder()
+            .connectTimeout(15, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
+            .build()
+    }
+
+    /** Shared by chat images and OpenUI, so a disposed chat row can reuse its decoded thumbnail. */
+    fun decodeThumbnailCached(context: Context, source: String, maxDimension: Int): ImageBitmap? {
+        val key = thumbnailKey(source, maxDimension)
+        thumbnailCache.get(key)?.let { return it }
+        return runCatching { decodeThumbnail(context, source, maxDimension) }.getOrNull()?.asImageBitmap()
+            ?.also { thumbnailCache.put(key, it) }
+    }
+
+    fun decodeThumbnail(context: Context, source: String, maxDimension: Int): Bitmap? {
+        if (source.startsWith("data:")) return decodeBytes(Base64.decode(source.substringAfter(","), Base64.DEFAULT), maxDimension)
+        if (source.startsWith("https://") || source.startsWith("http://")) return decodeBytes(download(source), maxDimension)
+        return decodeUri(context, Uri.parse(source), maxDimension)
+    }
+
+    private fun decodeBytes(bytes: ByteArray, maxDimension: Int): Bitmap =
+        decodeScaled(ImageDecoder.createSource(ByteBuffer.wrap(bytes)), maxDimension)
+
+    private fun download(url: String): ByteArray =
+        remote.newCall(Request.Builder().url(url).header("Accept", "image/*").build()).execute().use { response ->
+            if (!response.isSuccessful) throw IOException("HTTP ${response.code}")
+            val body = response.body ?: throw IOException("Empty response")
+            if (body.contentLength() > MAX_REMOTE_BYTES) throw IOException("Image too large")
+            val source = body.source()
+            // Content-Length can be missing, so cap what is actually read as well.
+            if (source.request(MAX_REMOTE_BYTES + 1)) throw IOException("Image too large")
+            source.buffer.readByteArray()
+        }
+
+    fun decodeUri(context: Context, uri: Uri, maxDimension: Int): Bitmap =
+        decodeScaled(ImageDecoder.createSource(context.contentResolver, uri), maxDimension)
+
+    /** Decodes straight to [targetSize], so the bitmap never exceeds [maxDimension], which callers budget for. */
+    private fun decodeScaled(source: ImageDecoder.Source, maxDimension: Int): Bitmap =
+        ImageDecoder.decodeBitmap(source) { decoder, info, _ ->
+            targetSize(info.size.width, info.size.height, maxDimension)?.let { (width, height) -> decoder.setTargetSize(width, height) }
+            decoder.allocator = ImageDecoder.ALLOCATOR_SOFTWARE
+        }
+
+    /** The size to decode a [width] × [height] image at so its longest side is [maxDimension]; null when it already fits. */
+    internal fun targetSize(width: Int, height: Int, maxDimension: Int): Pair<Int, Int>? {
+        val longest = max(width, height)
+        if (longest <= maxDimension) return null
+        val scale = maxDimension.toFloat() / longest
+        return (width * scale).toInt().coerceIn(1, maxDimension) to (height * scale).toInt().coerceIn(1, maxDimension)
+    }
+
+    suspend fun prepare(context: Context, uri: Uri): PreparedImage = withContext(Dispatchers.IO) {
+        prepare(decodeUri(context, uri, MAX_UPLOAD_DIMENSION))
+    }
+
+    /** JPEG-encodes a bitmap for upload, capped at 1600 px so a turn stays well under Hermes' 10 MB limit. */
+    fun prepare(bitmap: Bitmap): PreparedImage {
+        val longest = max(bitmap.width, bitmap.height)
+        val scaled = if (longest > MAX_UPLOAD_DIMENSION) {
+            val scale = MAX_UPLOAD_DIMENSION.toFloat() / longest
+            Bitmap.createScaledBitmap(bitmap, (bitmap.width * scale).toInt(), (bitmap.height * scale).toInt(), true)
+        } else bitmap
+        val bytes = ByteArrayOutputStream().use { out ->
+            scaled.compress(Bitmap.CompressFormat.JPEG, 85, out)
+            out.toByteArray()
+        }
+        return PreparedImage(bytes, "data:image/jpeg;base64," + Base64.encodeToString(bytes, Base64.NO_WRAP))
+    }
+}

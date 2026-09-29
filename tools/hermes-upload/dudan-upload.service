@@ -1,0 +1,40 @@
+# systemd user unit for dudan_upload.py. Setup steps are in README.md next to this file:
+#   mkdir -p -m 700 ~/.hermes/uploads
+#   cp dudan-upload.service ~/.config/systemd/user/
+#   systemctl --user daemon-reload && systemctl --user enable --now dudan-upload
+
+[Unit]
+Description=dudan file uploads for Hermes Agent
+# Keep retrying at boot until the Tailscale address exists; never give up.
+StartLimitIntervalSec=0
+
+[Service]
+Type=simple
+# API_SERVER_KEY comes from Hermes' env file. DUDAN_UPLOAD_* settings can go in a drop-in (see README).
+EnvironmentFile=-%h/.hermes/.env
+ExecStart=/usr/bin/python3 %h/.hermes/dudan_upload.py
+Restart=on-failure
+RestartSec=5
+# Exit status 2 is a configuration problem (no key, bad setting); retrying won't fix it.
+RestartPreventExitStatus=2
+UMask=0077
+
+# Hardening that works in any user unit.
+NoNewPrivileges=yes
+LockPersonality=yes
+RestrictRealtime=yes
+RestrictNamespaces=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+SystemCallArchitectures=native
+
+# Hardening that needs unprivileged user namespaces. The service can read your home directory but
+# only write to ~/.hermes/uploads, which must exist before the service starts. If you point
+# DUDAN_UPLOAD_DIR elsewhere, change ReadWritePaths to match. If the service fails with
+# status=226/NAMESPACE, the kernel doesn't allow these; comment them out.
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=%h/.hermes/uploads
+PrivateTmp=yes
+
+[Install]
+WantedBy=default.target

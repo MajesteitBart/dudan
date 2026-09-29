@@ -2,6 +2,6 @@
 <voice-interaction-service xmlns:android="http://schemas.android.com/apk/res/android"
     android:recognitionService="nl.bartvandermeeren.aight.assist.AightRecognitionService"
     android:sessionService="nl.bartvandermeeren.aight.assist.AightSessionService"
-    android:settingsActivity="nl.bartvandermeeren.aight.MainActivity"
+    android:settingsActivity="nl.bartvandermeeren.dudan.MainActivity"
     android:supportsAssist="true"
     android:supportsLocalInteraction="true" />

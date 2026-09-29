@@ -12,7 +12,7 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
-    <!-- "Display over other apps" lets Hermes open apps while no aight window is on screen. -->
+    <!-- "Display over other apps" lets Hermes open apps while no dudan window is on screen. -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <queries>
@@ -30,7 +30,7 @@
     </queries>
 
     <application
-        android:name=".AightApp"
+        android:name=".DudanApp"
         android:allowBackup="false"
         android:enableOnBackInvokedCallback="true"
         android:icon="@mipmap/ic_launcher"
@@ -38,7 +38,7 @@
         android:networkSecurityConfig="@xml/network_security_config"
         android:roundIcon="@mipmap/ic_launcher"
         android:supportsRtl="true"
-        android:theme="@style/Theme.Aight">
+        android:theme="@style/Theme.Dudan">
 
         <activity
             android:name=".MainActivity"
@@ -63,7 +63,7 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <data android:mimeType="text/plain" />
             </intent-filter>
-            <!-- Photos, videos, PDFs, documents: anything can be shared to aight and sent to Hermes. -->
+            <!-- Photos, videos, PDFs, documents: anything can be shared to dudan and sent to Hermes. -->
             <intent-filter>
                 <action android:name="android.intent.action.SEND" />
                 <category android:name="android.intent.category.DEFAULT" />
@@ -76,6 +76,12 @@
             </intent-filter>
         </activity>
 
+        <!-- Resolve activity intents and shortcuts saved before the rename. -->
+        <activity-alias
+            android:name="nl.bartvandermeeren.aight.MainActivity"
+            android:targetActivity=".MainActivity"
+            android:exported="true" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.files"
@@ -86,10 +92,10 @@
                 android:resource="@xml/file_paths" />
         </provider>
 
-        <!-- Digital assistant integration: these three services make aight selectable under
+        <!-- Digital assistant integration: these three services make dudan selectable under
              Settings > Apps > Default apps > Digital assistant app. -->
         <service
-            android:name=".assist.AightVoiceInteractionService"
+            android:name="nl.bartvandermeeren.aight.assist.AightVoiceInteractionService"
             android:exported="true"
             android:label="@string/app_name"
             android:permission="android.permission.BIND_VOICE_INTERACTION">
@@ -102,12 +108,12 @@
         </service>
 
         <service
-            android:name=".assist.AightSessionService"
+            android:name="nl.bartvandermeeren.aight.assist.AightSessionService"
             android:exported="true"
             android:permission="android.permission.BIND_VOICE_INTERACTION" />
 
         <service
-            android:name=".assist.AightRecognitionService"
+            android:name="nl.bartvandermeeren.aight.assist.AightRecognitionService"
             android:exported="true"
             android:label="@string/app_name">
             <intent-filter>

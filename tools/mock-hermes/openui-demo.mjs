@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 
-// Scripted OpenUI replies for the mock server. They only come back when the app sent aight's
+// Scripted OpenUI replies for the mock server. They only come back when the app sent dudan's
 // OpenUI instructions (Settings > Replies and files > Rich replies), as a real agent would behave.
 //   "compare" / "vergelijk"  -> table, bar chart, callout, follow-ups
 //   "form" / "formulier"     -> a booking form with validation; submitting it gets a plain answer
@@ -64,16 +64,16 @@ const steps = `Zo zet je de upload-service op.
 root = Card([header, how, details, facts, tags, pick])
 header = CardHeader("Uploads instellen", "Op de Hermes-server")
 how = Steps([s1, s2, s3])
-s1 = StepsItem("Kopieer het script", "Zet \`aight_upload.py\` in \`~/.hermes/\`.")
-s2 = StepsItem("Start de service", "\`systemctl --user enable --now aight-upload\`")
-s3 = StepsItem("Controleer", "Tik in aight op **Uploadservice controleren**.")
-details = Accordion([AccordionItem("why", "Waarom een aparte service?", [TextContent("Hermes neemt alleen afbeeldingen aan en maximaal 10 MB per verzoek.")]), AccordionItem("where", "Waar komen de bestanden?", [CodeBlock("text", "~/.hermes/uploads/aight/")])])
+s1 = StepsItem("Kopieer het script", "Zet \`dudan_upload.py\` in \`~/.hermes/\`.")
+s2 = StepsItem("Start de service", "\`systemctl --user enable --now dudan-upload\`")
+s3 = StepsItem("Controleer", "Tik in dudan op **Uploadservice controleren**.")
+details = Accordion([AccordionItem("why", "Waarom een aparte service?", [TextContent("Hermes neemt alleen afbeeldingen aan en maximaal 10 MB per verzoek.")]), AccordionItem("where", "Waar komen de bestanden?", [CodeBlock("text", "~/.hermes/uploads/dudan/")])])
 facts = EntityList([{left: "Poort", right: "8645"}, {left: "Maximaal", right: "250 MB"}, {left: "Bewaard", right: "30 dagen"}], "default", {left: "Instelling", right: "Waarde"})
 tags = TagBlock(["python3", "systemd", "tailscale"])
 pick = ListBlock([ListItem("Stap 1 uitleggen", "Wat doet het script precies?", null, "Vraag", {type: "continue_conversation", context: "Leg stap 1 uit"}), ListItem("Ik gebruik Docker", null, null, null, {type: "continue_conversation"})])
 \`\`\``;
 
-// Replies a model wrote from aight's OpenUI instructions (samples/), for checking real-world output:
+// Replies a model wrote from dudan's OpenUI instructions (samples/), for checking real-world output:
 //   "supermarkt" -> table and stacked bar, "backup" -> markdown steps and a radio form,
 //   "energieverbruik" -> donut chart and entity list, "offerte" -> the real Hermes reply to an
 //   attached PDF quote (table and entity list)

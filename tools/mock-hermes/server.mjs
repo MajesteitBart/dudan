@@ -4,10 +4,10 @@
 //
 // Usage: node tools/mock-hermes/server.mjs [port] [upload-port]
 //   port         the Hermes API (default 8642)
-//   upload-port  the file upload service, same protocol as tools/hermes-upload/aight_upload.py
-//                (default 8645). Files go to <OS temp dir>/aight-mock-uploads; upload state lives
+//   upload-port  the file upload service, same protocol as tools/hermes-upload/dudan_upload.py
+//                (default 8645). Files go to <OS temp dir>/dudan-mock-uploads; upload state lives
 //                in memory and is gone after a restart.
-// API key for both: dev-key-aight-0000000000 (or set MOCK_KEY).
+// API key for both: dev-key-dudan-0000000000 (or set MOCK_KEY).
 // With Rich replies on, questions with "vergelijk", "formulier", "grafiek" or "stappen" get OpenUI
 // replies (see openui-demo.mjs), and turns with attached files get a reply that names them.
 // From the Android emulator the host is http://10.0.2.2:<port>.
@@ -22,14 +22,14 @@ import { fileReply, openUiReply } from "./openui-demo.mjs";
 
 const PORT = Number(process.argv[2] ?? 8642);
 const UPLOAD_PORT = Number(process.argv[3] ?? 8645);
-const KEY = process.env.MOCK_KEY ?? "dev-key-aight-0000000000";
+const KEY = process.env.MOCK_KEY ?? "dev-key-dudan-0000000000";
 
 const sessions = new Map(); // id -> { meta, messages }
 const runs = new Map(); // id -> { status, output, error, events: [], listeners: Set, approval, stop }
 const now = () => Date.now() / 1000;
 
 function seed() {
-  const id = "aight_seed_herfst";
+  const id = "dudan_seed_herfst";
   const t = now() - 3600;
   sessions.set(id, {
     meta: { id, source: "api_server", title: "Herfstvakantie regio Midden", started_at: t, last_active: t + 60, pinned: true, message_count: 4 },
@@ -40,7 +40,7 @@ function seed() {
       { id: 4, role: "assistant", content: "De herfstvakantie voor **regio Midden** loopt van **zaterdag 17 oktober** tot en met **zondag 25 oktober 2026**.\n\nZal ik hem in je agenda zetten?", timestamp: t + 14 },
     ],
   });
-  const id2 = "aight_seed_code";
+  const id2 = "dudan_seed_code";
   sessions.set(id2, {
     meta: { id: id2, source: "api_server", title: "Drizzle schema voor doos", started_at: t - 86400, last_active: t - 86000, pinned: false, message_count: 2 },
     messages: [
@@ -323,10 +323,10 @@ const server = http.createServer(async (req, res) => {
 server.listen(PORT, "0.0.0.0", () => console.log(`mock hermes on http://0.0.0.0:${PORT} key=${KEY}`));
 
 // Upload service ---------------------------------------------------------------------------------
-// Stand-in for tools/hermes-upload/aight_upload.py with the same endpoints, status codes and error
+// Stand-in for tools/hermes-upload/dudan_upload.py with the same endpoints, status codes and error
 // codes. It skips fsync, the free-space check and pruning.
 
-const UPLOAD_DIR = join(tmpdir(), "aight-mock-uploads");
+const UPLOAD_DIR = join(tmpdir(), "dudan-mock-uploads");
 const UPLOAD_MAX_BYTES = 250 * 1024 * 1024;
 const UPLOAD_CHUNK_BYTES = 8 * 1024 * 1024;
 const UPLOAD_MAX_CHUNK = 16 * 1024 * 1024;
@@ -338,7 +338,7 @@ const notAllowed = (res, methods) =>
   uploadError(res, 405, "method_not_allowed", `Use ${methods.join(" or ")} here.`, {}, { Allow: methods.join(", ") });
 const megabytes = (n) => `${+(n / 1048576).toPrecision(4)} MB`;
 
-// Same rules as safe_name() in aight_upload.py.
+// Same rules as safe_name() in dudan_upload.py.
 function safeName(name) {
   let base = name.split(/[\\/]/).pop();
   base = base.replace(/\s+/gu, " ").replace(/[\p{Cc}\p{Cf}\p{Cs}<>:"/\\|?*]/gu, "").replace(/ {2,}/g, " ");

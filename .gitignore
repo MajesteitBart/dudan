@@ -14,3 +14,4 @@ captures/
 /artifacts/
 /app/libs/
 __pycache__/
+/tools/brand-assets/node_modules/

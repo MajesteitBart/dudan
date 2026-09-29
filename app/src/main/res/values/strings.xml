@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name" translatable="false">aight</string>
+    <string name="app_name" translatable="false">dudan</string>
 
     <!-- Chat -->
     <string name="greeting_named">Hello, %1$s</string>
@@ -109,7 +109,7 @@
 
     <!-- Voice -->
     <string name="speech_unavailable">No speech recognition service on this device.</string>
-    <string name="mic_permission_needed">aight needs the microphone for voice input.</string>
+    <string name="mic_permission_needed">dudan needs the microphone for voice input.</string>
     <string name="live_listening">Listening</string>
     <string name="live_thinking">Thinking</string>
     <string name="live_speaking">%1$s is speaking. Tap to interrupt.</string>
@@ -124,11 +124,11 @@
     <string name="screen_attached">Screen added</string>
     <string name="open_full_chat">Open full chat</string>
     <string name="notification_channel_replies">Replies</string>
-    <string name="assist_not_configured">aight isn\'t connected to Hermes yet. Tap to set it up.</string>
+    <string name="assist_not_configured">dudan isn\'t connected to Hermes yet. Tap to set it up.</string>
 
     <!-- Settings -->
     <string name="setup_title">Connect to Hermes</string>
-    <string name="setup_intro">Point aight at your Hermes Agent API server. Over Tailscale, use the MagicDNS name, for example http://clarkbox:8642.</string>
+    <string name="setup_intro">Point dudan at your Hermes Agent API server. Over Tailscale, use the MagicDNS name, for example http://clarkbox:8642.</string>
     <string name="section_connection">Connection</string>
     <string name="section_assistant">Assistant</string>
     <string name="section_history">History</string>
@@ -173,9 +173,9 @@
     <string name="connection_ok">Connected to %1$s</string>
     <string name="connection_failed">Couldn\'t connect: %1$s</string>
     <string name="insecure_url_warning">This http:// address is outside your tailnet, so the API key would travel unencrypted. Use a Tailscale address or https.</string>
-    <string name="default_assistant_on">aight is your default assistant</string>
-    <string name="default_assistant_off">aight isn\'t your default assistant yet</string>
-    <string name="default_assistant_detail">Choose aight under Default apps, Digital assistant app. On Samsung, also set Side button, Press and hold, to Digital assistant.</string>
+    <string name="default_assistant_on">dudan is your default assistant</string>
+    <string name="default_assistant_off">dudan isn\'t your default assistant yet</string>
+    <string name="default_assistant_detail">Choose dudan under Default apps, Digital assistant app. On Samsung, also set Side button, Press and hold, to Digital assistant.</string>
     <string name="open_assistant_settings">Open assistant settings</string>
     <string name="listen_on_invoke">Listen right away</string>
     <string name="listen_on_invoke_detail">Start listening when you open the assistant with the side button or a gesture</string>
@@ -212,7 +212,7 @@
     <string name="phone_control_no_tailscale">Tailscale isn\'t connected on this phone, so Hermes can\'t reach it.</string>
     <string name="phone_control_starting">Starting phone control…</string>
     <string name="phone_control_failed">Phone control didn\'t start: %1$s</string>
-    <string name="phone_control_background">Hermes can only open apps while aight is on screen. Make aight the default assistant above, or allow Display over other apps. Until then, the phone shows a notification to tap.</string>
+    <string name="phone_control_background">Hermes can only open apps while dudan is on screen. Make dudan the default assistant above, or allow Display over other apps. Until then, the phone shows a notification to tap.</string>
     <string name="phone_control_background_allow">Allow Display over other apps</string>
     <string name="phone_control_copy">Copy Hermes setup</string>
     <string name="phone_control_copied">Copied. Paste it on the Hermes host; each part says where it goes.</string>
@@ -235,14 +235,14 @@
     <string name="upload_failed">Couldn\'t upload %1$s: %2$s</string>
     <string name="upload_rejected_key">The upload service rejected the API key.</string>
     <string name="upload_unreachable">Can\'t reach the upload service on the Hermes host. See Settings, Replies and files.</string>
-    <string name="upload_not_service">This address answers, but not as the aight upload service. Check the upload URL.</string>
+    <string name="upload_not_service">This address answers, but not as the dudan upload service. Check the upload URL.</string>
 
     <!-- Replies and files settings -->
     <string name="section_replies_files">Replies and files</string>
     <string name="rich_replies">Rich replies</string>
     <string name="rich_replies_detail">Tables, charts, steps, forms and suggested follow-ups in replies, drawn with OpenUI</string>
     <string name="upload_server">Upload server</string>
-    <string name="upload_server_detail">Files up to 250 MB go to aight\'s upload service on the Hermes host, and the agent reads them there. Leave this empty to use port 8645 when Hermes uses HTTP. If Hermes uses HTTPS, enter the upload service address.</string>
+    <string name="upload_server_detail">Files up to 250 MB go to dudan\'s upload service on the Hermes host, and the agent reads them there. Leave this empty to use port 8645 when Hermes uses HTTP. If Hermes uses HTTPS, enter the upload service address.</string>
     <string name="upload_check">Check the upload service</string>
     <string name="upload_checking">Checking…</string>
     <string name="upload_ok">The upload service answers.</string>

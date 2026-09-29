@@ -1,18 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <style name="Theme.Aight" parent="android:Theme.Material.NoActionBar">
-        <item name="android:windowBackground">@color/aight_backdrop</item>
-        <item name="android:colorBackground">@color/aight_backdrop</item>
+    <style name="Theme.Dudan" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/dudan_backdrop</item>
+        <item name="android:colorBackground">@color/dudan_backdrop</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
         <item name="android:windowLightStatusBar">false</item>
-        <item name="android:windowSplashScreenBackground">@color/aight_backdrop</item>
+        <item name="android:windowSplashScreenBackground">@color/dudan_backdrop</item>
         <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
     </style>
 
     <!-- Window theme for the assistant overlay session: fully transparent so the scrim and glow
          are drawn by Compose over whatever app is underneath. -->
-    <style name="Theme.Aight.Assist" parent="android:Theme.Material.NoActionBar">
+    <style name="Theme.Dudan.Assist" parent="android:Theme.Material.NoActionBar">
         <item name="android:windowBackground">@android:color/transparent</item>
         <item name="android:colorBackground">@android:color/transparent</item>
         <item name="android:windowIsTranslucent">true</item>
