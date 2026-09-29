@@ -14,6 +14,17 @@ Requires JDK 17 and the Android SDK (compileSdk 36). The first build downloads t
 
 Release signing reads `signing.properties` and `signing/dudan-release.jks`. Both are git-ignored and only exist on the build machine. Keep a copy of the keystore: Android only accepts updates signed with the same key, so losing it means uninstalling and setting the app up again. Without `signing.properties`, release builds fall back to the debug key.
 
+## Publish a release
+
+Releases live on GitHub with the tag `android-v<version>`, the title `dudan v<version>`, and two files: `dudan-release-arm64-v8a-v<version>-<commit>.apk` and `SHA256SUMS`. Raise `versionName` and `versionCode` in `app/build.gradle.kts`, merge that to `main`, then on the build machine with the keystore:
+
+```
+git switch main && git pull
+node tools/release-apk.mjs
+```
+
+The script refuses to run with uncommitted changes or without `signing.properties`. It runs the unit tests, builds the release APK, checks that it isn't signed with the debug key, and writes the APK, `SHA256SUMS` and `notes.md` to `artifacts/android-v<version>/`. The notes list the package, version code, commit and signing certificate. Fill in what's new, then publish with the `gh release create` command the script prints.
+
 ## Developing without a live agent
 
 `tools/mock-hermes/server.mjs` imitates the Hermes API server (sessions, runs with SSE, approvals, model options, skills and jobs) with scripted replies:
@@ -22,7 +33,7 @@ Release signing reads `signing.properties` and `signing/dudan-release.jks`. Both
 node tools/mock-hermes/server.mjs 8650
 ```
 
-In the emulator, connect to `http://10.0.2.2:8650` with key `dev-key-dudan-0000000000`. Messages containing "verwijder" or "delete" trigger an approval request.
+In the emulator, connect to `http://10.0.2.2:8650` with key `dev-key-dudan-0000000000`. Messages containing "verwijder" or "delete" trigger an approval request. The mock answers in Dutch; start it with `MOCK_LANG=en` for English chats and replies, as in the README screenshots.
 
 The mock also runs the upload service's protocol on port 8645 (a second argument changes it), so attachments work in the emulator and the reply names the files it got. With Rich replies on, messages containing "vergelijk", "formulier", "grafiek" or "stappen" get scripted OpenUI replies, and "supermarkt", "backup" or "energieverbruik" get replies a model wrote from dudan's OpenUI instructions (`tools/mock-hermes/samples/`). "offerte" gets a real Hermes reply to an uploaded PDF quote: a table, a name/value list and a note. A unit test parses those samples too.
 

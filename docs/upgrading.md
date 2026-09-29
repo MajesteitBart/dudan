@@ -4,7 +4,7 @@
 
 ## Upgrading from aight
 
-The project now lives at [MajesteitBart/dudan](https://github.com/MajesteitBart/dudan). Install the new APK over the existing app with the same signing key. The Android application ID remains `nl.bartvandermeeren.aight` (with `.debug` for debug builds), so updates keep settings, permissions and downloaded voice models. The source namespace is `nl.bartvandermeeren.dudan`.
+The project now lives at [MajesteitBart/dudan](https://github.com/MajesteitBart/dudan). Install the new APK over the existing app with the same signing key. The Android application ID remains `nl.bartvandermeeren.aight` (with `.debug` for debug builds), so updates keep settings, permissions and downloaded voice models. The source namespace is `nl.bartvandermeeren.dudan`. Public releases restart at version 0.1.0, but the version code keeps counting up from aight 0.9.0, so Android installs 0.1.0 over it as an update.
 
 The old Android assistant entry points, activity alias, intent keys and encryption-key alias remain for compatibility. Existing Hermes chat IDs stay valid, including assistant chats. The former default assistant name becomes dudan; custom names stay as entered.
 
