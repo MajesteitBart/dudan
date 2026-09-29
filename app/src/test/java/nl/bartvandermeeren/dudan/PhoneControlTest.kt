@@ -329,11 +329,11 @@ class OpenedSomethingTest {
 class TailnetTest {
     @Test
     fun recognizesTailscaleRanges() {
-        assertTrue(Tailnet.isTailscaleAddress(InetAddress.getByName("100.122.202.50")))
+        assertTrue(Tailnet.isTailscaleAddress(InetAddress.getByName("100.77.56.78")))
         assertTrue(Tailnet.isTailscaleAddress(InetAddress.getByName("100.64.0.1")))
         assertTrue(Tailnet.isTailscaleAddress(InetAddress.getByName("fd7a:115c:a1e0::1")))
         assertFalse(Tailnet.isTailscaleAddress(InetAddress.getByName("100.128.0.1")))
-        assertFalse(Tailnet.isTailscaleAddress(InetAddress.getByName("192.168.86.34")))
+        assertFalse(Tailnet.isTailscaleAddress(InetAddress.getByName("192.168.1.20")))
         assertFalse(Tailnet.isTailscaleAddress(InetAddress.getByName("127.0.0.1")))
     }
 

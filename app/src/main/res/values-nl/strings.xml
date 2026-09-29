@@ -126,7 +126,7 @@
 
     <!-- Settings -->
     <string name="setup_title">Verbinden met Hermes</string>
-    <string name="setup_intro">Laat dudan naar je Hermes Agent API-server wijzen. Via Tailscale gebruik je de MagicDNS-naam, bijvoorbeeld http://clarkbox:8642.</string>
+    <string name="setup_intro">Laat dudan naar je Hermes Agent API-server wijzen. Via Tailscale gebruik je de MagicDNS-naam, bijvoorbeeld http://my-server:8642.</string>
     <string name="section_connection">Verbinding</string>
     <string name="section_assistant">Assistent</string>
     <string name="section_history">Geschiedenis</string>

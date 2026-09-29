@@ -4,7 +4,7 @@
 
 Your Hermes agent, one side-button press away.
 
-dudan brings your own Hermes agent to Android. Chat, talk hands-free, ask about what's on your screen, or send a file for the agent to work on. Your conversations live in Hermes, so you can pick them up in its dashboard or CLI too.
+dudan brings your own [Hermes agent](https://github.com/NousResearch/hermes-agent) to Android. Chat, talk hands-free, ask about what's on your screen, or send a file for the agent to work on. Your conversations live in Hermes, so you can pick them up in its dashboard or CLI too.
 
 ## Press, speak, done
 
@@ -52,3 +52,7 @@ You'll need Android 12 or later, your own Hermes API server, and Tailscale conne
 - [Behavior, limitations and model credits](docs/reference.md)
 
 [Documentation](docs/README.md) | [Brand assets and animated reveal](docs/branding.md)
+
+## License
+
+dudan is released under the [MIT License](LICENSE). The bundled Google Sans Flex and Google Sans Code fonts are under the SIL Open Font License 1.1; their license files are in [licenses/](licenses/). The speech models the app downloads on first use have their own licenses, listed under [Model credits](docs/reference.md#model-credits).

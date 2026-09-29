@@ -271,9 +271,9 @@ class SmallHelpersTest {
 
     @Test
     fun flagsPlainHttpOutsideTheTailnet() {
-        assertFalse(isInsecureRemote("http://clarkbox:8642"))
-        assertFalse(isInsecureRemote("http://100.91.52.84:8642"))
-        assertFalse(isInsecureRemote("http://clarkbox.tail1234.ts.net:8642"))
+        assertFalse(isInsecureRemote("http://my-server:8642"))
+        assertFalse(isInsecureRemote("http://100.88.12.34:8642"))
+        assertFalse(isInsecureRemote("http://my-server.tail1234.ts.net:8642"))
         assertFalse(isInsecureRemote("https://hermes.example.com"))
         assertTrue(isInsecureRemote("http://hermes.example.com"))
         assertTrue(isInsecureRemote("192.168.1.10:8642"))

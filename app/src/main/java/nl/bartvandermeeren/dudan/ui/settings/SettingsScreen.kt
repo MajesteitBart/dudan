@@ -201,7 +201,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
             }
 
             Section(stringResource(R.string.section_connection)) {
-                Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://clarkbox:8642", keyboard = KeyboardType.Uri)
+                Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://my-server:8642", keyboard = KeyboardType.Uri)
                 if (isInsecureRemote(url)) Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
                 Field(
                     key, { key = it; test = TestState.Idle }, stringResource(R.string.api_key),
