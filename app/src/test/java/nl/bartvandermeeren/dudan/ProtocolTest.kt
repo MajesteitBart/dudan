@@ -259,6 +259,13 @@ class SmallHelpersTest {
         assertEquals("Gemini 3 Flash", prettyModelName("google/gemini-3-flash"))
         assertEquals("Hermes 4 405B", prettyModelName("hermes-4-405b"))
         assertEquals("Sonnet 4", prettyModelName("claude-sonnet-4-20250514"))
+        assertEquals("Opus 5.5", prettyModelName("claude-opus-5-5"))
+        assertEquals("Sonnet 4.5", prettyModelName("claude-sonnet-4-5-20250929"))
+        assertEquals("GPT-6 Astra", prettyModelName("gpt-6-astra"))
+        assertEquals("GPT-6.1 Sol", prettyModelName("gpt-6.1-sol"))
+        assertEquals("GPT-6 Luna", prettyModelName("gpt-6-luna"))
+        assertEquals("GLM 5.3 Flash", prettyModelName("z-ai/glm-5.3-flash"))
+        assertEquals("Muse Spark 1.3", prettyModelName("meta/muse-spark-1.3"))
     }
 
     @Test

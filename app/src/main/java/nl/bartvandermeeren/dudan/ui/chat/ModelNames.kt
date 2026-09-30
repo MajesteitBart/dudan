@@ -2,6 +2,7 @@ package nl.bartvandermeeren.dudan.ui.chat
 
 private val dateSuffix = Regex("-\\d{8}$")
 private val paramSize = Regex("^\\d+(\\.\\d+)?[bm]$")
+private val versionPart = Regex("^\\d{1,2}$")
 private val acronyms = setOf("gpt", "glm", "oss", "llm", "qwq")
 
 /**
@@ -13,6 +14,12 @@ fun prettyModelName(id: String): String {
     if (name.isBlank()) return id
     var tokens = name.split('-', '_').filter { it.isNotEmpty() }
     if (tokens.size > 1 && tokens.first().equals("claude", ignoreCase = true)) tokens = tokens.drop(1)
+    // Anthropic spells the dot in a version as a hyphen: "claude-opus-5-5" is Opus 5.5.
+    tokens = tokens.fold(mutableListOf<String>()) { merged, token ->
+        val last = merged.lastOrNull()
+        if (last != null && versionPart.matches(last) && versionPart.matches(token)) merged[merged.lastIndex] = "$last.$token" else merged += token
+        merged
+    }
     val out = StringBuilder()
     tokens.forEachIndexed { index, raw ->
         val token = raw.lowercase()

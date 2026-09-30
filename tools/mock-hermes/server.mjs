@@ -314,20 +314,33 @@ const server = http.createServer(async (req, res) => {
   if (path === "/v1/capabilities") return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "hermes-agent", features: { run_submission: true } });
   if (path === "/api/model/options") {
     return send(res, 200, {
-      current_provider: "openrouter",
-      current_model: "anthropic/claude-opus-4.6",
+      current_provider: "openai-codex",
+      current_model: "gpt-6-astra",
       providers: [
         {
-          slug: "openrouter", name: "OpenRouter", authenticated: true, models: ["anthropic/claude-opus-4.6", "google/gemini-3-flash", "openai/gpt-5.5"],
+          slug: "openai-codex", name: "ChatGPT or Codex Subscription", authenticated: true, models: ["gpt-6-astra", "gpt-6.1-sol", "gpt-6-luna"],
           // Real Hermes reports per model whether it takes a thinking level and fast mode (priority processing).
           capabilities: {
-            "anthropic/claude-opus-4.6": { fast: true, reasoning: true },
-            "google/gemini-3-flash": { fast: false, reasoning: true },
-            "openai/gpt-5.5": { fast: true, reasoning: true },
+            "gpt-6-astra": { fast: true, reasoning: true },
+            "gpt-6.1-sol": { fast: true, reasoning: true },
+            "gpt-6-luna": { fast: true, reasoning: true },
           },
         },
-        { slug: "nous", name: "Nous Portal", authenticated: true, models: [{ id: "hermes-4-405b", label: "Hermes 4 405B" }], capabilities: { "hermes-4-405b": { fast: false, reasoning: false } } },
-        { slug: "anthropic", name: "Anthropic", authenticated: false, models: ["claude-haiku"] },
+        {
+          slug: "anthropic", name: "Anthropic", authenticated: true, models: ["claude-opus-5-5", "claude-sonnet-5-5"],
+          capabilities: {
+            "claude-opus-5-5": { fast: false, reasoning: true },
+            "claude-sonnet-5-5": { fast: false, reasoning: true },
+          },
+        },
+        {
+          slug: "openrouter", name: "OpenRouter", authenticated: true, models: ["z-ai/glm-5.3-flash", "meta/muse-spark-1.3", "qwen/qwen3.8-max"],
+          capabilities: {
+            "z-ai/glm-5.3-flash": { fast: false, reasoning: true },
+            "meta/muse-spark-1.3": { fast: false, reasoning: true },
+            "qwen/qwen3.8-max": { fast: false, reasoning: true },
+          },
+        },
       ],
     });
   }

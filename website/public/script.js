@@ -42,6 +42,47 @@ function setUpDownloads() {
     });
 }
 
+// The nav shows the sky until the page moves, then turns into a night bar. A marker at the
+// top of the page tells us when it has scrolled out of view, so there is no scroll listener.
+function setUpNav() {
+  const nav = document.querySelector(".nav");
+  if (!nav) return;
+  if (!("IntersectionObserver" in window)) {
+    nav.classList.add("is-scrolled");
+    return;
+  }
+  const top = document.createElement("div");
+  top.className = "nav-sentinel";
+  top.setAttribute("aria-hidden", "true");
+  document.body.prepend(top);
+  new IntersectionObserver(([entry]) => nav.classList.toggle("is-scrolled", !entry.isIntersecting)).observe(top);
+}
+
+// Prompts on the get-started page get a copy button. Without JavaScript the text is still there to select.
+function setUpCopy() {
+  if (!navigator.clipboard) return;
+  document.querySelectorAll("[data-copy]").forEach((box) => {
+    const text = box.querySelector("[data-copy-text]").textContent.trim();
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "btn btn-ghost btn-small";
+    button.textContent = "Copy prompt";
+    button.setAttribute("aria-live", "polite");
+    let reset;
+    button.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(text);
+        button.textContent = "Copied";
+      } catch {
+        button.textContent = "Select the text to copy";
+      }
+      clearTimeout(reset);
+      reset = setTimeout(() => (button.textContent = "Copy prompt"), 2500);
+    });
+    box.querySelector(".prompt-bar").append(button);
+  });
+}
+
 function setUpReveals() {
   const items = document.querySelectorAll("[data-reveal]");
   if (!("IntersectionObserver" in window)) {
@@ -218,6 +259,8 @@ function setUpWordmark() {
 }
 
 document.addEventListener("DOMContentLoaded", () => {
+  setUpNav();
+  setUpCopy();
   setUpDownloads();
   setUpReveals();
   setUpStory();

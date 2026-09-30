@@ -26,7 +26,7 @@ for (const name of ["overlay", "rich-reply", "foldable", "approval", "files"]) {
   await sharp(join(shots, `${name}.jpg`)).webp({ quality: 82 }).toFile(out("assets/screens", `${name}.webp`));
 }
 // Crop for the spec sheet: the part of the model picker that shows the settings.
-for (const [name, top, height] of [["model-picker", 470, 970]]) {
+for (const [name, top, height] of [["model-picker", 328, 970]]) {
   await sharp(join(shots, `${name}.jpg`))
     .extract({ left: 0, top, width: 720, height })
     .webp({ quality: 82 })
@@ -67,12 +67,63 @@ await sharp(join(assets, "dudan-app-icon.png")).resize(180, 180).png().toFile(ou
 await sharp(join(assets, "dudan-app-icon.png")).resize(32, 32).png().toFile(out("favicon-32.png"));
 
 // QR code for desktop visitors: scan it with the phone to reach the latest release.
-writeFileSync(
-  out("assets/qr-download.svg"),
-  await QRCode.toString(RELEASES, { type: "svg", margin: 1, errorCorrectionLevel: "M", color: { dark: "#141736", light: "#ffffff" } }),
-);
+// Drawn here instead of with the library's SVG output: modules with rounded corners that join
+// up, rounded finder squares and the app icon in the middle. Error correction level H covers
+// the icon. The modules run from deep blue to violet, still dark enough for any scanner.
+function qrSvg(text, iconSvg) {
+  const { modules } = QRCode.create(text, { errorCorrectionLevel: "H" });
+  const n = modules.size;
+  const quiet = 3;
+  const size = n + quiet * 2;
+  const logo = Math.round(n * 0.22) | 1;
+  const plate = logo + 2;
+  const p0 = (n - plate) / 2;
+  const isFinder = (x, y) => (x < 7 && y < 7) || (x >= n - 7 && y < 7) || (x < 7 && y >= n - 7);
+  const isPlate = (x, y) => x >= p0 && x < p0 + plate && y >= p0 && y < p0 + plate;
+  const dark = (x, y) => x >= 0 && y >= 0 && x < n && y < n && !isFinder(x, y) && !isPlate(x, y) && modules.get(y, x);
 
-// Icons: Phosphor (MIT) as an inline sprite between the markers in index.html. Regular weight,
+  const num = (v) => +v.toFixed(2);
+  // A rounded rectangle as a path. Radii run clockwise from the top left.
+  const box = (x, y, w, h, [a, b, c, d]) => {
+    const arc = (r, dx, dy) => (r ? `a${r} ${r} 0 0 1 ${dx} ${dy}` : "");
+    return `M${num(x + a)} ${num(y)}h${num(w - a - b)}${arc(b, b, b)}v${num(h - b - c)}${arc(c, -c, c)}h${num(-(w - c - d))}${arc(d, -d, -d)}v${num(-(h - d - a))}${arc(a, a, -a)}z`;
+  };
+
+  // A corner is round when neither module beside it is dark, so neighbours merge into one shape.
+  const round = (p, q) => (p || q ? 0 : 0.5);
+  let cells = "";
+  for (let y = 0; y < n; y++) {
+    for (let x = 0; x < n; x++) {
+      if (!dark(x, y)) continue;
+      const [up, right, down, left] = [dark(x, y - 1), dark(x + 1, y), dark(x, y + 1), dark(x - 1, y)];
+      cells += box(x + quiet, y + quiet, 1, 1, [round(up, left), round(up, right), round(down, right), round(down, left)]);
+    }
+  }
+
+  // Finder squares: a ring with a rounded dot in it (drawn with the even-odd rule).
+  let eyes = "";
+  for (const [ex, ey] of [[0, 0], [n - 7, 0], [0, n - 7]]) {
+    const x = ex + quiet;
+    const y = ey + quiet;
+    eyes += box(x, y, 7, 7, [2.2, 2.2, 2.2, 2.2]) + box(x + 1, y + 1, 5, 5, [1.4, 1.4, 1.4, 1.4]) + box(x + 2, y + 2, 3, 3, [1, 1, 1, 1]);
+  }
+
+  // The tile of the app icon, without the empty margin around it.
+  const icon = Buffer.from(iconSvg.replace('viewBox="0 0 512 512" width="512" height="512"', 'viewBox="32 32 448 448" width="448" height="448"')).toString("base64");
+  const at = p0 + 1 + quiet;
+  return [
+    `<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" viewBox="0 0 ${size} ${size}" width="${size * 10}" height="${size * 10}" role="img" aria-label="QR code for the latest dudan release on GitHub">`,
+    `<defs><linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="${size}" y2="${size}"><stop offset="0" stop-color="#14206b"/><stop offset="0.55" stop-color="#372aa0"/><stop offset="1" stop-color="#5a2bb0"/></linearGradient></defs>`,
+    `<rect width="${size}" height="${size}" rx="3.2" fill="#ffffff"/>`,
+    `<path fill="url(#ink)" d="${cells}"/>`,
+    `<path fill="url(#ink)" fill-rule="evenodd" d="${eyes}"/>`,
+    `<image xlink:href="data:image/svg+xml;base64,${icon}" x="${at}" y="${at}" width="${logo}" height="${logo}"/>`,
+    `</svg>`,
+  ].join("\n");
+}
+writeFileSync(out("assets/qr-download.svg"), qrSvg(RELEASES, readFileSync(join(assets, "dudan-app-icon.svg"), "utf8")));
+
+// Icons: Phosphor (MIT) as an inline sprite between the markers in each page. Regular weight,
 // except names ending in -fill.
 const icons = {
   download: "download-simple", github: "github-logo", android: "android-logo", server: "hard-drives", lock: "lock-key",
@@ -84,14 +135,16 @@ const symbols = Object.entries(icons).map(([id, file]) => {
   const paths = readFileSync(join(phosphor, weight, `${file}.svg`), "utf8").replace(/^<svg[^>]*>|<\/svg>\s*$/g, "");
   return `  <symbol id="i-${id}" viewBox="0 0 256 256">${paths}</symbol>`;
 });
-const page = join(pub, "index.html");
-writeFileSync(
-  page,
-  readFileSync(page, "utf8").replace(
-    /<!-- icons:start -->[\s\S]*<!-- icons:end -->/,
-    `<!-- icons:start -->\n<!-- Phosphor Icons (MIT). Generated by website/tools/generate.mjs. -->\n<svg class="sprite" aria-hidden="true">\n${symbols.join("\n")}\n</svg>\n<!-- icons:end -->`,
-  ),
-);
+for (const name of ["index.html", "get-started/index.html"]) {
+  const page = join(pub, name);
+  writeFileSync(
+    page,
+    readFileSync(page, "utf8").replace(
+      /<!-- icons:start -->[\s\S]*<!-- icons:end -->/,
+      `<!-- icons:start -->\n<!-- Phosphor Icons (MIT). Generated by website/tools/generate.mjs. -->\n<svg class="sprite" aria-hidden="true">\n${symbols.join("\n")}\n</svg>\n<!-- icons:end -->`,
+    ),
+  );
+}
 
 // Share image: og/og.html rendered at 1200x630 by headless Chrome.
 const chrome =

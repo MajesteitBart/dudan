@@ -17,3 +17,6 @@ __pycache__/
 /tools/brand-assets/node_modules/
 /website/tools/node_modules/
 /gtm/
+
+# Local Netlify folder
+.netlify
