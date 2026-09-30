@@ -136,21 +136,31 @@ dd { margin: 0; }
 .btn-small { min-height: 40px; padding: 0 16px; font-size: 0.9375rem; }
 .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
 
-/* The play button: lighter than the ghost button, with the play symbol in a disc. */
-.btn-play { padding: 0 12px 0 0; gap: 0.65em; color: var(--text); }
-.btn-play:hover { color: var(--text); }
+/* The play button: a ghost button with the play symbol in a light disc. The disc sends out two
+   rings once the hero has settled (see Motion), under the five seconds WCAG allows for motion
+   without a pause control. */
+.btn-play { padding: 0 22px 0 6px; gap: 0.75em; }
 .play-disc {
+  position: relative;
   display: grid;
   place-items: center;
   width: 38px;
   height: 38px;
   border-radius: 50%;
-  background: var(--glass-2);
-  border: 1px solid var(--outline);
-  transition: background-color 0.25s var(--ease), color 0.25s var(--ease), transform 0.25s var(--ease);
+  background: var(--text);
+  color: var(--ink);
+  transition: transform 0.25s var(--ease);
 }
 .play-disc .icon { width: 14px; height: 14px; }
-.btn-play:hover .play-disc { background: var(--text); color: var(--ink); border-color: var(--text); transform: scale(1.06); }
+.play-disc::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2px solid var(--text);
+  opacity: 0;
+}
+.btn-play:hover .play-disc { transform: scale(1.06); }
 .btn-meta { color: var(--text-3); font-weight: 400; }
 
 /* Navigation */
@@ -594,6 +604,7 @@ html:has(.video[open]) { overflow: hidden; }
   .screen.is-active { transform: none; }
   .phone-inline .screen { transform: none; }
   .side-key::after { animation: press 2.6s 1.2s ease-out infinite; }
+  .play-disc::after { animation: ping 2.4s 1.3s ease-out 2; }
 
   .js [data-reveal] { opacity: 0; transform: translateY(20px); transition: opacity 0.8s var(--ease), transform 0.8s var(--ease); }
   .js [data-reveal].is-in { opacity: 1; transform: none; }
@@ -602,6 +613,10 @@ html:has(.video[open]) { overflow: hidden; }
   .video[open]::backdrop { animation: fade 0.3s ease-out both; }
 }
 @keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+@keyframes ping {
+  0% { opacity: 0.7; transform: scale(1); }
+  60%, 100% { opacity: 0; transform: scale(1.6); }
+}
 @keyframes pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
 @keyframes fade { from { opacity: 0; } }
 @keyframes press {
