@@ -1,0 +1,14 @@
+{
+  "name": "dudan-website-assets",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "generate": "node generate.mjs"
+  },
+  "dependencies": {
+    "@phosphor-icons/core": "2.1.1",
+    "qrcode": "1.5.4",
+    "sharp": "0.35.5",
+    "subset-font": "2.9.0"
+  }
+}

@@ -1,0 +1,4 @@
+interface:
+  display_name: "dudan and Hermes"
+  short_description: "Set up Hermes and build, install or connect dudan"
+  default_prompt: "Use $dudan-hermes to set up Hermes and build, install or connect dudan for the requested environment."

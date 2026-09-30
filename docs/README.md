@@ -8,3 +8,4 @@
 - [Upgrading](upgrading.md): keep an existing installation, credentials and server configuration working.
 - [Brand assets](branding.md): source artwork, PNG exports and Android icons.
 - [Upload service](../tools/hermes-upload/README.md): install, configure and troubleshoot the service on the Hermes host.
+- [Agent skill](../skills/README.md): install reusable instructions for Hermes setup, dudan builds and phone connectivity.

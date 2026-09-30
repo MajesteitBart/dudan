@@ -1,3 +1,5 @@
+[Let your agent install and set up dudan](skills/README.md#let-your-agent-set-it-up).
+
 <p align="center">
   <img src="assets/dudan-wordmark.png" alt="dudan" width="800">
 </p>
@@ -57,6 +59,8 @@ Six backgrounds, eight accent colors, frosted glass and a layout that adapts to 
 ## Get started
 
 You'll need Android 12 or later on a 64-bit ARM phone, your own Hermes API server, and Tailscale connecting the phone and server. Download the APK from the [latest release](https://github.com/MajesteitBart/dudan/releases/latest), or build it yourself.
+
+For guided installation, [copy the setup prompt and let your agent prepare Hermes and walk you through the phone setup](skills/README.md#let-your-agent-set-it-up).
 
 - [Connect Hermes and set up your phone](docs/setup.md)
 - [Build the APK and develop locally](docs/development.md)

@@ -1,0 +1,107 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 460" width="1100" height="460">
+  <title>dudan</title>
+  <style>
+    .a { animation-fill-mode: both; animation-timing-function: cubic-bezier(.65,0,.35,1); }
+    .pop  { transform-box: fill-box; transform-origin: center; }
+    .draw { stroke-dasharray: 1 1; stroke-dashoffset: 0; animation-name: draw; }
+    @keyframes draw { from { stroke-dashoffset: 1; } }
+    @keyframes ignite { 0% { transform: scale(0); } 65% { transform: scale(1.12); } 100% { transform: scale(1); } }
+    @keyframes holeIn { from { transform: scale(0); } }
+    @keyframes flare { 0% { opacity: 0; transform: scale(.2); } 30% { opacity: .9; } 100% { opacity: 0; transform: scale(2.6); } }
+    @keyframes rise { from { transform: translateY(160px); } }
+    @keyframes fade { from { opacity: 0; } }
+    @keyframes spread { from { transform: scaleX(0); opacity: 0; } }
+    @keyframes shine { 0%,100% { opacity: 1; } 40% { opacity: 0; } }
+    @keyframes pulse { 0% { opacity: 0; transform: scale(1); } 40% { opacity: .55; } 100% { opacity: 0; transform: scale(1.9); } }
+
+    #flare  { animation: flare 0.6s 0.09s both ease-out; opacity: 0; }
+    #hole   { animation: holeIn 0.36s 0.21s both cubic-bezier(.2,.9,.3,1.2); }
+    #orb    { animation: ignite 0.48s 0.18s both cubic-bezier(.2,.9,.3,1.25); }
+    #hi     { animation: shine 0.66s 1.5s both ease-in-out; }
+    #pulse  { animation: pulse 0.66s 1.53s both ease-out; opacity: 0; }
+    #ring1  { animation-duration: 0.51s; animation-delay: 0.39s; }
+    #stem1  { animation: rise 0.36s 0.72s both cubic-bezier(.2,.8,.2,1); }
+    #u      { animation-duration: 0.33s; animation-delay: 0.87s; }
+    #ring2  { animation-duration: 0.33s; animation-delay: 0.96s; }
+    #stem2  { animation-duration: 0.18s;  animation-delay: 1.17s; }
+    #ring3  { animation-duration: 0.33s; animation-delay: 1.05s; }
+    #stem3  { animation-duration: 0.15s; animation-delay: 1.29s; }
+    #n      { animation-duration: 0.39s; animation-delay: 1.14s; }
+    #halo   { animation: fade 0.6s 1.32s both ease-out; }
+    #floorA { animation: spread 0.72s 1.26s both cubic-bezier(.2,.8,.2,1); transform-box: fill-box; transform-origin: center; }
+    #floorB { animation: spread 0.54s 0.66s both cubic-bezier(.2,.8,.2,1); transform-box: fill-box; transform-origin: center; }
+
+    @media (prefers-reduced-motion: reduce) { * { animation: none !important; } }
+  </style>
+  <defs>
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="0" y1="200" x2="0" y2="446">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.6" stop-color="#f3f3fb"/>
+      <stop offset="1" stop-color="#d6d6f2"/>
+    </linearGradient>
+    <radialGradient id="hole" gradientUnits="userSpaceOnUse" cx="419" cy="360" r="46.5">
+      <stop offset="0.6" stop-color="#1a2a9a"/>
+      <stop offset="1" stop-color="#0c1a66"/>
+    </radialGradient>
+    <linearGradient id="orb" gradientUnits="userSpaceOnUse" x1="395" y1="385" x2="455" y2="340">
+      <stop offset="0" stop-color="#1f86ff"/>
+      <stop offset="0.45" stop-color="#4a55fb"/>
+      <stop offset="1" stop-color="#a24cff"/>
+    </linearGradient>
+    <radialGradient id="orbHi" gradientUnits="userSpaceOnUse" cx="432" cy="340" r="30">
+      <stop offset="0" stop-color="#e3c6ff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#e3c6ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="floor" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#2f63ff" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#1a3fd6" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#0b1a66" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#081334"/>
+      <stop offset="0.6" stop-color="#040a1c"/>
+      <stop offset="1" stop-color="#01030a"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter><clipPath id="stemClip"><rect x="440" y="150" width="90" height="212"/></clipPath>
+  </defs>
+  <ellipse id="floorA" cx="550.5" cy="366" rx="420" ry="26" fill="url(#floor)" opacity="0.6"/>
+  <ellipse id="floorB" cx="258" cy="368" rx="150" ry="22" fill="url(#floor)"/>
+  <g transform="translate(-172 -102)">
+    <g id="halo" opacity="0.55" filter="url(#glow)" fill="none" stroke="#3d62ff">
+      <circle cx="419" cy="360" r="66" stroke-width="40"/>
+      <path d="M466 360 V236 Q466 230 471 227 L506 203 V360 Z" fill="#3d62ff" stroke="none"/>
+      <g stroke-width="37">
+        <path d="M537.5 291 V364.5 A46 46 0 0 0 629.5 364.5 V291"/>
+        <circle cx="729" cy="359.5" r="52"/><path d="M781 243 V360"/>
+        <circle cx="884" cy="358.5" r="52"/><path d="M937.5 358 V428.5"/>
+        <path d="M990 428.5 V359 A52 52 0 0 1 1094 359 V428.5"/>
+      </g>
+    </g>
+    <g fill="none" stroke="url(#ink)">
+      <circle id="ring1" class="a draw" pathLength="1" cx="419" cy="360" r="66" stroke-width="40"/>
+      <g stroke-width="37">
+        <path id="u" class="a draw" pathLength="1" d="M537.5 291 V364.5 A46 46 0 0 0 629.5 364.5 V291"/>
+        <circle id="ring2" class="a draw" pathLength="1" cx="729" cy="359.5" r="52"/>
+        <path id="stem2" class="a draw" pathLength="1" d="M781 360 V243"/>
+        <circle id="ring3" class="a draw" pathLength="1" cx="884" cy="358.5" r="52"/>
+        <path id="stem3" class="a draw" pathLength="1" d="M937.5 358 V428.5"/>
+        <path id="n" class="a draw" pathLength="1" d="M990 428.5 V359 A52 52 0 0 1 1094 359 V428.5"/>
+      </g>
+    </g>
+    <g clip-path="url(#stemClip)">
+      <path id="stem1" d="M466 360 V236 Q466 230 471 227 L506 203 V360 Z" fill="url(#ink)"/>
+    </g>
+    <circle id="hole" class="pop" cx="419" cy="360" r="46.5" fill="url(#hole)"/>
+    <circle id="pulse" class="pop" cx="424" cy="362" r="31" fill="none" stroke="#8f7bff" stroke-width="3"/>
+    <g id="orb" class="pop">
+      <circle cx="424" cy="362" r="31" fill="url(#orb)"/>
+      <circle id="hi" cx="424" cy="362" r="31" fill="url(#orbHi)"/>
+    </g>
+    <circle id="flare" class="pop" cx="424" cy="362" r="34" fill="#b9a8ff" filter="url(#soft)"/>
+  </g>
+</svg>

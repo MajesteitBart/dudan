@@ -15,3 +15,5 @@ captures/
 /app/libs/
 __pycache__/
 /tools/brand-assets/node_modules/
+/website/tools/node_modules/
+/gtm/

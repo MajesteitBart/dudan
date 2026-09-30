@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<!-- Source for public/og-image.png. website/tools/generate.mjs renders it at 1200x630. -->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<style>
+  @font-face { font-family: "Google Sans Flex"; src: url("../public/fonts/google-sans-flex-400.woff2") format("woff2"); font-weight: 400; }
+  @font-face { font-family: "Google Sans Flex"; src: url("../public/fonts/google-sans-flex-600.woff2") format("woff2"); font-weight: 600; }
+  html, body { margin: 0; width: 1200px; height: 630px; overflow: hidden; }
+  body {
+    position: relative;
+    font-family: "Google Sans Flex", sans-serif;
+    color: #f7f7fc;
+    background:
+      radial-gradient(55% 50% at 90% 0%, rgba(143, 166, 230, 0.32), transparent 70%),
+      radial-gradient(45% 45% at 0% 100%, rgba(192, 138, 180, 0.22), transparent 70%),
+      linear-gradient(180deg, #212a5f 0%, #354490 55%, #1a1e4e 100%);
+  }
+  .copy { position: absolute; left: 76px; top: 76px; width: 700px; }
+  .copy img { width: 220px; display: block; margin-left: -8px; }
+  h1 { margin: 40px 0 0; font-size: 60px; line-height: 0.98; letter-spacing: -0.035em; font-weight: 600; }
+  p { margin: 26px 0 0; font-size: 25px; line-height: 1.4; color: #cbcde2; max-width: 32ch; }
+  .glow {
+    position: absolute; right: -30px; top: 30px; width: 560px; height: 560px; border-radius: 50%;
+    background: radial-gradient(circle at 45% 55%, rgba(74, 85, 251, 0.55), rgba(162, 76, 255, 0.22) 45%, transparent 70%);
+    filter: blur(20px);
+  }
+  .phone {
+    position: absolute; right: 90px; top: 70px; width: 290px; padding: 9px; border-radius: 44px;
+    background: #0e0f26; border: 1px solid rgba(255, 255, 255, 0.16);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.1), 0 50px 100px -40px rgba(3, 3, 20, 0.9);
+  }
+  .phone img { display: block; width: 100%; border-radius: 35px; }
+</style>
+</head>
+<body>
+  <div class="copy">
+    <img src="../public/assets/wordmark.svg" alt="">
+    <h1>Your phone's assistant should be one that knows you. That's Dudan.</h1>
+    <p>Your own Hermes Agent on your phone. Talk to it, use your tools and make it your own.</p>
+  </div>
+  <div class="glow"></div>
+  <div class="phone"><img src="../public/assets/screens/overlay.webp" alt=""></div>
+</body>
+</html>

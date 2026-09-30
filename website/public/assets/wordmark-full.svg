@@ -1,0 +1,69 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 460" width="1100" height="460">
+  <title>dudan</title>
+  <defs>
+    <linearGradient id="ink" gradientUnits="userSpaceOnUse" x1="0" y1="200" x2="0" y2="446">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.6" stop-color="#f3f3fb"/>
+      <stop offset="1" stop-color="#d6d6f2"/>
+    </linearGradient>
+    <radialGradient id="hole" gradientUnits="userSpaceOnUse" cx="419" cy="360" r="46.5">
+      <stop offset="0.6" stop-color="#1a2a9a"/>
+      <stop offset="1" stop-color="#0c1a66"/>
+    </radialGradient>
+    <linearGradient id="orb" gradientUnits="userSpaceOnUse" x1="395" y1="385" x2="455" y2="340">
+      <stop offset="0" stop-color="#1f86ff"/>
+      <stop offset="0.45" stop-color="#4a55fb"/>
+      <stop offset="1" stop-color="#a24cff"/>
+    </linearGradient>
+    <radialGradient id="orbHi" gradientUnits="userSpaceOnUse" cx="432" cy="340" r="30">
+      <stop offset="0" stop-color="#e3c6ff" stop-opacity="0.85"/>
+      <stop offset="1" stop-color="#e3c6ff" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="floor" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#2f63ff" stop-opacity="0.85"/>
+      <stop offset="0.5" stop-color="#1a3fd6" stop-opacity="0.3"/>
+      <stop offset="1" stop-color="#0b1a66" stop-opacity="0"/>
+    </radialGradient>
+    <radialGradient id="bg" cx="50%" cy="45%" r="75%">
+      <stop offset="0" stop-color="#081334"/>
+      <stop offset="0.6" stop-color="#040a1c"/>
+      <stop offset="1" stop-color="#01030a"/>
+    </radialGradient>
+    <filter id="glow" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="14"/>
+    </filter>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="6"/>
+    </filter>
+  </defs>
+  <ellipse cx="550" cy="366" rx="420" ry="26" fill="url(#floor)" opacity="0.6"/>
+  <ellipse cx="258" cy="368" rx="150" ry="22" fill="url(#floor)"/>
+  <g transform="translate(-172 -102)">
+    <g opacity="0.55" filter="url(#glow)">
+      <g><circle cx="419" cy="360" r="66" fill="none" stroke="#3d62ff" stroke-width="40"/>
+      <path d="M466 360 V236 Q466 230 471 227 L506 203 V360 Z" fill="#3d62ff"/><g fill="none" stroke="#3d62ff" stroke-width="37">
+        <path d="M537.5 291 V364.5 A46 46 0 0 0 629.5 364.5 V291"/>
+        <circle cx="729" cy="359.5" r="52"/>
+        <path d="M781 243 V360"/>
+        <circle cx="884" cy="358.5" r="52"/>
+        <path d="M937.5 358 V428.5"/>
+        <path d="M990 428.5 V359 A52 52 0 0 1 1094 359 V428.5"/>
+      </g></g>
+    </g>
+    <g>
+      <circle cx="419" cy="360" r="66" fill="none" stroke="url(#ink)" stroke-width="40"/>
+      <path d="M466 360 V236 Q466 230 471 227 L506 203 V360 Z" fill="url(#ink)"/>
+      <g fill="none" stroke="url(#ink)" stroke-width="37">
+        <path d="M537.5 291 V364.5 A46 46 0 0 0 629.5 364.5 V291"/>
+        <circle cx="729" cy="359.5" r="52"/>
+        <path d="M781 243 V360"/>
+        <circle cx="884" cy="358.5" r="52"/>
+        <path d="M937.5 358 V428.5"/>
+        <path d="M990 428.5 V359 A52 52 0 0 1 1094 359 V428.5"/>
+      </g>
+      <circle cx="419" cy="360" r="46.5" fill="url(#hole)"/>
+      <circle cx="424" cy="362" r="31" fill="url(#orb)"/>
+      <circle cx="424" cy="362" r="31" fill="url(#orbHi)"/>
+    </g>
+  </g>
+</svg>
