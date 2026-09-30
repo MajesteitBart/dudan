@@ -38,6 +38,8 @@ The script writes:
 
 The download buttons read the latest GitHub release through the GitHub API. On an Android phone, they link straight to the APK. On other devices, they scroll to the setup section, which has a QR code for the phone. If the API call fails, the links fall back to the releases page.
 
+The "Watch the video" button in the hero opens the intro video in a dialog. The video is hosted on Mux. Its player loads from `player.mux.com` only when someone opens the dialog, with Mux Data tracking turned off. Without JavaScript, the button links to Mux's player page.
+
 Nothing else on the page calls an outside service. There are no analytics, cookies or external fonts.
 
 ## Deploy

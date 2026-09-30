@@ -9,7 +9,8 @@
     Referrer-Policy = "strict-origin-when-cross-origin"
     Permissions-Policy = "camera=(), microphone=(), geolocation=()"
     # 'unsafe-inline' styles: the animated wordmark SVG carries its own <style>.
-    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.github.com; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
+    # frame-src: the intro video plays in Mux's player, which loads when someone opens it.
+    Content-Security-Policy = "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; font-src 'self'; connect-src 'self' https://api.github.com; frame-src https://player.mux.com; frame-ancestors 'none'; base-uri 'self'; form-action 'none'"
 
 [[headers]]
   for = "/fonts/*"

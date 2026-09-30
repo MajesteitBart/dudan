@@ -136,6 +136,23 @@ dd { margin: 0; }
 .btn-small { min-height: 40px; padding: 0 16px; font-size: 0.9375rem; }
 .cta-row { display: flex; flex-wrap: wrap; gap: 12px; }
 
+/* The play button: lighter than the ghost button, with the play symbol in a disc. */
+.btn-play { padding: 0 12px 0 0; gap: 0.65em; color: var(--text); }
+.btn-play:hover { color: var(--text); }
+.play-disc {
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: var(--glass-2);
+  border: 1px solid var(--outline);
+  transition: background-color 0.25s var(--ease), color 0.25s var(--ease), transform 0.25s var(--ease);
+}
+.play-disc .icon { width: 14px; height: 14px; }
+.btn-play:hover .play-disc { background: var(--text); color: var(--ink); border-color: var(--text); transform: scale(1.06); }
+.btn-meta { color: var(--text-3); font-weight: 400; }
+
 /* Navigation */
 .nav {
   position: sticky;
@@ -520,6 +537,50 @@ pre code { background: none; padding: 0; font-size: inherit; white-space: pre; }
 .footer-links a { color: var(--text-2); text-decoration: none; font-size: 0.9375rem; }
 .footer-links a:hover { color: var(--text); }
 
+/* The intro video in a dialog. It fills the viewport, so a click outside the player lands
+   on the dialog itself and closes it. The 16:9 frame fits both the width and the height. */
+html { scrollbar-gutter: stable; }
+html:has(.video[open]) { overflow: hidden; }
+.video {
+  width: 100%;
+  height: 100%;
+  max-width: none;
+  max-height: none;
+  margin: 0;
+  padding: var(--gutter);
+  border: 0;
+  background: transparent;
+  color: var(--text);
+}
+.video[open] { display: grid; place-items: center; }
+.video::backdrop { background: rgba(6, 7, 22, 0.84); -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px); }
+.video-box { width: min(100%, 1120px, (100dvh - 2 * var(--gutter) - 56px) * 16 / 9); display: grid; gap: 12px; justify-items: end; }
+.video-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--outline);
+  background: var(--glass-2);
+  color: var(--text);
+  cursor: pointer;
+  transition: background-color 0.25s var(--ease), transform 0.25s var(--ease);
+}
+.video-close:hover { background: rgba(255, 255, 255, 0.18); }
+.video-close:active { transform: scale(0.94); }
+.video-frame {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border-radius: 20px;
+  overflow: hidden;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 50px 100px -40px rgba(3, 3, 20, 0.9);
+}
+.video-frame iframe { display: block; width: 100%; height: 100%; border: 0; }
+
 /* Motion */
 @media (prefers-reduced-motion: no-preference) {
   .hero > * { animation: rise 0.9s var(--ease) both; }
@@ -536,8 +597,13 @@ pre code { background: none; padding: 0; font-size: inherit; white-space: pre; }
 
   .js [data-reveal] { opacity: 0; transform: translateY(20px); transition: opacity 0.8s var(--ease), transform 0.8s var(--ease); }
   .js [data-reveal].is-in { opacity: 1; transform: none; }
+
+  .video[open] .video-box { animation: pop 0.45s var(--ease) both; }
+  .video[open]::backdrop { animation: fade 0.3s ease-out both; }
 }
 @keyframes rise { from { opacity: 0; transform: translateY(24px); } }
+@keyframes pop { from { opacity: 0; transform: translateY(12px) scale(0.97); } }
+@keyframes fade { from { opacity: 0; } }
 @keyframes press {
   0% { opacity: 0.9; transform: scale(0.4); }
   45%, 100% { opacity: 0; transform: scale(2.2); }
@@ -548,6 +614,7 @@ pre code { background: none; padding: 0; font-size: inherit; white-space: pre; }
 
 @media (prefers-reduced-transparency: reduce) {
   .nav { background: var(--night); -webkit-backdrop-filter: none; backdrop-filter: none; }
+  .video::backdrop { background: rgba(6, 7, 22, 0.94); -webkit-backdrop-filter: none; backdrop-filter: none; }
   .download { background: var(--sheet); }
   .asks li { background: #1f4a4d; }
 }

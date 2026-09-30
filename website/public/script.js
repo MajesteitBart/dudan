@@ -164,6 +164,38 @@ function setUpStory() {
   place();
 }
 
+// The intro video plays from Mux in a dialog. Its player only loads once someone opens it.
+// Without JavaScript, the link goes to Mux's own player page.
+function setUpVideo() {
+  const dialog = document.getElementById("video");
+  if (!dialog || typeof dialog.showModal !== "function") return;
+  const frame = dialog.querySelector(".video-frame");
+
+  document.querySelectorAll("[data-video]").forEach((link) => {
+    link.setAttribute("aria-haspopup", "dialog");
+    link.addEventListener("click", (event) => {
+      event.preventDefault();
+      const src = new URL(link.href);
+      src.searchParams.set("autoplay", "true");
+      const player = document.createElement("iframe");
+      player.src = src.href;
+      player.title = dialog.getAttribute("aria-label");
+      player.allow = "accelerometer; gyroscope; autoplay; encrypted-media; picture-in-picture; fullscreen";
+      frame.replaceChildren(player);
+      dialog.showModal();
+    });
+  });
+
+  // The close button and any click outside the player close the dialog. Clicks and keys inside
+  // the player never reach this page, so Escape only works outside it; the close button is
+  // one Shift+Tab away.
+  dialog.addEventListener("click", (event) => {
+    if (!event.target.closest(".video-frame")) dialog.close();
+  });
+  // Removing the player stops the video.
+  dialog.addEventListener("close", () => frame.replaceChildren());
+}
+
 // The footer wordmark loads its animated version once it scrolls into view, so the
 // animation plays while someone is looking at it.
 function setUpWordmark() {
@@ -189,5 +221,6 @@ document.addEventListener("DOMContentLoaded", () => {
   setUpDownloads();
   setUpReveals();
   setUpStory();
+  setUpVideo();
   setUpWordmark();
 });
