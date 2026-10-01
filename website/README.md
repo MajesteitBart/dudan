@@ -49,7 +49,11 @@ Nothing else on the pages calls an outside service. There are no analytics, cook
 
 The site is hosted on Netlify. DNS for `bvdm.ai` is on Cloudflare, with a CNAME from `dudan.bvdm.ai` to the Netlify site. The record is DNS-only (not proxied), so Netlify issues the TLS certificate.
 
+Netlify publishes `main` from GitHub. Every push to `main` deploys the site, with `website` as the base directory, so a change goes live by merging it into `main`.
+
+Don't run `netlify deploy --prod` from a local checkout. It publishes whatever that working tree holds, and the next push to `main` replaces it. That's how unmerged work went live on 30 September and then disappeared. To show someone a change before it's merged, make a draft deploy instead. It gets its own URL and leaves the live site alone:
+
 ```sh
 cd website
-netlify deploy --prod
+netlify deploy
 ```
