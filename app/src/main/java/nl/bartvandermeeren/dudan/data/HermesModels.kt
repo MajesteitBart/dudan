@@ -62,6 +62,9 @@ data class SessionSummary(
 
 data class ToolCallRef(val id: String?, val name: String, val arguments: String?)
 
+/** Rows of a session's transcript. [sessionId] is the live session Hermes resolved, which changes when it compresses a chat. */
+data class MessagePage(val sessionId: String?, val messages: List<HermesMessage>)
+
 data class HermesMessage(
     val id: String?,
     val role: String,

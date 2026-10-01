@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.delay
 import nl.bartvandermeeren.dudan.R
+import nl.bartvandermeeren.dudan.chat.BackgroundStatus
 import nl.bartvandermeeren.dudan.chat.ImageRef
 import nl.bartvandermeeren.dudan.chat.MessageState
 import nl.bartvandermeeren.dudan.chat.Step
@@ -85,6 +86,7 @@ import nl.bartvandermeeren.dudan.ui.components.rememberImageBitmap
 import nl.bartvandermeeren.dudan.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
 import nl.bartvandermeeren.dudan.ui.theme.Palette
+import nl.bartvandermeeren.dudan.voice.SpeechText
 
 /** A bubble like Superhuman's "yes!", tinted with the user's accent, its tail toward the edge they write from. */
 private val UserBubbleShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 6.dp, bottomStart = 22.dp)
@@ -223,6 +225,91 @@ fun AssistantMessageItem(
                     color = Palette.TextTertiary,
                     modifier = Modifier.padding(top = 2.dp),
                 )
+            }
+        }
+    }
+}
+
+/**
+ * A result a subagent delivered after the agent's turn ended. It reads as a notice from background
+ * work, not as something the user said. While the agent hasn't looked at it, the last one offers to
+ * have it review the results and finish; nothing continues until the user asks. [onReview] is null
+ * when this isn't the result waiting for review.
+ */
+@Composable
+fun BackgroundResultItem(
+    message: UiMessage,
+    assistantName: String,
+    reviewing: Boolean,
+    reviewError: String?,
+    onReview: (() -> Unit)?,
+    modifier: Modifier = Modifier,
+) {
+    val result = message.background ?: return
+    var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
+    val (icon, tint) = when {
+        result.status == BackgroundStatus.Completed -> Icons.Outlined.AccountTree to Palette.TextSecondary
+        result.status == BackgroundStatus.Failed && !result.interim -> Icons.Outlined.ErrorOutline to Palette.Danger
+        else -> Icons.Outlined.ErrorOutline to Palette.SparkAmber
+    }
+    val title = when {
+        result.interim -> stringResource(R.string.background_task_failed)
+        result.status == BackgroundStatus.Completed -> stringResource(R.string.background_done)
+        result.status == BackgroundStatus.PartlyFailed && result.taskCount != null ->
+            stringResource(R.string.background_partly_failed, result.failedCount, result.taskCount)
+        else -> stringResource(R.string.background_failed)
+    }
+    Column(modifier.fillMaxWidth().padding(horizontal = 18.dp)) {
+        Box(Modifier.fillMaxWidth().pane(RoundedCornerShape(20.dp), Palette.Code, outline = Palette.Hairline)) {
+            Column(Modifier.padding(horizontal = 18.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                    Icon(icon, contentDescription = null, tint = tint, modifier = Modifier.size(20.dp))
+                    Text(title, style = MaterialTheme.typography.titleSmall, color = Palette.TextPrimary, modifier = Modifier.weight(1f))
+                }
+                if (result.interim) {
+                    Text(stringResource(R.string.background_task_failed_detail), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+                }
+                if (message.text.isNotBlank()) {
+                    var longer by remember(message.id) { mutableStateOf(false) }
+                    Box(Modifier.animateContentSize()) {
+                        if (expanded) {
+                            SelectionContainer { Markdown(message.text, style = MaterialTheme.typography.bodyMedium) }
+                        } else {
+                            val preview = remember(message.text) { SpeechText.fromMarkdown(message.text).trim() }
+                            Text(
+                                preview,
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Palette.TextSecondary,
+                                maxLines = 3,
+                                overflow = TextOverflow.Ellipsis,
+                                onTextLayout = { longer = longer || it.hasVisualOverflow || preview != message.text.trim() },
+                            )
+                        }
+                    }
+                    if (longer) {
+                        Text(
+                            stringResource(if (expanded) R.string.background_hide else R.string.background_show),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = LocalAccent.current.soft,
+                            modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable { expanded = !expanded }.padding(vertical = 4.dp),
+                        )
+                    }
+                }
+                if (onReview != null) {
+                    Text(stringResource(R.string.background_waiting, assistantName), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+                    val accent = LocalAccent.current
+                    Box(Modifier.pane(CircleShape, accent.color).clickable(enabled = !reviewing, onClick = onReview)) {
+                        Row(
+                            Modifier.padding(horizontal = 16.dp, vertical = 10.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        ) {
+                            if (reviewing) CircularProgressIndicator(strokeWidth = 2.dp, color = accent.on, modifier = Modifier.size(14.dp))
+                            Text(stringResource(R.string.background_review), style = MaterialTheme.typography.labelLarge, color = accent.on)
+                        }
+                    }
+                    reviewError?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.Danger) }
+                }
             }
         }
     }

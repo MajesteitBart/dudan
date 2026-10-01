@@ -85,6 +85,16 @@
     <string name="approval_session">Allow for this chat</string>
     <string name="approval_always">Always allow</string>
     <string name="approval_deny">Deny</string>
+    <string name="background_done">Background work finished</string>
+    <string name="background_failed">Background work failed</string>
+    <string name="background_partly_failed">%1$d of %2$d background tasks failed</string>
+    <string name="background_task_failed">A background task failed</string>
+    <string name="background_task_failed_detail">The other tasks are still running. Their results follow.</string>
+    <string name="background_show">Show result</string>
+    <string name="background_hide">Hide result</string>
+    <string name="background_waiting">%1$s hasn\'t reviewed this yet and won\'t continue until you ask.</string>
+    <string name="background_review">Review result and finish</string>
+    <string name="background_review_prompt">Review the background results above and finish the task. If anything still needs my confirmation, ask me first.</string>
 
     <!-- Models -->
     <string name="model_picker_title">Model</string>
@@ -124,6 +134,7 @@
     <string name="screen_attached">Screen added</string>
     <string name="open_full_chat">Open full chat</string>
     <string name="notification_channel_replies">Replies</string>
+    <string name="notification_channel_background">Background work</string>
     <string name="assist_not_configured">dudan isn\'t connected to Hermes yet. Tap to set it up.</string>
 
     <!-- Settings -->

@@ -337,10 +337,16 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                 modifier = Modifier.fillMaxSize().widthIn(max = 880.dp).fadeEdges(top = 18.dp, bottom = 14.dp),
             ) {
                 itemsIndexed(messages, key = { _, m -> m.id }) { index, message ->
-                    if (message.role == Role.User) {
-                        UserMessageItem(message)
-                    } else {
-                        AssistantMessageItem(
+                    when (message.role) {
+                        Role.User -> UserMessageItem(message)
+                        Role.Background -> BackgroundResultItem(
+                            message = message,
+                            assistantName = settings.assistantName,
+                            reviewing = conversation.reviewing,
+                            reviewError = conversation.reviewError,
+                            onReview = vm::reviewBackground.takeIf { index == messages.lastIndex && conversation.awaitingReview },
+                        )
+                        Role.Assistant -> AssistantMessageItem(
                             message = message,
                             isLast = index == messages.lastIndex,
                             assistantName = settings.assistantName,

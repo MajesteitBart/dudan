@@ -69,6 +69,7 @@ import nl.bartvandermeeren.dudan.chat.Conversation
 import nl.bartvandermeeren.dudan.chat.Role
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.ui.chat.AssistantMessageItem
+import nl.bartvandermeeren.dudan.ui.chat.BackgroundResultItem
 import nl.bartvandermeeren.dudan.ui.chat.UserMessageItem
 import nl.bartvandermeeren.dudan.ui.components.Composer
 import nl.bartvandermeeren.dudan.ui.components.pane
@@ -238,10 +239,16 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
                     verticalArrangement = Arrangement.spacedBy(18.dp),
                 ) {
                     itemsIndexed(conversation.messages, key = { _, m -> m.id }) { index, message ->
-                        if (message.role == Role.User) {
-                            UserMessageItem(message)
-                        } else {
-                            AssistantMessageItem(
+                        when (message.role) {
+                            Role.User -> UserMessageItem(message)
+                            Role.Background -> BackgroundResultItem(
+                                message = message,
+                                assistantName = settings.assistantName,
+                                reviewing = conversation.reviewing,
+                                reviewError = conversation.reviewError,
+                                onReview = state::reviewBackground.takeIf { index == conversation.messages.lastIndex && conversation.awaitingReview },
+                            )
+                            Role.Assistant -> AssistantMessageItem(
                                 message = message,
                                 isLast = index == conversation.messages.lastIndex,
                                 assistantName = settings.assistantName,

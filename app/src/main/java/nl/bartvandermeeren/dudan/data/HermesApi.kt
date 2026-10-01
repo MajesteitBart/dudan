@@ -95,9 +95,39 @@ class HermesApi(
         send(request("api", "sessions", id).delete().build())
     }
 
-    suspend fun sessionMessages(id: String): List<HermesMessage> {
-        val root = getJson("api", "sessions", id, "messages")
-        return root.asObject()?.get("data").asArray().orEmpty().mapNotNull { it.asObject()?.let(HermesMessage::from) }
+    /** The session's transcript: the latest 500 rows, which is Hermes' default page. */
+    suspend fun sessionMessages(id: String): MessagePage = messagePage(getJson("api", "sessions", id, "messages"))
+
+    /**
+     * The last [limit] rows, for polling. A server that ignores `order` returns the oldest rows instead
+     * and doesn't echo the order back; from then on this falls back to the default page.
+     */
+    suspend fun sessionTail(id: String, limit: Int): MessagePage {
+        val base = server().baseUrl
+        if (tailUnsupportedOn != base) {
+            val root = getJson("api", "sessions", id, "messages", query = mapOf("order" to "latest", "limit" to limit.toString()))
+            if (root.asObject()?.get("pagination").asObject()?.str("order") == "latest") return messagePage(root)
+            tailUnsupportedOn = base
+        }
+        return sessionMessages(id)
+    }
+
+    /**
+     * [limit] rows ending [offset] rows before the newest, oldest first; Hermes pages back from the end
+     * with `order=latest`. Null when the server doesn't page that way.
+     */
+    suspend fun sessionRowsBefore(id: String, offset: Int, limit: Int): List<HermesMessage>? {
+        val query = mapOf("order" to "latest", "limit" to limit.toString(), "offset" to offset.toString())
+        val root = getJson("api", "sessions", id, "messages", query = query)
+        if (root.asObject()?.get("pagination").asObject()?.str("order") != "latest") return null
+        return messagePage(root).messages
+    }
+
+    @Volatile private var tailUnsupportedOn: String? = null
+
+    private fun messagePage(root: JsonElement): MessagePage {
+        val o = root.asObject()
+        return MessagePage(o?.str("session_id"), o?.get("data").asArray().orEmpty().mapNotNull { it.asObject()?.let(HermesMessage::from) })
     }
 
     // ---- Agent turns ----------------------------------------------------------------------------
@@ -110,16 +140,34 @@ class HermesApi(
      * [instructions] is added to the system prompt of this turn only; Hermes doesn't store it, so it
      * reaches no other channel.
      */
-    suspend fun startRun(sessionId: String, input: String, model: ModelChoice, instructions: String? = null): String {
+    suspend fun startRun(sessionId: String, input: String, model: ModelChoice, instructions: String? = null): String =
+        admitRun(sessionId, input, model, instructions, idempotencyKey = null).runId
+
+    /**
+     * Starts a run like [startRun]. Requests with the same [idempotencyKey] and body get the same run:
+     * Hermes then answers with that run's current status and `replayed`.
+     */
+    suspend fun admitRun(
+        sessionId: String,
+        input: String,
+        model: ModelChoice,
+        instructions: String?,
+        idempotencyKey: String?,
+    ): RunAdmission {
         val body = buildJsonObject {
             put("input", input)
             put("session_id", sessionId)
             putModel(model)
             if (!instructions.isNullOrBlank()) put("instructions", instructions)
         }
-        val root = sendJson(request("v1", "runs").post(body.toBody()).build()).asObject()
-        return root?.str("run_id") ?: throw HermesException(500, "Hermes did not return a run id")
+        val request = request("v1", "runs").post(body.toBody())
+        if (idempotencyKey != null) request.header("Idempotency-Key", idempotencyKey)
+        val root = sendJson(request.build()).asObject()
+        val runId = root?.str("run_id") ?: throw HermesException(500, "Hermes did not return a run id")
+        return RunAdmission(runId, root.str("status"), root.bool("replayed") ?: false)
     }
+
+    data class RunAdmission(val runId: String, val status: String?, val replayed: Boolean)
 
     fun runEvents(runId: String): Flow<AgentEvent> = sse {
         request("v1", "runs", runId, "events").header("Accept", "text/event-stream").get().build()

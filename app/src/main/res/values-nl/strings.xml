@@ -83,6 +83,16 @@
     <string name="approval_session">Toestaan voor dit gesprek</string>
     <string name="approval_always">Altijd toestaan</string>
     <string name="approval_deny">Weigeren</string>
+    <string name="background_done">Achtergrondwerk klaar</string>
+    <string name="background_failed">Achtergrondwerk mislukt</string>
+    <string name="background_partly_failed">%1$d van %2$d achtergrondtaken mislukt</string>
+    <string name="background_task_failed">Een achtergrondtaak is mislukt</string>
+    <string name="background_task_failed_detail">De andere taken lopen nog. Hun resultaten volgen.</string>
+    <string name="background_show">Resultaat tonen</string>
+    <string name="background_hide">Resultaat verbergen</string>
+    <string name="background_waiting">%1$s heeft dit nog niet bekeken en gaat pas verder als je dat vraagt.</string>
+    <string name="background_review">Resultaat bekijken en afronden</string>
+    <string name="background_review_prompt">Bekijk de resultaten van het achtergrondwerk hierboven en rond de taak af. Vraag het me eerst als iets nog mijn bevestiging nodig heeft.</string>
 
     <!-- Models -->
     <string name="model_picker_title">Model</string>
@@ -122,6 +132,7 @@
     <string name="screen_attached">Scherm toegevoegd</string>
     <string name="open_full_chat">Volledig gesprek openen</string>
     <string name="notification_channel_replies">Antwoorden</string>
+    <string name="notification_channel_background">Achtergrondwerk</string>
     <string name="assist_not_configured">dudan is nog niet verbonden met Hermes. Tik om het in te stellen.</string>
 
     <!-- Settings -->

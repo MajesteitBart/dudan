@@ -135,6 +135,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     fun reloadCurrent() = engine.load(_currentId.value, force = true)
 
+    /** The app is back in front: show what arrived while it was away, such as background results. */
+    fun onAppResumed() {
+        engine.load(_currentId.value)
+        if (engine.sessions.value.loadedOnce) engine.refreshSessions()
+    }
+
+    /** The user asks the agent to act on background results that came in after its turn. */
+    fun reviewBackground() {
+        speaker.stop()
+        engine.reviewBackground(_currentId.value, getApplication<Application>().getString(R.string.background_review_prompt))
+    }
+
     /** True while picked images are being encoded; the composer counts as busy so nothing overtakes that turn. */
     var preparingSend by mutableStateOf(false)
         private set

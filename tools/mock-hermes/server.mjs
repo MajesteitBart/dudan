@@ -12,6 +12,9 @@
 // replies (see openui-demo.mjs), and turns with attached files get a reply that names them.
 // MOCK_LANG=en switches the seeded chats and scripted replies from Dutch to English, as used for
 // the README screenshots.
+// Questions with "op de achtergrond" or "in the background" start a detached subagent, the way
+// Hermes' delegate_task does: the run ends at once and the worker's result lands in the transcript
+// MOCK_BACKGROUND_MS later (default 20000), without a new turn.
 // From the Android emulator the host is http://10.0.2.2:<port>.
 
 import http from "node:http";
@@ -37,6 +40,10 @@ const TURN_TEXT = {
     cleanupThinking: "Eerst kijken wat er in de exportmap staat voordat ik iets weghaal.",
     cleanupInterim: "Alles in die map is ouder dan zes maanden. Ik verwijder de hele map.",
     cleanedUp: "Klaar. Ik heb `~/tmp/old-exports` verwijderd; dat maakt 2,1 GB vrij.",
+    dispatched: "Ik heb een subagent op pad gestuurd om de vluchten te vergelijken. Het resultaat komt vanzelf in dit gesprek.",
+    workerGoal: "Vergelijk vluchten Amsterdam–Lissabon op 14 november",
+    workerResult: "De goedkoopste directe vlucht is **TAP TP671** om 06:15 voor €89. KLM KL1691 om 09:40 kost €134.",
+    reviewed: "Ik heb het resultaat bekeken. De goedkoopste directe vlucht is TAP TP671 om 06:15 voor €89. Zal ik hem voor je vastzetten?",
   },
   en: {
     thinking: "The user wants an answer. I'll look it up first.",
@@ -46,10 +53,18 @@ const TURN_TEXT = {
     cleanupThinking: "Let me check what's in the exports folder before I remove anything.",
     cleanupInterim: "Everything in there is more than six months old. I'll remove the whole folder.",
     cleanedUp: "Done. I removed `~/tmp/old-exports` and freed 2.1 GB.",
+    dispatched: "I sent a subagent off to compare the flights. Its result will show up in this chat by itself.",
+    workerGoal: "Compare flights Amsterdam–Lisbon on 14 November",
+    workerResult: "The cheapest direct flight is **TAP TP671** at 06:15 for €89. KLM KL1691 at 09:40 costs €134.",
+    reviewed: "I looked at the result. The cheapest direct flight is TAP TP671 at 06:15 for €89. Shall I hold it for you?",
   },
 }[LANG];
 
 const sessions = new Map(); // id -> { meta, messages }
+// Hermes' message ids are SQLite row ids: unique across sessions and increasing.
+let lastRowId = 0;
+const rowId = () => ++lastRowId;
+const BACKGROUND_MS = Number(process.env.MOCK_BACKGROUND_MS ?? 20000);
 const runs = new Map(); // id -> { status, output, error, events: [], listeners: Set, approval, stop }
 const now = () => Date.now() / 1000;
 
@@ -80,18 +95,18 @@ function seed() {
   sessions.set(id, {
     meta: { id, source: "api_server", title: SEED_TEXT.holidayTitle, started_at: t, last_active: t + 60, pinned: true, message_count: 4 },
     messages: [
-      { id: 1, role: "user", content: SEED_TEXT.holidayQuestion, timestamp: t },
-      { id: 2, role: "assistant", content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "web_search", arguments: JSON.stringify({ query: SEED_TEXT.holidayQuery }) } }], timestamp: t + 5 },
-      { id: 3, role: "tool", tool_call_id: "c1", content: SEED_TEXT.holidayResult, timestamp: t + 9 },
-      { id: 4, role: "assistant", content: SEED_TEXT.holidayAnswer, timestamp: t + 14 },
+      { id: rowId(), role: "user", content: SEED_TEXT.holidayQuestion, timestamp: t },
+      { id: rowId(), role: "assistant", content: "", tool_calls: [{ id: "c1", type: "function", function: { name: "web_search", arguments: JSON.stringify({ query: SEED_TEXT.holidayQuery }) } }], timestamp: t + 5 },
+      { id: rowId(), role: "tool", tool_call_id: "c1", content: SEED_TEXT.holidayResult, timestamp: t + 9 },
+      { id: rowId(), role: "assistant", content: SEED_TEXT.holidayAnswer, timestamp: t + 14 },
     ],
   });
   const id2 = "dudan_seed_code";
   sessions.set(id2, {
     meta: { id: id2, source: "api_server", title: SEED_TEXT.codeTitle, started_at: t - 86400, last_active: t - 86000, pinned: false, message_count: 2 },
     messages: [
-      { id: 5, role: "user", content: SEED_TEXT.codeQuestion, timestamp: t - 86400 },
-      { id: 6, role: "assistant", content: "```typescript\nimport { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';\n\nexport const accounts = sqliteTable('accounts', {\n  id: text('id').primaryKey(),\n  email: text('email').notNull(),\n});\n```", timestamp: t - 86380 },
+      { id: rowId(), role: "user", content: SEED_TEXT.codeQuestion, timestamp: t - 86400 },
+      { id: rowId(), role: "assistant", content: "```typescript\nimport { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';\n\nexport const accounts = sqliteTable('accounts', {\n  id: text('id').primaryKey(),\n  email: text('email').notNull(),\n});\n```", timestamp: t - 86380 },
     ],
   });
 }
@@ -155,7 +170,9 @@ async function agentTurn(session, input, emit, control, instructions) {
   const question = textOf(input);
   const hasImage = Array.isArray(input) && input.some((p) => p.type === "image_url");
   const t0 = now();
-  session.messages.push({ id: session.messages.length + 100, role: "user", content: input, timestamp: t0 });
+  session.messages.push({ id: rowId(), role: "user", content: input, timestamp: t0 });
+  if (/achtergrondwerk hierboven|background results above/i.test(question)) return reviewTurn(session, emit, t0);
+  if (/op de achtergrond|in the background/i.test(question)) return backgroundTurn(session, emit, t0);
   // A request to delete something looks around the folder first, then asks for approval.
   const cleanup = /verwijder|delete|\brm\s/i.test(question);
   emit("reasoning.available", { text: cleanup ? TURN_TEXT.cleanupThinking : TURN_TEXT.thinking });
@@ -209,12 +226,69 @@ async function agentTurn(session, input, emit, control, instructions) {
   return { status: "completed", output: out };
 }
 
+async function streamText(out, emit) {
+  for (const piece of out.match(/[\s\S]{1,8}/g)) {
+    emit("message.delta", { delta: piece });
+    await sleep(25);
+  }
+}
+
+// delegate_task with background=true: the tool returns at once and the run ends; the worker's
+// result is saved to the transcript later as a user row, the way gateway/wake.py does it.
+async function backgroundTurn(session, emit, t0) {
+  const delegationId = `deleg_${randomBytes(4).toString("hex")}`;
+  const goal = TURN_TEXT.workerGoal;
+  emit("tool.started", { tool: "delegate_task", preview: goal });
+  await sleep(400);
+  emit("tool.completed", { tool: "delegate_task", duration: 0.4, error: false, preview: "dispatched" });
+  const out = TURN_TEXT.dispatched;
+  await streamText(out, emit);
+  const payload = { status: "dispatched", mode: "background", count: 1, delegation_id: delegationId, goals: [goal], note: "Results are delivered only after you END YOUR TURN." };
+  session.messages.push(
+    { id: rowId(), role: "assistant", content: "", tool_calls: [{ id: "d1", function: { name: "delegate_task", arguments: JSON.stringify({ goal, background: true }) } }], timestamp: t0 + 1 },
+    { id: rowId(), role: "tool", tool_call_id: "d1", content: JSON.stringify(payload), timestamp: t0 + 1 },
+    { id: rowId(), role: "assistant", content: out, timestamp: now() },
+  );
+  touch(session);
+  setTimeout(() => {
+    if (!sessions.has(session.meta.id)) return;
+    const content = [
+      `[ASYNC DELEGATION COMPLETE — ${delegationId}]`,
+      "A background subagent you dispatched earlier has finished. You may have moved on since dispatching it; the full task source is below so you can act on the result or re-dispatch if things have changed.",
+      "",
+      `Original goal: ${goal}`,
+      "Role: leaf   Model: mock",
+      `Status: completed   API calls: 6   Duration: ${Math.round(BACKGROUND_MS / 1000)}s`,
+      "--- RESULT ---",
+      TURN_TEXT.workerResult,
+    ].join("\n");
+    session.messages.push({ id: rowId(), role: "user", content, display_kind: "async_delegation_complete", timestamp: now() });
+    touch(session);
+    console.log(`  background result for ${session.meta.id} (${delegationId})`);
+  }, BACKGROUND_MS);
+  return { status: "completed", output: out };
+}
+
+async function reviewTurn(session, emit, t0) {
+  const out = TURN_TEXT.reviewed;
+  await streamText(out, emit);
+  session.messages.push({ id: rowId(), role: "assistant", content: out, timestamp: now() });
+  touch(session);
+  return { status: "completed", output: out };
+}
+
+function touch(session) {
+  session.meta.last_active = now();
+  session.meta.message_count = session.messages.length;
+  if (!session.meta.title) session.meta.title = textOf(session.messages.find((m) => m.role === "user")?.content ?? "").slice(0, 40);
+}
+
 function finish(session, out, t0) {
   const t = now();
   session.messages.push(
-    { id: session.messages.length + 100, role: "assistant", content: "", tool_calls: [{ id: "x1", function: { name: "web_search", arguments: "{\"query\":\"mock\"}" } }], timestamp: t0 + 1 },
-    { id: session.messages.length + 101, role: "tool", tool_call_id: "x1", content: "3 results", timestamp: t0 + 2 },
-    { id: session.messages.length + 102, role: "assistant", content: out, timestamp: t },
+    { id: rowId(), role: "assistant", content: "", tool_calls: [{ id: "x1", function: { name: "web_search", arguments: "{\"query\":\"mock\"}" } }], timestamp: t0 + 1 },
+    { id: rowId(), role: "tool", tool_call_id: "x1", content: "3 results", timestamp: t0 + 2 },
+    { id: rowId(), role: "assistant", content: out, timestamp: t },
   );
   session.meta.last_active = t;
   session.meta.message_count = session.messages.length;
@@ -298,7 +372,17 @@ const server = http.createServer(async (req, res) => {
       sessions.delete(s.meta.id);
       return send(res, 200, { object: "hermes.session.deleted", id: s.meta.id, deleted: true });
     }
-    if (parts[3] === "messages") return send(res, 200, { object: "list", session_id: s.meta.id, data: s.messages });
+    if (parts[3] === "messages") {
+      // Hermes' default page is the latest 500 rows. order=latest pages back from the newest row,
+      // order=oldest forward from the first; both return rows oldest first.
+      const explicit = url.searchParams.get("limit");
+      const limit = Math.min(Number(explicit ?? 500), 500);
+      const offset = Number(url.searchParams.get("offset") ?? 0);
+      const order = url.searchParams.get("order") ?? (explicit === null ? "latest" : "oldest");
+      const end = Math.max(s.messages.length - offset, 0);
+      const data = order === "latest" ? s.messages.slice(Math.max(end - limit, 0), end) : s.messages.slice(offset, offset + limit);
+      return send(res, 200, { object: "list", session_id: s.meta.id, data, pagination: { limit, offset, order, returned: data.length } });
+    }
     if (parts[3] === "chat" && parts[4] === "stream") {
       const body = await readBody(req);
       const runId = `run_${randomUUID().replace(/-/g, "")}`;

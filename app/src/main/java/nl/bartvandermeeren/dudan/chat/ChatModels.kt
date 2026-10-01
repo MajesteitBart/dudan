@@ -2,9 +2,11 @@ package nl.bartvandermeeren.dudan.chat
 
 import nl.bartvandermeeren.dudan.data.ApprovalRequest
 import nl.bartvandermeeren.dudan.data.FileRef
+import nl.bartvandermeeren.dudan.data.ModelChoice
 import nl.bartvandermeeren.dudan.data.SessionSummary
 
-enum class Role { User, Assistant }
+/** [Background] is a result a subagent delivered after the agent's turn ended; see [BackgroundResult]. */
+enum class Role { User, Assistant, Background }
 
 enum class MessageState { Streaming, Done, Failed, Cancelled }
 
@@ -42,10 +44,22 @@ data class UiMessage(
     val reconnecting: Boolean = false,
     /** Stop was requested; waiting for Hermes to confirm the run ended. */
     val stopping: Boolean = false,
+    /** Set on [Role.Background] items. */
+    val background: BackgroundResult? = null,
+    /** Set on a user turn sent by "Review result and finish"; a retry checks again that nobody continued meanwhile. */
+    val review: ReviewRequest? = null,
 ) {
     val isStreaming: Boolean get() = state == MessageState.Streaming
+    val reviewsBackground: Boolean get() = review != null
     val workedMs: Long? get() = if (startedAtMs != null && finishedAtMs != null) finishedAtMs - startedAtMs else null
 }
+
+/**
+ * How a "Review result and finish" turn asked Hermes for its run: the idempotency key and, once sent,
+ * the model and whether rich replies were on. A retry asks again with exactly these, since Hermes only
+ * matches a repeated key with the same request.
+ */
+data class ReviewRequest(val key: String, val model: ModelChoice? = null, val richReplies: Boolean? = null)
 
 data class Conversation(
     val sessionId: String,
@@ -55,9 +69,20 @@ data class Conversation(
     val loaded: Boolean = false,
     val loading: Boolean = false,
     val loadError: String? = null,
+    /** "Review and finish" is checking with Hermes before it starts the turn. */
+    val reviewing: Boolean = false,
+    val reviewError: String? = null,
 ) {
     val isBusy: Boolean get() = messages.lastOrNull()?.isStreaming == true
     val showGreeting: Boolean get() = messages.isEmpty() && !loading && loadError == null
+
+    /**
+     * Background results came in after the agent's last turn and it hasn't looked at them. Only the
+     * user continues from here: arriving results never start a turn by themselves. An early failure
+     * notice alone doesn't count, because the rest of its batch is still running.
+     */
+    val awaitingReview: Boolean
+        get() = messages.takeLastWhile { it.role == Role.Background }.any { it.background?.interim == false }
 }
 
 data class SessionsState(

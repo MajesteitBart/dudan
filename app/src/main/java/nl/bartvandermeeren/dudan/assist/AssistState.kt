@@ -12,6 +12,7 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.data.AppContainer
 import nl.bartvandermeeren.dudan.data.AppSettings
@@ -143,6 +144,10 @@ class AssistState(
 
     fun stop() {
         sessionId?.let(engine::stop)
+    }
+
+    fun reviewBackground() {
+        sessionId?.let { engine.reviewBackground(it, context.getString(R.string.background_review_prompt)) }
     }
 
     fun openFullChat() = openInApp(sessionId, OpenMode.Chat)
