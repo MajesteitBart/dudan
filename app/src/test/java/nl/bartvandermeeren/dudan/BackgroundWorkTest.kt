@@ -194,6 +194,15 @@ class BackgroundHistoryTest {
     }
 
     @Test
+    fun everyStreamedReplyKeepsItsIdWhenSeveralTurnsCatchUpAtOnce() {
+        val shown = listOf(user("l_1", "Vraag 1"), answer("l_2", "Antwoord 1"), user("l_3", "Vraag 2"), answer("l_4", "Antwoord 2"))
+        val transcript = listOf(user("h_1", "Vraag 1"), answer("h_2", "Antwoord 1"), user("h_3", "Vraag 2"), answer("h_4", "Antwoord 2"))
+        val merged = HistoryMapper.reconcile(shown, transcript).messages
+        assertEquals(listOf("h_1", "l_2", "h_3", "l_4"), merged.map { it.id })
+        assertEquals(merged, HistoryMapper.reconcile(merged, transcript).messages)
+    }
+
+    @Test
     fun aResultFromBeforeAStoppedTurnGoesBeforeIt() {
         val stopped = listOf(user("h_1", "Eerder"), answer("h_2", "Eerder antwoord"), user("l_3", "Nieuw"), answer("l_4", "Half", MessageState.Cancelled))
         // The result landed just before the user sent "Nieuw", which Hermes saved before the stop.
