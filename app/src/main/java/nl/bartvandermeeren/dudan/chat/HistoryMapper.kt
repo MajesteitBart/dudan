@@ -115,7 +115,7 @@ object HistoryMapper {
     fun reconcile(shown: List<UiMessage>, transcript: List<UiMessage>): Reconciled {
         val questionIndex = shown.indexOfLast { it.role == Role.User }
         val question = shown.getOrNull(questionIndex)
-        if (question == null || question.id.startsWith("h_")) return Reconciled(keepReplyIds(shown, transcript, -1), caughtUp = true)
+        if (question == null || question.id.startsWith("h_")) return Reconciled(keepReplyIds(shown, transcript), caughtUp = true)
         val anchor = shown.subList(0, questionIndex).lastOrNull { it.id.startsWith("h_") }?.id
         val from = anchor?.let { id -> transcript.indexOfFirst { it.id == id } + 1 } ?: 0
         val savedQuestion = (from until transcript.size).firstOrNull {
@@ -123,7 +123,7 @@ object HistoryMapper {
         }
         val answer = shown.drop(questionIndex + 1).lastOrNull { it.role == Role.Assistant }
         if (savedQuestion != null && holdsTurn(transcript, savedQuestion, answer)) {
-            return Reconciled(keepReplyIds(shown, transcript, savedQuestion), caughtUp = true)
+            return Reconciled(keepReplyIds(shown, transcript), caughtUp = true)
         }
         val known = shown.mapNotNullTo(mutableSetOf()) { it.background?.key }
         fun results(indices: IntRange) = indices.map { transcript[it] }.filter { it.role == Role.Background && it.background?.key !in known }
@@ -145,20 +145,23 @@ object HistoryMapper {
 
     /**
      * Replies this app streamed keep their ids on the saved copies, so a reply being read aloud keeps
-     * its stop button. A reply is matched within its own turn: the one after its question, found by id,
-     * or at [savedQuestion] for the chat's last question when that is still this app's own.
+     * its stop button. Each question is matched to its saved copy in order (by id when it has one,
+     * else the next question with the same text), and a reply only within its own question's turn.
      */
-    private fun keepReplyIds(shown: List<UiMessage>, transcript: List<UiMessage>, savedQuestion: Int): List<UiMessage> {
+    private fun keepReplyIds(shown: List<UiMessage>, transcript: List<UiMessage>): List<UiMessage> {
         val ids = mutableMapOf<Int, String>()
-        var question: UiMessage? = null
+        var next = 0
+        var turn = -1
         shown.forEach { message ->
-            if (message.role == Role.User) question = message
-            if (message.role != Role.Assistant || message.id.startsWith("h_") || message.text.isBlank()) return@forEach
-            val asked = question ?: return@forEach
-            val start = if (asked.id.startsWith("h_")) transcript.indexOfFirst { it.id == asked.id } else savedQuestion
-            if (start < 0 || transcript.getOrNull(start)?.role != Role.User) return@forEach
-            val end = (start + 1 until transcript.size).firstOrNull { transcript[it].role == Role.User } ?: transcript.size
-            val reply = (start + 1 until end).lastOrNull { transcript[it].role == Role.Assistant && transcript[it].text.trim() == message.text.trim() }
+            if (message.role == Role.User) {
+                turn = if (message.id.startsWith("h_")) transcript.indexOfFirst { it.id == message.id }
+                else (next until transcript.size).firstOrNull { transcript[it].role == Role.User && transcript[it].text.trim() == message.text.trim() } ?: -1
+                if (turn >= 0) next = turn + 1
+                return@forEach
+            }
+            if (message.role != Role.Assistant || message.id.startsWith("h_") || message.text.isBlank() || turn < 0) return@forEach
+            val end = (turn + 1 until transcript.size).firstOrNull { transcript[it].role == Role.User } ?: transcript.size
+            val reply = (turn + 1 until end).lastOrNull { transcript[it].role == Role.Assistant && transcript[it].text.trim() == message.text.trim() }
             if (reply != null) ids[reply] = message.id
         }
         return if (ids.isEmpty()) transcript else transcript.mapIndexed { index, message -> ids[index]?.let { message.copy(id = it) } ?: message }
