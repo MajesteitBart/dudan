@@ -29,6 +29,8 @@ class LocalSpeechSession(
     private val context: Context,
     private val engine: OrukeetEngine,
     private val listener: Listener,
+    /** Silence after speech that ends the utterance; see [Endpointer]. */
+    private val endSilenceMs: Int = Endpointer.DEFAULT_END_SILENCE_MS,
 ) {
     interface Listener {
         fun onListening()
@@ -132,7 +134,7 @@ class LocalSpeechSession(
         val pcm = ShortArray(WINDOW)
         val window = FloatArray(WINDOW)
         val audio = Recording()
-        val endpointer = Endpointer()
+        val endpointer = Endpointer(endSilenceMs = endSilenceMs)
         var speechStart = -1
         var lastPreview = 0
         var windows = 0

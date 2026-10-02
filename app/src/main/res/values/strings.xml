@@ -164,6 +164,10 @@
     <string name="stt_orukeet_downloading">Downloading speech model… %1$d%%</string>
     <string name="stt_orukeet_download">Download speech model (%1$d MB)</string>
     <string name="stt_orukeet_crashed">Orukeet crashed while starting on this phone. Voice input uses the Android recognizer until you try again.</string>
+    <string name="speech_pause">Stop listening after</string>
+    <string name="speech_pause_value">%1$.1f s</string>
+    <string name="speech_pause_detail">How long you can stay silent before voice input ends. Raise it if dudan cuts you off mid-sentence.</string>
+    <string name="speech_pause_detail_system">How long you can stay silent before voice input ends. The Android recognizer may ignore this and keep its own timing.</string>
     <string name="tts_preview_text">Hi %1$s, this is how I sound when I read a reply aloud.</string>
     <string name="section_dutch_voice">Dutch voice</string>
     <string name="tts_supertonic">Supertonic</string>

@@ -38,6 +38,7 @@ class SpeechInput(private val context: Context) {
     val isActive: Boolean get() = _phase.value != Phase.Idle
 
     private var language: String? = null
+    private var pauseMs = Endpointer.DEFAULT_END_SILENCE_MS
     private var candidates: List<android.content.ComponentName> = emptyList()
     private var attempt = 0
 
@@ -47,7 +48,9 @@ class SpeechInput(private val context: Context) {
         this.onResult = onResult
         this.onError = onError
         val container = context.appContainer
-        if (container.settingsSnapshot.value.sttEngine == SttEngine.Orukeet && container.orukeet.isReady) {
+        val settings = container.settingsSnapshot.value
+        pauseMs = settings.speechPauseMs
+        if (settings.sttEngine == SttEngine.Orukeet && container.orukeet.isReady) {
             startLocal(container.orukeet)
             return
         }
@@ -103,6 +106,7 @@ class SpeechInput(private val context: Context) {
                     callback?.invoke(code)
                 }
             },
+            endSilenceMs = pauseMs,
         )
         local = session
         session.start()
@@ -125,6 +129,9 @@ class SpeechInput(private val context: Context) {
             putExtra(RecognizerIntent.EXTRA_PARTIAL_RESULTS, true)
             putExtra(RecognizerIntent.EXTRA_MAX_RESULTS, 1)
             putExtra(RecognizerIntent.EXTRA_CALLING_PACKAGE, context.packageName)
+            // Only a request: Android's docs warn that a recognizer may ignore these and keep its own timing.
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, pauseMs.toLong())
+            putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, pauseMs.toLong())
             if (!language.isNullOrBlank()) {
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
                 putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)

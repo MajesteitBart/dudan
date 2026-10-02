@@ -12,8 +12,11 @@ class Endpointer(
     private val keepThreshold: Float = 0.35f,
     /** Continuous speech needed to start, so a cough or click doesn't. */
     private val startSpeechMs: Int = 160,
-    /** Silence after speech that ends the utterance. */
-    private val endSilenceMs: Int = 1_100,
+    /**
+     * Silence after speech that ends the utterance. Long enough by default that a pause at a comma or
+     * to find a word doesn't cut the sentence off; Settings > Speech input changes it.
+     */
+    private val endSilenceMs: Int = DEFAULT_END_SILENCE_MS,
     /** Nothing said this long after the microphone opened: give up, like Android's recognizer. */
     private val noSpeechTimeoutMs: Int = 8_000,
     private val maxUtteranceMs: Int = 60_000,
@@ -54,4 +57,11 @@ class Endpointer(
 
     /** Trailing silence at the moment the utterance ended, so it can be trimmed before decoding. */
     val trailingSilenceMs: Int get() = silenceRunMs
+
+    companion object {
+        const val DEFAULT_END_SILENCE_MS = 2_000
+
+        /** What the setting offers: shorter cuts sentences off, longer makes every question wait. */
+        val END_SILENCE_RANGE_MS = 1_000..5_000
+    }
 }

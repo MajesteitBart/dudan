@@ -29,7 +29,10 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-        if (savedInstanceState == null) handleIntent(intent)
+        // Reopening from Recents after Back replays the intent that started the task. For an assistant
+        // hand-off that would bring back its chat, or start Live again; open like the launcher does.
+        val fromRecents = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
+        if (savedInstanceState == null && !fromRecents) handleIntent(intent)
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
             DudanTheme(

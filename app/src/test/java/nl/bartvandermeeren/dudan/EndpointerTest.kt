@@ -1,6 +1,7 @@
 package nl.bartvandermeeren.dudan
 
 import nl.bartvandermeeren.dudan.voice.Endpointer
+import nl.bartvandermeeren.dudan.voice.Endpointer.Companion.DEFAULT_END_SILENCE_MS
 import nl.bartvandermeeren.dudan.voice.Endpointer.Event
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -28,11 +29,11 @@ class EndpointerTest {
     fun speechThenSilenceStartsAndEnds() {
         val clock = intArrayOf(0)
         val endpointer = Endpointer()
-        val events = endpointer.feed(500, 0.02f, clock) + endpointer.feed(1_000, 0.9f, clock) + endpointer.feed(2_000, 0.02f, clock)
+        val events = endpointer.feed(500, 0.02f, clock) + endpointer.feed(1_000, 0.9f, clock) + endpointer.feed(3_000, 0.02f, clock)
         assertEquals(listOf(Event.Started, Event.Ended), events.map { it.first }.distinct())
-        // Started 160 ms into speech; ended 1.1 s after it stopped.
+        // Started 160 ms into speech; ended the default 2 s after it stopped.
         assertEquals(500 + 160, events.first { it.first == Event.Started }.second, window)
-        assertEquals(1_500 + 1_100, events.first { it.first == Event.Ended }.second, window)
+        assertEquals(1_500 + DEFAULT_END_SILENCE_MS, events.first { it.first == Event.Ended }.second, window)
     }
 
     @Test
@@ -50,10 +51,31 @@ class EndpointerTest {
         val events = endpointer.feed(1_000, 0.9f, clock) +
             endpointer.feed(700, 0.1f, clock) +
             endpointer.feed(1_000, 0.9f, clock) +
-            endpointer.feed(1_500, 0.1f, clock)
+            endpointer.feed(2_500, 0.1f, clock)
         assertEquals(listOf(Event.Started, Event.Ended), events.map { it.first }.distinct())
         // The 700 ms pause didn't end it; only the silence after the second sentence did.
-        assertEquals(2_700 + 1_100, events.first { it.first == Event.Ended }.second, window)
+        assertEquals(2_700 + DEFAULT_END_SILENCE_MS, events.first { it.first == Event.Ended }.second, window)
+    }
+
+    @Test
+    fun aPauseToFindTheNextWordKeepsListening() {
+        val clock = intArrayOf(0)
+        val endpointer = Endpointer()
+        // 1.5 s at a comma used to end the question at 1.1 s.
+        val events = endpointer.feed(1_500, 0.9f, clock) + endpointer.feed(1_500, 0.1f, clock) + endpointer.feed(1_000, 0.9f, clock)
+        assertEquals(listOf(Event.Started), events.map { it.first })
+    }
+
+    @Test
+    fun theUsersPauseSettingDecidesTheEnd() {
+        val clock = intArrayOf(0)
+        val endpointer = Endpointer(endSilenceMs = 3_500)
+        val events = endpointer.feed(1_000, 0.9f, clock) +
+            endpointer.feed(3_000, 0.1f, clock) +
+            endpointer.feed(1_000, 0.9f, clock) +
+            endpointer.feed(4_000, 0.1f, clock)
+        assertEquals(listOf(Event.Started, Event.Ended), events.map { it.first }.distinct())
+        assertEquals(5_000 + 3_500, events.first { it.first == Event.Ended }.second, window)
     }
 
     @Test
