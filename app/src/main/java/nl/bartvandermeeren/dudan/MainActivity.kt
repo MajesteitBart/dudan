@@ -29,10 +29,7 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.dark(Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-        // Reopening from Recents after Back replays the intent that started the task. For an assistant
-        // hand-off that would bring back its chat, or start Live again; open like the launcher does.
-        val fromRecents = intent.flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY != 0
-        if (savedInstanceState == null && !fromRecents) handleIntent(intent)
+        if (handlesLaunchIntent(restored = savedInstanceState != null, intent.flags)) handleIntent(intent)
         setContent {
             val settings by vm.settings.collectAsStateWithLifecycle()
             DudanTheme(
@@ -97,3 +94,11 @@ class MainActivity : ComponentActivity() {
         const val EXTRA_FROM_ASSISTANT = "nl.bartvandermeeren.aight.FROM_ASSISTANT"
     }
 }
+
+/**
+ * Whether onCreate acts on the intent that started the activity. A restored activity already did.
+ * Reopening from Recents after Back replays the intent that started the task: for an assistant
+ * hand-off that would bring back its chat, or start Live again, so dudan opens like the launcher does.
+ */
+internal fun handlesLaunchIntent(restored: Boolean, flags: Int): Boolean =
+    !restored && flags and Intent.FLAG_ACTIVITY_LAUNCHED_FROM_HISTORY == 0
