@@ -5,6 +5,7 @@ import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
 import androidx.datastore.preferences.core.edit
+import androidx.datastore.preferences.core.intPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
 import java.security.SecureRandom
@@ -12,6 +13,7 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import nl.bartvandermeeren.dudan.voice.Endpointer
 
 /**
  * Hermes' `reasoning_effort` levels the picker offers, weakest first. A level the model doesn't
@@ -88,6 +90,8 @@ data class AppSettings(
     val dutchTtsEngine: DutchTtsEngine = DutchTtsEngine.Supertonic,
     val supertonicVoice: String = DEFAULT_SUPERTONIC_VOICE,
     val sttEngine: SttEngine = SttEngine.Orukeet,
+    /** How long the user can pause before voice input decides they're done. */
+    val speechPauseMs: Int = Endpointer.DEFAULT_END_SILENCE_MS,
     /** Hermes may act on this phone through its MCP server; see device/PhoneControl. */
     val phoneControl: Boolean = false,
     /** The bearer token Hermes sends to that server. Created when phone control is first turned on. */
@@ -146,6 +150,7 @@ class SettingsRepository(private val context: Context) {
         val dutchTtsEngine = stringPreferencesKey("dutch_tts_engine")
         val supertonicVoice = stringPreferencesKey("supertonic_voice")
         val sttEngine = stringPreferencesKey("stt_engine")
+        val speechPauseMs = intPreferencesKey("speech_pause_ms")
         val phoneControl = booleanPreferencesKey("phone_control")
         val phoneToken = stringPreferencesKey("phone_token_enc")
         val richReplies = booleanPreferencesKey("rich_replies")
@@ -188,6 +193,7 @@ class SettingsRepository(private val context: Context) {
         dutchTtsEngine = this[Keys.dutchTtsEngine]?.let { runCatching { DutchTtsEngine.valueOf(it) }.getOrNull() } ?: DutchTtsEngine.Supertonic,
         supertonicVoice = this[Keys.supertonicVoice]?.takeIf { it.isNotBlank() } ?: AppSettings.DEFAULT_SUPERTONIC_VOICE,
         sttEngine = this[Keys.sttEngine]?.let { runCatching { SttEngine.valueOf(it) }.getOrNull() } ?: SttEngine.Orukeet,
+        speechPauseMs = this[Keys.speechPauseMs]?.coerceIn(Endpointer.END_SILENCE_RANGE_MS) ?: Endpointer.DEFAULT_END_SILENCE_MS,
         phoneControl = this[Keys.phoneControl] ?: false,
         phoneToken = this[Keys.phoneToken]?.let(SecretBox::decrypt).orEmpty(),
         richReplies = this[Keys.richReplies] ?: true,
@@ -234,6 +240,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setDutchTtsEngine(value: DutchTtsEngine) = context.dataStore.edit { it[Keys.dutchTtsEngine] = value.name }
     suspend fun setSupertonicVoice(value: String) = context.dataStore.edit { it[Keys.supertonicVoice] = value }
     suspend fun setSttEngine(value: SttEngine) = context.dataStore.edit { it[Keys.sttEngine] = value.name }
+    suspend fun setSpeechPause(ms: Int) = context.dataStore.edit { it[Keys.speechPauseMs] = ms.coerceIn(Endpointer.END_SILENCE_RANGE_MS) }
     suspend fun setRichReplies(value: Boolean) = context.dataStore.edit { it[Keys.richReplies] = value }
     suspend fun setUploadUrl(value: String) = context.dataStore.edit {
         val url = value.trim()

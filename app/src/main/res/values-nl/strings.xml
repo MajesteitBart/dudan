@@ -162,6 +162,10 @@
     <string name="stt_orukeet_downloading">Spraakmodel downloaden… %1$d%%</string>
     <string name="stt_orukeet_download">Spraakmodel downloaden (%1$d MB)</string>
     <string name="stt_orukeet_crashed">Orukeet crashte bij het starten op deze telefoon. Spraakinvoer gebruikt de Android-herkenning tot je het opnieuw probeert.</string>
+    <string name="speech_pause">Stop met luisteren na</string>
+    <string name="speech_pause_value">%1$.1f s</string>
+    <string name="speech_pause_detail">Zo lang mag je stil zijn voordat de spraakinvoer stopt. Zet het hoger als dudan je midden in een zin onderbreekt.</string>
+    <string name="speech_pause_detail_system">Zo lang mag je stil zijn voordat de spraakinvoer stopt. De Android-herkenning kan dit negeren en zijn eigen timing aanhouden.</string>
     <string name="tts_preview_text">Hi %1$s, this is how I sound when I read a reply aloud.</string>
     <string name="section_dutch_voice">Nederlandse stem</string>
     <string name="tts_supertonic">Supertonic</string>

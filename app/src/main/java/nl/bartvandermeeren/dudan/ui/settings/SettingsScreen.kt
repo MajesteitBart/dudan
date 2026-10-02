@@ -53,10 +53,13 @@ import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.Slider
+import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -73,6 +76,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.stateDescription
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
@@ -86,6 +90,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import kotlin.math.roundToInt
 import nl.bartvandermeeren.dudan.BuildConfig
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.appContainer
@@ -115,6 +120,7 @@ import nl.bartvandermeeren.dudan.ui.theme.Accent
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import nl.bartvandermeeren.dudan.ui.theme.Sky
+import nl.bartvandermeeren.dudan.voice.Endpointer
 import nl.bartvandermeeren.dudan.voice.ModelPackage
 import nl.bartvandermeeren.dudan.voice.KokoroVoice
 import nl.bartvandermeeren.dudan.voice.SupertonicVoice
@@ -421,12 +427,58 @@ private fun SpeechInputSettings(vm: MainViewModel, settings: AppSettings) {
         selected = settings.sttEngine,
         onSelect = { scope.launch { vm.settingsRepository.setSttEngine(it) } },
     )
-    if (settings.sttEngine != SttEngine.Orukeet) return
-    Text(stringResource(R.string.stt_orukeet_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-    ModelStatus(
-        vm.orukeetModel,
-        ModelTexts(R.string.stt_orukeet_ready, R.string.stt_orukeet_downloading, R.string.stt_orukeet_download, R.string.stt_orukeet_crashed),
-    )
+    if (settings.sttEngine == SttEngine.Orukeet) {
+        Text(stringResource(R.string.stt_orukeet_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+        ModelStatus(
+            vm.orukeetModel,
+            ModelTexts(R.string.stt_orukeet_ready, R.string.stt_orukeet_downloading, R.string.stt_orukeet_download, R.string.stt_orukeet_crashed),
+        )
+    }
+    SpeechPause(settings.speechPauseMs, systemRecognizer = settings.sttEngine == SttEngine.System) {
+        scope.launch { vm.settingsRepository.setSpeechPause(it) }
+    }
+}
+
+private const val PAUSE_STEP_MS = 500
+
+/** How long a silence ends voice input, in half-second steps. */
+@Composable
+private fun SpeechPause(savedMs: Int, systemRecognizer: Boolean, onSave: (Int) -> Unit) {
+    val range = Endpointer.END_SILENCE_RANGE_MS
+    // Saved when the thumb is let go, not at every step of the drag.
+    var ms by remember(savedMs) { mutableIntStateOf(savedMs) }
+    val title = stringResource(R.string.speech_pause)
+    val value = stringResource(R.string.speech_pause_value, ms / 1000f)
+    val accent = LocalAccent.current
+    Column {
+        Row(verticalAlignment = Alignment.CenterVertically) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary, modifier = Modifier.weight(1f))
+            Text(value, style = MaterialTheme.typography.labelLarge, color = accent.soft)
+        }
+        Text(
+            stringResource(if (systemRecognizer) R.string.speech_pause_detail_system else R.string.speech_pause_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = Palette.TextSecondary,
+        )
+        Slider(
+            value = ms.toFloat(),
+            onValueChange = { ms = (it / PAUSE_STEP_MS).roundToInt() * PAUSE_STEP_MS },
+            onValueChangeFinished = { onSave(ms) },
+            valueRange = range.first.toFloat()..range.last.toFloat(),
+            steps = (range.last - range.first) / PAUSE_STEP_MS - 1,
+            colors = SliderDefaults.colors(
+                thumbColor = accent.color,
+                activeTrackColor = accent.color,
+                inactiveTrackColor = Palette.Outline,
+                activeTickColor = accent.on,
+                inactiveTickColor = Palette.TextTertiary,
+            ),
+            modifier = Modifier.semantics {
+                contentDescription = title
+                stateDescription = value
+            },
+        )
+    }
 }
 
 /** The wording for one on-device model's status. */
