@@ -169,6 +169,11 @@ function textOf(content) {
 async function agentTurn(session, input, emit, control, instructions) {
   const question = textOf(input);
   const hasImage = Array.isArray(input) && input.some((p) => p.type === "image_url");
+  if (instructions) {
+    // The OpenUI prompt is long and never changes; log only whether it came, and the turn's context.
+    const [first, context] = String(instructions).split("## This turn\n\n");
+    console.log(`  instructions${first.includes("openui-lang") ? " (with the OpenUI prompt)" : ""}:`, (context ?? first).trim());
+  }
   const t0 = now();
   session.messages.push({ id: rowId(), role: "user", content: input, timestamp: t0 });
   if (/achtergrondwerk hierboven|background results above/i.test(question)) return reviewTurn(session, emit, t0);

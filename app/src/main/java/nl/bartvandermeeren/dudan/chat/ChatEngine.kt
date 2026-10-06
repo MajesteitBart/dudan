@@ -34,7 +34,6 @@ import nl.bartvandermeeren.dudan.data.ModelProfile
 import nl.bartvandermeeren.dudan.data.RunOutcome
 import nl.bartvandermeeren.dudan.data.SessionSummary
 import nl.bartvandermeeren.dudan.data.AppSettings
-import nl.bartvandermeeren.dudan.openui.OpenUiPrompt
 
 /** An image ready to send: JPEG bytes plus the data: URL Hermes expects. */
 class PreparedImage(val bytes: ByteArray, val dataUrl: String)
@@ -62,6 +61,7 @@ class ChatEngine(
         val text: String,
         val images: List<PreparedImage>,
         files: List<FileRef>,
+        val origin: TurnOrigin,
         /** Set for "Review result and finish"; see [reviewBackground]. */
         var review: ReviewRequest? = null,
     ) {
@@ -242,7 +242,9 @@ class ChatEngine(
                     return@launch
                 }
                 show(sessionId, rows)
-                if (flow.value.awaitingReview) startTurn(sessionId, prompt, review = request)
+                // Asked the same way from every surface, so another dudan reviewing this result sends the
+                // same request and joins the run instead of hitting the key's conflict check.
+                if (flow.value.awaitingReview) startTurn(sessionId, prompt, origin = TurnOrigin(), review = request)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -254,21 +256,27 @@ class ChatEngine(
     }
 
     /** Starts a turn. Returns false when the conversation is still busy with the previous one. */
-    fun send(sessionId: String, text: String, images: List<PreparedImage> = emptyList(), files: List<FileRef> = emptyList()): Boolean =
-        startTurn(sessionId, text, images, files)
+    fun send(
+        sessionId: String,
+        text: String,
+        images: List<PreparedImage> = emptyList(),
+        files: List<FileRef> = emptyList(),
+        origin: TurnOrigin = TurnOrigin(),
+    ): Boolean = startTurn(sessionId, text, images, files, origin)
 
     private fun startTurn(
         sessionId: String,
         text: String,
         images: List<PreparedImage> = emptyList(),
         files: List<FileRef> = emptyList(),
+        origin: TurnOrigin = TurnOrigin(),
         review: ReviewRequest? = null,
     ): Boolean {
         val flow = flowFor(sessionId)
         if (flow.value.isBusy || (text.isBlank() && images.isEmpty() && files.isEmpty())) return false
         val user = UiMessage(
             id = nextLocalId(), role = Role.User, text = text, images = images.map { ImageRef(it.dataUrl) }, files = files,
-            review = review,
+            review = review, origin = origin,
         )
         val assistant = UiMessage(
             id = nextLocalId(), role = Role.Assistant, state = MessageState.Streaming, startedAtMs = System.currentTimeMillis(),
@@ -276,7 +284,7 @@ class ChatEngine(
         val wasNew = flow.value.isNew
         flow.update { it.copy(messages = it.messages + user + assistant, loaded = true, loadError = null) }
         if (wasNew) addOptimisticSession(sessionId, text.ifBlank { files.joinToString(", ") { it.name } })
-        val turn = Turn(sessionId, user.id, assistant.id, text, images, files, review)
+        val turn = Turn(sessionId, user.id, assistant.id, text, images, files, origin, review)
         turns[sessionId] = turn
         turn.job = scope.launch { runTurn(turn) }
         return true
@@ -299,7 +307,10 @@ class ChatEngine(
         val images = lastUser.images.mapNotNull { ref ->
             ref.source.takeIf { it.startsWith("data:") }?.let { PreparedImage(ByteArray(0), it) }
         }
-        send(sessionId, lastUser.text, images, lastUser.files)
+        // A question loaded from the transcript lost its origin; an assistant chat still says where it was asked.
+        val origin = lastUser.origin
+            ?: TurnOrigin(if (profileOf(sessionId) == ModelProfile.Assistant) TurnOrigin.Surface.Assistant else TurnOrigin.Surface.App)
+        send(sessionId, lastUser.text, images, lastUser.files, origin)
     }
 
     /**
@@ -448,7 +459,7 @@ class ChatEngine(
                 // A retried review asks the way it asked before.
                 val model = turn.review?.model ?: settings.modelFor(profileOf(sessionId))
                 val rich = turn.review?.richReplies ?: settings.richReplies
-                val instructions = OpenUiPrompt.instructions.takeIf { rich }
+                val instructions = TurnInstructions.build(turn.origin, settings.phoneControl, rich)
                 val events: Flow<AgentEvent> = if (turn.usesRuns) {
                     val runId = if (turn.review == null) api.startRun(sessionId, turn.input, model, instructions)
                     else admitReview(turn, model, rich, settings)
@@ -701,7 +712,7 @@ class ChatEngine(
     private suspend fun admitReview(turn: Turn, model: ModelChoice, rich: Boolean, settings: AppSettings): String {
         val key = turn.review!!.key
         remember(turn, ReviewRequest(key, model, rich))
-        val admission = api.admitRun(turn.sessionId, turn.input, model, OpenUiPrompt.instructions.takeIf { rich }, key)
+        val admission = api.admitRun(turn.sessionId, turn.input, model, reviewInstructions(turn, rich), key)
         if (!admission.replayed || admission.status !in setOf("failed", "cancelled", "interrupted")) return admission.runId
         val next = ReviewRequest(
             key = key.substringBeforeLast('#') + "#" + ((key.substringAfterLast('#', "1").toIntOrNull() ?: 1) + 1),
@@ -709,8 +720,14 @@ class ChatEngine(
             richReplies = settings.richReplies,
         )
         remember(turn, next)
-        return api.admitRun(turn.sessionId, turn.input, next.model!!, OpenUiPrompt.instructions.takeIf { next.richReplies == true }, next.key).runId
+        return api.admitRun(turn.sessionId, turn.input, next.model!!, reviewInstructions(turn, next.richReplies == true), next.key).runId
     }
+
+    /**
+     * A review's instructions leave out Phone control: that setting belongs to each phone, and another
+     * dudan reviewing the same result has to send the same request to join the run.
+     */
+    private fun reviewInstructions(turn: Turn, rich: Boolean) = TurnInstructions.build(turn.origin, phoneControl = null, richReplies = rich)
 
     private fun remember(turn: Turn, request: ReviewRequest) {
         turn.review = request

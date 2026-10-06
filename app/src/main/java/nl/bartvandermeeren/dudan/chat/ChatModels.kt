@@ -48,6 +48,8 @@ data class UiMessage(
     val background: BackgroundResult? = null,
     /** Set on a user turn sent by "Review result and finish"; a retry checks again that nobody continued meanwhile. */
     val review: ReviewRequest? = null,
+    /** Where a question sent from this app was asked; a retry sends it the same way. */
+    val origin: TurnOrigin? = null,
 ) {
     val isStreaming: Boolean get() = state == MessageState.Streaming
     val reviewsBackground: Boolean get() = review != null
