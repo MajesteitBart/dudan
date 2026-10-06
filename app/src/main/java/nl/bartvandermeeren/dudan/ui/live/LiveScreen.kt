@@ -61,6 +61,7 @@ import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.chat.MessageState
 import nl.bartvandermeeren.dudan.chat.Role
+import nl.bartvandermeeren.dudan.chat.TurnOrigin
 import nl.bartvandermeeren.dudan.ui.components.DudanMark
 import nl.bartvandermeeren.dudan.ui.components.glass
 import nl.bartvandermeeren.dudan.ui.theme.Palette
@@ -126,7 +127,7 @@ class LiveController(
         reply = ""
         val id = sessionId()
         val before = engine.conversation(id).value.messages.size
-        engine.send(id, text)
+        engine.send(id, text, origin = TurnOrigin(TurnOrigin.Surface.Live, spoken = true))
         turn = scope.launch {
             val done = engine.conversation(id).first { c ->
                 val last = c.messages.lastOrNull()

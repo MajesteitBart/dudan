@@ -48,6 +48,8 @@ data class UiMessage(
     val background: BackgroundResult? = null,
     /** Set on a user turn sent by "Review result and finish"; a retry checks again that nobody continued meanwhile. */
     val review: ReviewRequest? = null,
+    /** Where a question sent from this app was asked; a retry sends it the same way. */
+    val origin: TurnOrigin? = null,
 ) {
     val isStreaming: Boolean get() = state == MessageState.Streaming
     val reviewsBackground: Boolean get() = review != null
@@ -56,10 +58,15 @@ data class UiMessage(
 
 /**
  * How a "Review result and finish" turn asked Hermes for its run: the idempotency key and, once sent,
- * the model and whether rich replies were on. A retry asks again with exactly these, since Hermes only
- * matches a repeated key with the same request.
+ * the model and the settings that shaped its instructions. A retry asks again with exactly these, since
+ * Hermes only matches a repeated key with the same request.
  */
-data class ReviewRequest(val key: String, val model: ModelChoice? = null, val richReplies: Boolean? = null)
+data class ReviewRequest(
+    val key: String,
+    val model: ModelChoice? = null,
+    val richReplies: Boolean? = null,
+    val phoneControl: Boolean? = null,
+)
 
 data class Conversation(
     val sessionId: String,

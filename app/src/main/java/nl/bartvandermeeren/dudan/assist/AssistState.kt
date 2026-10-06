@@ -14,6 +14,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.ChatEngine
+import nl.bartvandermeeren.dudan.chat.TurnOrigin
 import nl.bartvandermeeren.dudan.data.AppContainer
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.AppVisibility
@@ -126,11 +127,11 @@ class AssistState(
         attachScreenshot = false
         speech.cancel()
         if (shot == null) {
-            engine.send(id, message)
+            engine.send(id, message, origin = origin())
         } else {
             scope.launch {
                 val image = withContext(Dispatchers.Default) { ImageCodec.prepare(shot) }
-                engine.send(id, message, listOf(image))
+                engine.send(id, message, listOf(image), origin = origin(screenshot = true))
             }
         }
     }
@@ -139,8 +140,12 @@ class AssistState(
     fun sendFromReply(message: String): Boolean {
         val id = sessionId ?: return false
         speech.cancel()
-        return engine.send(id, message)
+        return engine.send(id, message, origin = origin())
     }
+
+    /** Tells Hermes the question came from the overlay, and whether its answer will be read aloud. */
+    private fun origin(screenshot: Boolean = false) =
+        TurnOrigin(TurnOrigin.Surface.Assistant, spoken = speakNextReply && settings?.speakReplies == true, screenshot = screenshot)
 
     fun stop() {
         sessionId?.let(engine::stop)

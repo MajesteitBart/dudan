@@ -16,15 +16,21 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
 import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.chat.Conversation
 import nl.bartvandermeeren.dudan.chat.MessageState
+import nl.bartvandermeeren.dudan.chat.PreparedImage
 import nl.bartvandermeeren.dudan.chat.Role
+import nl.bartvandermeeren.dudan.chat.TurnInstructions
+import nl.bartvandermeeren.dudan.chat.TurnOrigin
 import nl.bartvandermeeren.dudan.chat.UiMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.HermesApi
@@ -102,14 +108,94 @@ class ChatEngineTest {
     private fun sendAndSettle(
         text: String,
         profile: ModelProfile = ModelProfile.Chats,
+        origin: TurnOrigin = TurnOrigin(),
+        images: List<PreparedImage> = emptyList(),
         whileRunning: (String) -> Unit = {},
     ): UiMessage = runBlocking {
-        val id = withContext(dispatcher) { engine.startNew(profile).also { engine.send(it, text) } }
+        val id = withContext(dispatcher) { engine.startNew(profile).also { engine.send(it, text, images, origin = origin) } }
         whileRunning(id)
-        withTimeout(20_000) {
-            val flow = withContext(dispatcher) { engine.conversation(id) }
-            flow.first { c: Conversation -> c.messages.lastOrNull()?.let { !it.isStreaming } == true }.messages.last()
+        settle(id)
+    }
+
+    private suspend fun settle(id: String): UiMessage = withTimeout(20_000) {
+        val flow = withContext(dispatcher) { engine.conversation(id) }
+        flow.first { c: Conversation -> c.messages.lastOrNull()?.let { !it.isStreaming } == true }.messages.last()
+    }
+
+    private fun String.json(): JsonObject = Json.parseToJsonElement(this).jsonObject
+
+    @Test
+    fun everyTurnTellsHermesWhereItWasAsked() {
+        settings = settings.copy(phoneControl = true)
+        val runs = CopyOnWriteArrayList<String>()
+        script { request ->
+            when {
+                request.path == "/v1/runs" -> {
+                    runs += request.body.readUtf8()
+                    MockResponse().setResponseCode(202).setBody("""{"run_id":"run_${runs.size}"}""")
+                }
+                request.path!!.endsWith("/events") -> sse("""{"event":"run.completed","output":"Ok"}""")
+                else -> MockResponse().setResponseCode(404)
+            }
         }
+        val spoken = TurnOrigin(TurnOrigin.Surface.Assistant, spoken = true)
+        sendAndSettle("Wat is de hoofdstad van Frankrijk?")
+        sendAndSettle("Zet een timer van tien minuten", ModelProfile.Assistant, spoken)
+        val typed = runs[0].json()["instructions"]?.jsonPrimitive?.content
+        assertEquals(TurnInstructions.build(TurnOrigin(), phoneControl = true, richReplies = true), typed)
+        assertTrue(typed!!.contains("openui-lang"))
+        val heard = runs[1].json()["instructions"]?.jsonPrimitive?.content
+        assertEquals(TurnInstructions.build(spoken, phoneControl = true, richReplies = true), heard)
+        assertFalse(heard!!.contains("openui-lang"))
+    }
+
+    @Test
+    fun imageTurnsSendTheInstructionsAsTheSessionSystemMessage() {
+        val bodies = CopyOnWriteArrayList<String>()
+        script { request ->
+            if (request.path!!.endsWith("/chat/stream")) {
+                bodies += request.body.readUtf8()
+                sse("""{"event":"run.completed","output":"Een instellingenscherm."}""")
+            } else {
+                MockResponse().setResponseCode(404)
+            }
+        }
+        val origin = TurnOrigin(TurnOrigin.Surface.Assistant, screenshot = true)
+        val reply = sendAndSettle(
+            "Wat zie ik hier?", ModelProfile.Assistant, origin, listOf(PreparedImage(ByteArray(0), "data:image/jpeg;base64,AAAA")),
+        )
+        assertEquals(MessageState.Done, reply.state)
+        val body = bodies.single().json()
+        assertEquals(TurnInstructions.build(origin, phoneControl = false, richReplies = true), body["system_message"]?.jsonPrimitive?.content)
+        assertFalse(body.containsKey("instructions"))
+    }
+
+    @Test
+    fun retrySendsTheQuestionTheWayItWasFirstAsked() {
+        val runs = CopyOnWriteArrayList<String>()
+        script { request ->
+            when {
+                request.path == "/v1/runs" -> {
+                    runs += request.body.readUtf8()
+                    MockResponse().setResponseCode(202).setBody("""{"run_id":"run_${runs.size}"}""")
+                }
+                request.path == "/v1/runs/run_1/events" -> sse("""{"event":"run.failed","error":"Provider overloaded"}""")
+                request.path!!.endsWith("/events") -> sse("""{"event":"run.completed","output":"Het is kwart over acht."}""")
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        val live = TurnOrigin(TurnOrigin.Surface.Live, spoken = true)
+        var id = ""
+        val failed = sendAndSettle("Hoe laat is het?", origin = live) { id = it }
+        assertEquals(MessageState.Failed, failed.state)
+
+        val retried = runBlocking {
+            withContext(dispatcher) { engine.retry(id) }
+            settle(id)
+        }
+        assertEquals(MessageState.Done, retried.state)
+        assertEquals(2, runs.size)
+        assertEquals(TurnInstructions.build(live, phoneControl = false, richReplies = true), runs[1].json()["instructions"]?.jsonPrimitive?.content)
     }
 
     @Test
@@ -529,8 +615,13 @@ class ChatEngineTest {
         assertEquals(MessageState.Done, done.messages.last().state)
         assertEquals(1, inputs.size)
         assertTrue(inputs[0], inputs[0].contains(""""input":"Rond af""""))
-        // Another dudan reviewing the same result, or a repeated request, joins this run.
+        // Another dudan reviewing the same result, or a repeated request, joins this run. The overlay and
+        // the app ask the same way, so the surface it was tapped on doesn't change the request.
         assertEquals(listOf("dudan-review-deleg_4"), keys)
+        assertEquals(
+            TurnInstructions.build(TurnOrigin(), phoneControl = false, richReplies = true),
+            inputs[0].json()["instructions"]?.jsonPrimitive?.content,
+        )
         assertTrue(done.messages.last { it.role == Role.User }.reviewsBackground)
         assertFalse(done.awaitingReview)
     }
@@ -588,8 +679,8 @@ class ChatEngineTest {
         flow.await { it.messages.lastOrNull()?.state == MessageState.Failed }
 
         hermes.status["run_1"] = "completed"
-        // A different model and no rich replies now; the retry must still ask the way it first did.
-        settings = settings.copy(model = ModelChoice("anthropic", "other-model"), richReplies = false)
+        // A different model, no rich replies and Phone control on now; the retry must still ask the way it first did.
+        settings = settings.copy(model = ModelChoice("anthropic", "other-model"), richReplies = false, phoneControl = true)
         runBlocking { withContext(dispatcher) { engine.retry("s_lost") } }
         val done = flow.await { c -> c.messages.lastOrNull()?.let { it.role == Role.Assistant && it.state == MessageState.Done } == true }
         assertEquals("Klaar via de eerste run.", done.messages.last().text)
