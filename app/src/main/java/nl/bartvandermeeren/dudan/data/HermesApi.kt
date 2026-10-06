@@ -44,10 +44,9 @@ class HermesApi(
     // ---- Health and discovery -----------------------------------------------------------------
 
     /** Returns the advertised model alias (profile name) on success; throws on auth or network errors. */
-    suspend fun verify(): String? {
-        val caps = getJson("v1", "capabilities").asObject()
-        return caps?.str("model")
-    }
+    suspend fun verify(): String? = capabilities().model
+
+    suspend fun capabilities(): ServerCapabilities = ServerCapabilities.from(getJson("v1", "capabilities").asObject())
 
     suspend fun modelOptions(): ModelCatalog {
         val root = getJson("api", "model", "options").asObject() ?: JsonObject(emptyMap())
@@ -61,6 +60,12 @@ class HermesApi(
             val name = o.str("name") ?: return@mapNotNull null
             SkillInfo(name, o.str("description"), o.str("category"))
         }
+    }
+
+    /** One skill's SKILL.md. Stock Hermes doesn't have this endpoint; see [ServerCapabilities.readsSkills]. */
+    suspend fun skill(name: String): SkillDetail {
+        val o = getJson("v1", "skills", name).asObject() ?: throw HermesException(500, "Hermes returned no skill")
+        return SkillDetail.from(o, name)
     }
 
     // ---- Sessions -------------------------------------------------------------------------------

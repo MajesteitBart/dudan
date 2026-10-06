@@ -18,6 +18,8 @@ Keep the port inside the tailnet. The API server runs agent turns with terminal 
 
 For attachments other than photos, also run the upload service on the Hermes host; [Files](#files) explains why and [upload service guide](../tools/hermes-upload/README.md) has the steps. Chat works without it.
 
+For the Skills screen and `$` tags, stock Hermes needs a one-line fix; see [Skills](#skills).
+
 ## Phone setup
 
 1. Install the APK. On the phone, download it from the [latest release](https://github.com/MajesteitBart/dudan/releases/latest) and open it. For a build of your own, `node tools/serve-apk.mjs <tailscale-ip> 8787` on the build PC serves everything in `artifacts/`, so the phone can open `http://<tailscale-ip>:8787/` and download it. Taildrop works too.
@@ -82,4 +84,21 @@ Photos skip the service. The app shrinks them and sends them inside the turn, wh
 The turn itself is plain text: your words, then one note per file in Hermes' own wording. That also lets file turns use the Runs API, so they survive a dropped connection. The chat history turns the notes back into file chips.
 
 Settings > Replies and files has the service's address. Left empty, the app uses port 8645 on the Hermes host, but only when the server URL starts with `http://`. With an `https://` server, enter the address yourself: the service speaks plain HTTP, and guessing would send the API key unencrypted to a host that may be outside the tailnet. Like the server URL, the field warns when an `http://` address points outside the tailnet. Check the upload service tests the address and the key, and says so when something else answers there, such as Hermes itself.
+
+## Skills
+
+The Skills screen and the `$` list in the prompt bar get Hermes' skills from `GET /v1/skills`. Stock Hermes answers that request with HTTP 500: its handler passes `_find_all_skills()` an `include_editorial` argument the function doesn't take ([issue #108967](https://github.com/NousResearch/hermes-agent/issues/108967)). Until upstream merges [PR #108968](https://github.com/NousResearch/hermes-agent/pull/108968), the Skills screen says so, and `$` tags find no skills. Chat works as usual.
+
+The fix drops that argument. In `gateway/platforms/api_server.py` in Hermes' checkout, in `_handle_skills`:
+
+```diff
+-                _find_all_skills(
+-                    skip_disabled=False, include_editorial=True
+-                )
++                _find_all_skills(skip_disabled=False)
+```
+
+Then run `hermes gateway restart`.
+
+Tapping a skill in the app shows its description and category, and Use in chat starts a chat with its tag. To read the skill's SKILL.md and see its files there too, Hermes needs `GET /v1/skills/{name}`, which it doesn't have. [`tools/hermes-patches/skills-api.patch`](../tools/hermes-patches/README.md) adds that endpoint and includes the fix above. dudan checks `GET /v1/capabilities` for the endpoint and only asks for SKILL.md when Hermes lists it.
 

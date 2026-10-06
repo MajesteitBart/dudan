@@ -42,7 +42,7 @@ Uploads resume after a dropped connection. Files other than photos need the smal
 
 Watch the agent's steps as it works, expand the details when you need them, and answer approval requests before Hermes runs commands that require your permission. Text and file tasks keep running on the server if your connection drops; dudan catches up when you're back. You'll get a notification when a reply arrives while you're elsewhere.
 
-Search, pin and rename chats. Browse Hermes skills. Run, pause or resume scheduled tasks. Conversations from other Hermes channels can appear in your chat list too.
+Search, pin and rename chats. Browse Hermes skills, or type `$` in a message to tell the agent which skill to use. Run, pause or resume scheduled tasks. Conversations from other Hermes channels can appear in your chat list too.
 
 ## Pick the model and the mood
 

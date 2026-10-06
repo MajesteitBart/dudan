@@ -29,6 +29,7 @@ import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AttachFile
+import androidx.compose.material.icons.outlined.AutoAwesome
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.PhotoCamera
@@ -56,6 +57,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -71,7 +73,9 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.chat.Role
+import nl.bartvandermeeren.dudan.chat.SkillTags
 import nl.bartvandermeeren.dudan.data.AppSettings
+import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.ui.MainViewModel
 import nl.bartvandermeeren.dudan.ui.components.DudanIcons
 import nl.bartvandermeeren.dudan.ui.components.DudanMark
@@ -120,6 +124,17 @@ fun ChatPane(
     val sessions by vm.sessions.collectAsStateWithLifecycle()
     val speakingId by vm.speaker.speakingId.collectAsStateWithLifecycle()
     val catalog by vm.modelCatalog.collectAsStateWithLifecycle()
+    val skillState by vm.skillCatalog.state.collectAsStateWithLifecycle()
+    val skills = skillState.skills.orEmpty()
+    // The list loads at start; if Hermes was out of reach then, a typed `$` tries again.
+    val typingTag = '$' in vm.composerText
+    LaunchedEffect(typingTag) { if (typingTag) vm.skillCatalog.ensureLoaded() }
+    val composerFocus = remember { FocusRequester() }
+    LaunchedEffect(vm.focusComposer) {
+        // While listening the prompt bar shows the waveform instead of the field.
+        if (vm.focusComposer && !listening) composerFocus.requestFocus()
+        vm.focusComposer = false
+    }
     val messages = conversation.messages
     val empty = conversation.showGreeting
     var showModelPicker by remember { mutableStateOf(false) }
@@ -166,7 +181,7 @@ fun ChatPane(
                         modifier = Modifier.align(Alignment.Center).size(28.dp),
                     )
                     conversation.loadError != null && messages.isEmpty() -> LoadError(conversation.loadError!!, onRetry = vm::reloadCurrent)
-                    else -> MessageList(vm, settings, speakingId)
+                    else -> MessageList(vm, settings, speakingId, skills)
                 }
             }
         }
@@ -193,6 +208,7 @@ fun ChatPane(
                 .navigationBarsPadding()
                 .imePadding()
                 .padding(start = 10.dp, end = 10.dp, bottom = 10.dp, top = 6.dp),
+            focusRequester = composerFocus,
             modelPicker = {
                 ModelPickerButton(modelTitle, modelSubtitle, onClick = {
                     vm.loadModels()
@@ -213,9 +229,19 @@ fun ChatPane(
                         showAddMenu = false
                         actions.onPickFiles()
                     }
+                    if (skills.isNotEmpty()) {
+                        GlassMenuItem(Icons.Outlined.AutoAwesome, stringResource(R.string.attach_skill), stringResource(R.string.attach_skill_detail)) {
+                            showAddMenu = false
+                            // A `$` at the end opens the skill list, the same as typing it.
+                            val draft = vm.composerText
+                            vm.composerText = if (draft.isEmpty() || draft.last().isWhitespace()) "$draft\$" else "$draft \$"
+                            vm.focusComposer = true
+                        }
+                    }
                 }
             },
             onRetryAttachment = vm::retryUpload,
+            skills = skills,
         )
     }
 
@@ -302,8 +328,9 @@ private fun LoadError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?) {
+private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?, skills: List<SkillInfo>) {
     val conversation by vm.conversation.collectAsStateWithLifecycle()
+    val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val messages = conversation.messages
     val listState = rememberLazyListState()
     var follow by remember { mutableStateOf(true) }
@@ -338,7 +365,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
             ) {
                 itemsIndexed(messages, key = { _, m -> m.id }) { index, message ->
                     when (message.role) {
-                        Role.User -> UserMessageItem(message)
+                        Role.User -> UserMessageItem(message, skillSlugs = skillSlugs)
                         Role.Background -> BackgroundResultItem(
                             message = message,
                             assistantName = settings.assistantName,

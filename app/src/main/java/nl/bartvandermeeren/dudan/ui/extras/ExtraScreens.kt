@@ -19,10 +19,13 @@ import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
 import androidx.compose.material.icons.outlined.Pause
 import androidx.compose.material.icons.outlined.PlayArrow
@@ -47,21 +50,28 @@ import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.JobInfo
+import nl.bartvandermeeren.dudan.data.SkillDetail
 import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.ui.MainViewModel
+import nl.bartvandermeeren.dudan.ui.components.CtaButton
 import nl.bartvandermeeren.dudan.ui.components.GlassDefaults
+import nl.bartvandermeeren.dudan.ui.components.Markdown
 import nl.bartvandermeeren.dudan.ui.components.PlainIconButton
 import nl.bartvandermeeren.dudan.ui.components.glass
 import nl.bartvandermeeren.dudan.ui.components.outlined
+import nl.bartvandermeeren.dudan.ui.openui.openExternalUrl
+import nl.bartvandermeeren.dudan.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 
@@ -178,22 +188,27 @@ fun SearchScreen(vm: MainViewModel, onBack: () -> Unit) {
     }
 }
 
+/** Where the docs explain stock Hermes' 500 for the skill list and its one-line fix. */
+private const val SKILLS_FIX_URL = "https://github.com/MajesteitBart/dudan/blob/main/docs/setup.md#skills"
+
 @Composable
 fun SkillsScreen(vm: MainViewModel, onBack: () -> Unit) {
-    var skills by remember { mutableStateOf<List<SkillInfo>?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    LaunchedEffect(Unit) {
-        try {
-            skills = vm.api.skills()
-        } catch (e: Exception) {
-            error = e.userMessage()
-        }
+    val catalog by vm.skillCatalog.state.collectAsStateWithLifecycle()
+    LaunchedEffect(Unit) { vm.skillCatalog.refresh() }
+    var openSkill by rememberSaveable { mutableStateOf<String?>(null) }
+    // Kept out here so the list is where it was when you come back from a skill.
+    val listState = rememberLazyListState()
+    openSkill?.let { name ->
+        val skill = catalog.skills?.firstOrNull { it.name == name } ?: SkillInfo(name, null, null)
+        SkillDetailScreen(vm, skill, readable = catalog.readsSkills, onBack = { openSkill = null })
+        return
     }
-    val useTemplate = stringResource(R.string.skill_prompt)
+    val skills = catalog.skills
     ScreenFrame(stringResource(R.string.skills), onBack) {
-        LoadingOrError(skills == null, error) {
+        if (skills == null && catalog.errorStatus == 500) HermesSkillsBug()
+        else LoadingOrError(skills == null, if (skills == null) catalog.error else null) {
             val grouped = skills.orEmpty().groupBy { it.category?.takeIf { c -> c.isNotBlank() } ?: "general" }.toSortedMap()
-            LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(bottom = 16.dp)) {
+            LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
                 item {
                     Text(
                         stringResource(R.string.skills_intro),
@@ -206,7 +221,7 @@ fun SkillsScreen(vm: MainViewModel, onBack: () -> Unit) {
                 grouped.forEach { (category, list) ->
                     item(key = "c_$category") {
                         Text(
-                            category.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.uppercase() },
+                            categoryLabel(category),
                             style = MaterialTheme.typography.labelMedium,
                             color = LocalAccent.current.soft,
                             modifier = Modifier.padding(start = 28.dp, top = 18.dp, bottom = 8.dp),
@@ -219,15 +234,101 @@ fun SkillsScreen(vm: MainViewModel, onBack: () -> Unit) {
                                 Column(
                                     Modifier
                                         .fillMaxWidth()
-                                        .clickable {
-                                            vm.newChat()
-                                            vm.composerText = useTemplate.format(skill.name)
-                                        }
+                                        .clickable { openSkill = skill.name }
                                         .padding(horizontal = 18.dp, vertical = 12.dp),
                                 ) {
                                     Text(skill.name, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
                                     skill.description?.takeIf { it.isNotBlank() }?.let {
                                         Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+private fun categoryLabel(category: String) = category.replace('_', ' ').replace('-', ' ').replaceFirstChar { it.uppercase() }
+
+/** Stock Hermes answers 500 for the skill list until upstream merges a one-line fix; docs/setup.md has it. */
+@Composable
+private fun HermesSkillsBug() {
+    val context = LocalContext.current
+    Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(stringResource(R.string.skills_hermes_bug), style = MaterialTheme.typography.bodyLarge, color = Palette.TextSecondary)
+        PillButton(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.skills_hermes_bug_fix)) { openExternalUrl(context, SKILLS_FIX_URL) }
+    }
+}
+
+/**
+ * One skill: what it's for, its category and Use in chat. When the server can send SKILL.md (a patched
+ * Hermes, see tools/hermes-patches), it also shows the instructions, where the file lives and its extra files.
+ */
+@Composable
+private fun SkillDetailScreen(vm: MainViewModel, skill: SkillInfo, readable: Boolean, onBack: () -> Unit) {
+    var detail by remember(skill.name) { mutableStateOf<SkillDetail?>(null) }
+    var error by remember(skill.name) { mutableStateOf<String?>(null) }
+    LaunchedEffect(skill.name, readable) {
+        if (!readable) return@LaunchedEffect
+        try {
+            detail = vm.api.skill(skill.name)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            error = e.userMessage()
+        }
+    }
+    val accent = LocalAccent.current
+    ScreenFrame(
+        title = null,
+        onBack = onBack,
+        header = {
+            Text(skill.name, style = MaterialTheme.typography.titleLarge, color = Palette.TextPrimary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+        },
+    ) {
+        LazyColumn(
+            Modifier.fillMaxSize(),
+            contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
+            verticalArrangement = Arrangement.spacedBy(12.dp),
+        ) {
+            item(key = "about") {
+                Column(Modifier.listCard(RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                    (detail?.description ?: skill.description)?.takeIf { it.isNotBlank() }?.let {
+                        Text(it, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
+                    }
+                    (detail?.category ?: skill.category)?.takeIf { it.isNotBlank() }?.let {
+                        Text(categoryLabel(it), style = MaterialTheme.typography.labelMedium, color = accent.soft)
+                    }
+                    detail?.path?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall.copy(fontFamily = GoogleSansCode), color = Palette.TextSecondary)
+                    }
+                    CtaButton(stringResource(R.string.skill_use), onClick = { vm.useSkill(skill) }, modifier = Modifier.padding(top = 4.dp))
+                }
+            }
+            if (readable) {
+                val loaded = detail
+                when {
+                    error != null -> item(key = "error") {
+                        Text(error.orEmpty(), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary, modifier = Modifier.padding(horizontal = 24.dp))
+                    }
+                    loaded == null -> item(key = "loading") { LoadingOrError(loading = true, error = null) {} }
+                    else -> {
+                        if (loaded.body.isNotBlank()) {
+                            item(key = "body") {
+                                Box(Modifier.listCard(RoundedCornerShape(24.dp)).padding(18.dp)) {
+                                    SelectionContainer { Markdown(loaded.body.trim(), style = MaterialTheme.typography.bodyMedium) }
+                                }
+                            }
+                        }
+                        if (loaded.files.isNotEmpty()) {
+                            item(key = "files") {
+                                Column(Modifier.listCard(RoundedCornerShape(24.dp)).padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                                    Text(stringResource(R.string.skill_files), style = MaterialTheme.typography.labelMedium, color = accent.soft)
+                                    loaded.files.forEach { file ->
+                                        Text(file, style = MaterialTheme.typography.bodySmall.copy(fontFamily = GoogleSansCode), color = Palette.TextSecondary)
                                     }
                                 }
                             }
@@ -288,11 +389,11 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
                                 if (busyJob == job.id) {
                                     CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.TextSecondary, modifier = Modifier.size(18.dp))
                                 } else {
-                                    JobButton(Icons.Rounded.Bolt, stringResource(R.string.job_run_now)) { act(job, "run") }
+                                    PillButton(Icons.Rounded.Bolt, stringResource(R.string.job_run_now)) { act(job, "run") }
                                     if (job.paused || !job.enabled) {
-                                        JobButton(Icons.Outlined.PlayArrow, stringResource(R.string.job_resume)) { act(job, "resume") }
+                                        PillButton(Icons.Outlined.PlayArrow, stringResource(R.string.job_resume)) { act(job, "resume") }
                                     } else {
-                                        JobButton(Icons.Outlined.Pause, stringResource(R.string.job_pause)) { act(job, "pause") }
+                                        PillButton(Icons.Outlined.Pause, stringResource(R.string.job_pause)) { act(job, "pause") }
                                     }
                                 }
                             }
@@ -305,7 +406,7 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
 }
 
 @Composable
-private fun JobButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+private fun PillButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
     Row(
         Modifier
             .outlined(CircleShape)

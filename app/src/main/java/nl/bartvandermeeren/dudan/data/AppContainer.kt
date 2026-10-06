@@ -54,7 +54,9 @@ class AppContainer(context: Context) {
     /** Attachments go to the upload service next to Hermes; see tools/hermes-upload. */
     val uploads = UploadClient(uploadHttp) { settings.current().uploads }
 
-    val engine = ChatEngine(api, appScope) { settings.current() }
+    val skillCatalog = SkillCatalog(api, appScope)
+
+    val engine = ChatEngine(api, appScope, skills = skillCatalog::skills) { settings.current() }
 
     val kokoroModel = ModelPackage(appContext, http, appScope, ModelPackage.KOKORO)
 

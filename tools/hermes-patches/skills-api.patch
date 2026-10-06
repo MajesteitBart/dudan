@@ -1,0 +1,132 @@
+diff --git a/gateway/platforms/api_server.py b/gateway/platforms/api_server.py
+index 3c89ada157..0afa8f65c2 100644
+--- a/gateway/platforms/api_server.py
++++ b/gateway/platforms/api_server.py
+@@ -85,6 +85,7 @@ _CAPABILITY_ENDPOINTS = (
+     ("run_approval", ("POST", "/v1/runs/{run_id}/approval")),
+     ("run_steer", ("POST", "/v1/runs/{run_id}/steer")),
+     ("run_stop", ("POST", "/v1/runs/{run_id}/stop")), ("skills", ("GET", "/v1/skills")),
++    ("skill", ("GET", "/v1/skills/{name}")),
+     ("toolsets", ("GET", "/v1/toolsets")), ("sessions", ("GET", "/api/sessions")),
+     ("session_create", ("POST", "/api/sessions")),
+     ("session", ("GET", "/api/sessions/{session_id}")),
+@@ -1617,6 +1618,7 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
+             ("POST", "/v1/artifacts/upload", self._handle_artifact_upload),
+             ("GET", "/v1/artifacts/download/{artifact_id}", self._handle_artifact_download),
+             ("GET", "/v1/skills", self._handle_skills),
++            ("GET", "/v1/skills/{name}", self._handle_skill_detail),
+             ("GET", "/v1/toolsets", self._handle_toolsets),
+             ("GET", "/api/sessions", self._handle_list_sessions),
+             ("POST", "/api/sessions", self._handle_create_session),
+@@ -2786,15 +2788,55 @@ class APIServerAdapter(OpenAICompatRoutesMixin, BasePlatformAdapter):
+         try:
+             from tools.skills_tool import _find_all_skills, _sort_skills
+             skills = _sort_skills(
+-                _find_all_skills(
+-                    skip_disabled=False, include_editorial=True
+-                )
++                _find_all_skills(skip_disabled=False)
+             )
+         except Exception:
+             logger.exception("GET /v1/skills failed")
+             return _error_response("Failed to enumerate skills", 500, err_type="server_error")
+         return web.json_response({"object": "list", "data": skills})
+ 
++    @_require_auth
++    async def _handle_skill_detail(self, request: "web.Request") -> "web.Response":
++        """GET /v1/skills/{name} — one skill's SKILL.md, raw (``content``) and after its frontmatter
++        (``body``), with name, description, category and linked files. Names resolve like
++        skill_view, but read-only: no dependency installs, no view or use counts."""
++        name = request.match_info["name"]
++        try:
++            from agent.skill_utils import parse_frontmatter
++            from tools.skills_tool import (
++                _get_category_from_path, _locate_skill, _read_skill_text, _skill_linked_files,
++                _skill_lookup_path_error, _skill_search_dirs)
++            if lookup_error := _skill_lookup_path_error(name):
++                return _error_response(lookup_error, 400)
++
++            def _load():
++                project_dirs, all_dirs, active_skills_dir = _skill_search_dirs()
++                error, skill_dir, skill_md = _locate_skill(name, None, project_dirs, all_dirs)
++                if error is not None:
++                    return json.loads(error).get("error") or f"Skill '{name}' not found.", None
++                content = _read_skill_text(skill_md)
++                frontmatter, body = parse_frontmatter(content)
++                try:
++                    path = skill_md.relative_to(active_skills_dir).as_posix()
++                except ValueError:  # external dir: relative to the skill's own parent
++                    path = skill_md.relative_to(skill_md.parent.parent).as_posix()
++                description = frontmatter.get("description")
++                return None, {
++                    "object": "skill",
++                    "name": str(frontmatter.get("name") or (skill_dir.name if skill_dir else skill_md.stem)),
++                    "description": "" if description is None else str(description),
++                    "category": _get_category_from_path(skill_md),
++                    "path": path, "content": content, "body": body,
++                    "linked_files": _skill_linked_files(skill_dir)}
++
++            not_found, skill = await asyncio.to_thread(_load)
++        except Exception:
++            logger.exception("GET /v1/skills/%s failed", name)
++            return _error_response("Failed to read skill", 500, err_type="server_error")
++        if not_found:
++            return _error_response(not_found, 404, err_type="not_found_error", code="skill_not_found")
++        return web.json_response(skill)
++
+     @_require_auth
+     async def _handle_toolsets(self, request: "web.Request") -> "web.Response":
+         """GET /v1/toolsets — each toolset the api_server agent exposes: enabled/configured state
+diff --git a/tests/gateway/test_api_server.py b/tests/gateway/test_api_server.py
+index 9b190e89b5..df41c7d0fb 100644
+--- a/tests/gateway/test_api_server.py
++++ b/tests/gateway/test_api_server.py
+@@ -356,6 +356,7 @@ def _create_app(adapter: APIServerAdapter) -> web.Application:
+     app.router.add_get("/api/model/options", adapter._handle_model_options)
+     app.router.add_get("/v1/capabilities", adapter._handle_capabilities)
+     app.router.add_get("/v1/skills", adapter._handle_skills)
++    app.router.add_get("/v1/skills/{name}", adapter._handle_skill_detail)
+     app.router.add_get("/v1/toolsets", adapter._handle_toolsets)
+     app.router.add_post("/api/sessions/{session_id}/chat", adapter._handle_session_chat)
+     app.router.add_post("/api/sessions/{session_id}/chat/stream", adapter._handle_session_chat_stream)
+@@ -945,6 +946,40 @@ class TestSkillsEndpoint:
+                 for entry in data["data"]:
+                     assert set(entry.keys()) >= {"name", "description", "category"}
+ 
++    @pytest.mark.asyncio
++    async def test_skill_detail_returns_skill_md(self, adapter):
++        from hermes_constants import get_hermes_home
++
++        skill_dir = get_hermes_home() / "skills" / "notes" / "api-skill-detail-probe"
++        (skill_dir / "references").mkdir(parents=True, exist_ok=True)
++        (skill_dir / "SKILL.md").write_text(
++            "---\nname: api-skill-detail-probe\ndescription: Probe skill\n---\n\n# Probe\n\nBody.\n",
++            encoding="utf-8",
++        )
++        (skill_dir / "references" / "api.md").write_text("Reference.\n", encoding="utf-8")
++        app = _create_app(adapter)
++        async with TestClient(TestServer(app)) as cli:
++            resp = await cli.get("/v1/skills/api-skill-detail-probe")
++            assert resp.status == 200
++            data = await resp.json()
++        assert data["name"] == "api-skill-detail-probe"
++        assert data["description"] == "Probe skill"
++        assert data["category"] == "notes"
++        assert data["path"] == "notes/api-skill-detail-probe/SKILL.md"
++        assert data["content"].startswith("---\nname: api-skill-detail-probe")
++        assert data["body"].strip() == "# Probe\n\nBody."
++        assert data["linked_files"] == {"references": ["references/api.md"]}
++
++    @pytest.mark.asyncio
++    async def test_skill_detail_rejects_unknown_names_and_traversal(self, adapter):
++        app = _create_app(adapter)
++        async with TestClient(TestServer(app)) as cli:
++            missing = await cli.get("/v1/skills/no-such-skill-anywhere")
++            assert missing.status == 404
++            assert (await missing.json())["error"]["code"] == "skill_not_found"
++            escape = await cli.get("/v1/skills/..%2F..%2Fetc")
++            assert escape.status in (400, 404)
++
+ 
+ class TestToolsetsEndpoint:
+     @pytest.mark.asyncio

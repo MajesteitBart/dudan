@@ -33,6 +33,7 @@ import nl.bartvandermeeren.dudan.data.ModelChoice
 import nl.bartvandermeeren.dudan.data.ModelProfile
 import nl.bartvandermeeren.dudan.data.RunOutcome
 import nl.bartvandermeeren.dudan.data.SessionSummary
+import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.data.AppSettings
 
 /** An image ready to send: JPEG bytes plus the data: URL Hermes expects. */
@@ -48,6 +49,8 @@ class ChatEngine(
     private val scope: CoroutineScope,
     /** Pauses between transcript checks while background work is out; the last one repeats. */
     private val watchPauses: List<Long> = listOf(3_000, 5_000, 10_000, 15_000, 20_000, 30_000),
+    /** Hermes' skills, to tell `$skill` tags from other dollar signs. Keep it before [currentSettings], which callers pass as a trailing lambda. */
+    private val skills: suspend () -> List<SkillInfo> = { emptyList() },
     private val currentSettings: suspend () -> AppSettings,
 ) {
     /**
@@ -461,13 +464,13 @@ class ChatEngine(
                 val rich = turn.review?.richReplies ?: settings.richReplies
                 val instructions = TurnInstructions.build(turn.origin, settings.phoneControl, rich)
                 val events: Flow<AgentEvent> = if (turn.usesRuns) {
-                    val runId = if (turn.review == null) api.startRun(sessionId, turn.input, model, instructions)
+                    val runId = if (turn.review == null) api.startRun(sessionId, turn.input, model, withSkills(instructions, turn.text))
                     else admitReview(turn, model, rich, settings)
                     turn.runId = runId
                     if (turn.stopRequested) sendStop(turn)
                     api.runEvents(runId)
                 } else {
-                    api.sessionChatStream(sessionId, multimodalMessage(turn.input, turn.images), model, instructions)
+                    api.sessionChatStream(sessionId, multimodalMessage(turn.input, turn.images), model, withSkills(instructions, turn.text))
                 }
                 var sawTerminal = false
                 events.collect { event ->
@@ -503,6 +506,17 @@ class ChatEngine(
             val delegated = message?.steps.orEmpty().any { it.kind == StepKind.Subagent || (it.kind == StepKind.Tool && "delegate" in it.title) }
             if (!cancelled && (delegated || watches.containsKey(sessionId))) scope.launch { refreshAfterTurn(sessionId) }
         }
+    }
+
+    /**
+     * [instructions] plus the hint that makes the agent load the skills [text] tags; the message itself
+     * keeps its `$` tags as typed. The hint changes from message to message, so it goes last and the
+     * parts before it stay the same for the provider's prompt cache.
+     */
+    private suspend fun withSkills(instructions: String, text: String): String {
+        if ('$' !in text) return instructions
+        val hint = SkillTags.instructions(SkillTags.find(text, skills())) ?: return instructions
+        return instructions + "\n\n" + hint
     }
 
     /** Hermes may still be saving the turn when its run ends; give it a moment before comparing. */

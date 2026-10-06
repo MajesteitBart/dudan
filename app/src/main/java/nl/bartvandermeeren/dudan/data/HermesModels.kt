@@ -232,6 +232,51 @@ object AgentEventParser {
 
 data class SkillInfo(val name: String, val description: String?, val category: String?)
 
+/**
+ * One skill's SKILL.md from GET /v1/skills/{name}: [body] is the markdown after the frontmatter, [path]
+ * where it lives under Hermes' skills folder, and [files] its references, scripts and templates.
+ */
+data class SkillDetail(
+    val name: String,
+    val description: String?,
+    val category: String?,
+    val path: String?,
+    val body: String,
+    val files: List<String>,
+) {
+    companion object {
+        fun from(o: JsonObject, requested: String): SkillDetail = SkillDetail(
+            name = o.str("name") ?: requested,
+            description = o.str("description")?.takeIf { it.isNotBlank() },
+            category = o.str("category")?.takeIf { it.isNotBlank() },
+            path = o.str("path")?.takeIf { it.isNotBlank() },
+            body = o.str("body") ?: o.str("content").orEmpty(),
+            // {"references": ["references/api.md"], "scripts": [...]}
+            files = when (val linked = o["linked_files"]) {
+                is JsonObject -> linked.values.flatMap { it.asArray().orEmpty().mapNotNull { f -> (f as? JsonPrimitive)?.contentOrNull } }
+                is JsonArray -> linked.mapNotNull { (it as? JsonPrimitive)?.contentOrNull }
+                else -> emptyList()
+            },
+        )
+    }
+}
+
+/**
+ * What GET /v1/capabilities says: the model alias Hermes advertises and the names of its endpoints,
+ * from `endpoints: {"skills": {"method": "GET", "path": "/v1/skills"}, ...}`.
+ */
+data class ServerCapabilities(val model: String?, val endpoints: Set<String>) {
+    /** GET /v1/skills/{name}, which stock Hermes lacks; tools/hermes-patches adds it. */
+    val readsSkills: Boolean get() = "skill" in endpoints
+
+    companion object {
+        fun from(o: JsonObject?): ServerCapabilities = ServerCapabilities(
+            model = o?.str("model"),
+            endpoints = o?.get("endpoints").asObject()?.filterValues { it is JsonObject }?.keys.orEmpty(),
+        )
+    }
+}
+
 data class JobInfo(
     val id: String,
     val name: String,

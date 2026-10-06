@@ -29,14 +29,17 @@ import nl.bartvandermeeren.dudan.chat.Conversation
 import nl.bartvandermeeren.dudan.chat.MessageState
 import nl.bartvandermeeren.dudan.chat.PreparedImage
 import nl.bartvandermeeren.dudan.chat.Role
+import nl.bartvandermeeren.dudan.chat.SkillTags
 import nl.bartvandermeeren.dudan.chat.TurnInstructions
 import nl.bartvandermeeren.dudan.chat.TurnOrigin
 import nl.bartvandermeeren.dudan.chat.UiMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.HermesApi
+import nl.bartvandermeeren.dudan.data.HermesJson
 import nl.bartvandermeeren.dudan.data.ModelChoice
 import nl.bartvandermeeren.dudan.data.ModelProfile
 import nl.bartvandermeeren.dudan.data.ReasoningEffort
+import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.device.PhoneControl
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.Dispatcher
@@ -244,6 +247,97 @@ class ChatEngineTest {
         assertTrue(runs[0], runs[0].contains(""""model":"small-model"""") && runs[0].contains(""""reasoning_effort":"low"""") && !runs[0].contains("fast"))
         assertTrue(runs[1], runs[1].contains(""""model":"big-model"""") && !runs[1].contains("model_options"))
         assertEquals(ModelProfile.Assistant, ChatEngine.profileOf(runs[0].substringAfter(""""session_id":"""").substringBefore('"')))
+    }
+
+    // ---- $skill tags ----------------------------------------------------------------------------
+
+    private val todoist = SkillInfo("todoist-task-operator", "Manage Todoist tasks", "productivity")
+    private val todoistHint = SkillTags.instructions(listOf("todoist-task-operator"))!!
+
+    /** What an untagged turn from the app sends; the skill hint follows it. */
+    private fun base(rich: Boolean = true) = TurnInstructions.build(TurnOrigin(), phoneControl = false, richReplies = rich)
+
+    private fun knowSkills(vararg skills: SkillInfo) {
+        engine = ChatEngine(HermesApi(OkHttpClient()) { settings.server }, scope, listOf(100L), skills = { skills.toList() }) { settings }
+    }
+
+    private fun json(request: RecordedRequest) = HermesJson.parseToJsonElement(request.body.readUtf8()).jsonObject
+
+    @Test
+    fun taggedSkillsGoLastInTheRunInstructionsAndTheMessageStaysAsTyped() {
+        knowSkills(todoist)
+        val runs = CopyOnWriteArrayList<JsonObject>()
+        script { request ->
+            when {
+                request.path == "/v1/runs" -> {
+                    runs += json(request)
+                    MockResponse().setResponseCode(202).setBody("""{"run_id":"run_${runs.size}"}""")
+                }
+                request.path!!.endsWith("/events") -> sse("""{"event":"run.completed","output":"Ok"}""")
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        sendAndSettle("\$todoist-task-operator zet melk op de lijst")
+        sendAndSettle("Dat kost \$5 en \$onbekend doet niets")
+        settings = settings.copy(richReplies = false)
+        sendAndSettle("\$todoist-task-operator zet brood op de lijst")
+        sendAndSettle("Zet eieren op de lijst")
+
+        assertEquals("\$todoist-task-operator zet melk op de lijst", runs[0]["input"]!!.jsonPrimitive.content)
+        assertEquals(base() + "\n\n" + todoistHint, runs[0]["instructions"]!!.jsonPrimitive.content)
+        // A dollar amount and an unknown tag are plain text: no skill hint.
+        assertEquals(base(), runs[1]["instructions"]!!.jsonPrimitive.content)
+        // Without rich replies the hint follows the turn's context alone, and an untagged turn sends only that.
+        assertEquals(base(rich = false) + "\n\n" + todoistHint, runs[2]["instructions"]!!.jsonPrimitive.content)
+        assertEquals(base(rich = false), runs[3]["instructions"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun taggedSkillsReachImageTurnsAsTheSystemMessage() {
+        knowSkills(todoist)
+        val streams = CopyOnWriteArrayList<JsonObject>()
+        script { request ->
+            if (request.path!!.endsWith("/chat/stream")) {
+                streams += json(request)
+                sse("""{"event":"run.completed","output":"Een boodschappenlijst."}""")
+            } else {
+                MockResponse().setResponseCode(404)
+            }
+        }
+        val photo = PreparedImage(ByteArray(0), "data:image/jpeg;base64,AAAA")
+        sendAndSettle("\$todoist-task-operator zet dit op de lijst", images = listOf(photo))
+        sendAndSettle("Wat staat hier?", images = listOf(photo))
+
+        val tagged = streams[0]
+        assertEquals(base() + "\n\n" + todoistHint, tagged["system_message"]!!.jsonPrimitive.content)
+        assertFalse("instructions" in tagged)
+        assertTrue(tagged["message"].toString(), tagged["message"].toString().contains("\$todoist-task-operator zet dit op de lijst"))
+        assertEquals(base(), streams[1]["system_message"]!!.jsonPrimitive.content)
+    }
+
+    @Test
+    fun aRetryTagsTheSkillsAgain() {
+        knowSkills(todoist)
+        val runs = CopyOnWriteArrayList<JsonObject>()
+        script { request ->
+            when (request.path) {
+                "/v1/runs" -> {
+                    runs += json(request)
+                    MockResponse().setResponseCode(202).setBody("""{"run_id":"run_${runs.size}"}""")
+                }
+                "/v1/runs/run_1/events" -> sse("""{"event":"run.failed","error":"provider error"}""")
+                "/v1/runs/run_2/events" -> sse("""{"event":"run.completed","output":"Melk staat erop."}""")
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        var id = ""
+        val failed = sendAndSettle("\$todoist-task-operator zet melk op de lijst") { id = it }
+        assertEquals(MessageState.Failed, failed.state)
+        val flow = runBlocking { withContext(dispatcher) { engine.retry(id); engine.conversation(id) } }
+        flow.await { c -> c.messages.lastOrNull()?.state == MessageState.Done }
+
+        assertEquals(2, runs.size)
+        runs.forEach { assertEquals(base() + "\n\n" + todoistHint, it["instructions"]!!.jsonPrimitive.content) }
     }
 
     @Test

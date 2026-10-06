@@ -1,6 +1,11 @@
 // Local stand-in for the Hermes Agent API server, for UI development without a live agent.
 // Mirrors the wire contract of gateway/platforms/api_server.py (Hermes 0.21): sessions, runs with
-// SSE events, session chat stream, approvals, model options, skills and jobs.
+// SSE events, session chat stream, approvals, model options, skills and jobs. It also serves
+// GET /v1/skills/{name}, which stock Hermes lacks (tools/hermes-patches/skills-api.patch adds it),
+// and advertises it in /v1/capabilities. MOCK_NO_SKILL_DETAIL=1 leaves that endpoint out, like stock
+// Hermes; MOCK_SKILLS_500=1 makes GET /v1/skills fail with the 500 stock Hermes gives.
+// A message with a $skill tag shows a skill_view step for each tagged skill. The log shows the
+// instructions and system_message each turn received.
 //
 // Usage: node tools/mock-hermes/server.mjs [port] [upload-port]
 //   port         the Hermes API (default 8642)
@@ -29,6 +34,8 @@ const PORT = Number(process.argv[2] ?? 8642);
 const UPLOAD_PORT = Number(process.argv[3] ?? 8645);
 const KEY = process.env.MOCK_KEY ?? "dev-key-dudan-0000000000";
 const LANG = process.env.MOCK_LANG === "en" ? "en" : "nl";
+const SKILL_DETAIL = process.env.MOCK_NO_SKILL_DETAIL !== "1";
+const SKILLS_500 = process.env.MOCK_SKILLS_500 === "1";
 
 // What the scripted agent says around its tool calls.
 const TURN_TEXT = {
@@ -165,6 +172,86 @@ function textOf(content) {
   return "";
 }
 
+// Skills as Hermes keeps them: SKILL.md is frontmatter plus a markdown body, and files next to it
+// sit in references/, scripts/, templates/ or assets/.
+const SKILLS = [
+  {
+    name: "github-pr-workflow", description: "Open, review and merge pull requests with gh", category: "software",
+    body: `# GitHub PR workflow
+
+Use this skill when the user asks to open, update, review or merge a pull request.
+
+## Steps
+
+1. Check the branch: \`git status\` and \`git log --oneline -5\`. Never work on \`main\`.
+2. Push the branch and open the PR with \`gh pr create --fill\`. Keep the description short: what changed and why.
+3. Wait for CI with \`scripts/wait-for-ci.sh <pr-number>\`. Read the logs of a failing check before you change anything.
+4. Merge with \`gh pr merge --squash --delete-branch\` once CI is green and a reviewer approved.
+
+## Rules
+
+- Don't force-push to a branch someone else is reviewing.
+- Ask before you merge.
+`,
+    files: { scripts: ["scripts/wait-for-ci.sh"], references: ["references/review-checklist.md"] },
+  },
+  {
+    name: "obsidian-notes", description: "Search and write notes in the Obsidian vault", category: "knowledge",
+    body: `# Obsidian notes
+
+The vault lives in \`~/vault\`. Search it before you write, and link new notes to the ones that exist.
+
+## Searching
+
+Use \`rg -i --type md "<words>" ~/vault\`. Read the two or three best matches before you answer.
+
+## Writing
+
+- One idea per note. Titles in sentence case.
+- Put new notes in \`Inbox/\` unless the user names a folder; \`references/folders.md\` lists them.
+- Link related notes with \`[[Title]]\`.
+`,
+    files: { references: ["references/folders.md"] },
+  },
+  {
+    name: "planning_with_files", description: "Plan long tasks in files and keep them up to date", category: "productivity",
+    body: `# Planning with files
+
+For a task that takes more than a few steps, keep three files in the working folder and update them as you go:
+
+| File | What goes in it |
+|---|---|
+| \`plan.md\` | The goal, the steps and which one you're on |
+| \`findings.md\` | What you learned, with sources |
+| \`progress.md\` | What you did, in order |
+
+Start from \`templates/plan.md\`. Read the files again before each step.
+`,
+    files: { templates: ["templates/plan.md"] },
+  },
+  {
+    name: "todoist", description: "Add, find and complete Todoist tasks", category: "productivity",
+    body: `# Todoist
+
+Use the \`td\` CLI. It reads the API token from \`TODOIST_API_TOKEN\`.
+
+\`\`\`sh
+td add "Buy milk" --due today --project Groceries
+td list --filter "today | overdue"
+td done <task-id>
+\`\`\`
+
+Never delete tasks; complete them. When the user names no project, use the Inbox.
+`,
+  },
+];
+
+// dudan sends $skill tags as instructions naming the skills; real Hermes then loads each with skill_view.
+function taggedSkills(instructions) {
+  const list = /\$ sign: ([^\n]+?)\. Load each/.exec(instructions ?? "")?.[1];
+  return list ? list.split(",").map((s) => s.trim()).filter(Boolean) : [];
+}
+
 // Runs the scripted agent turn, calling emit(name, payload) for every event.
 async function agentTurn(session, input, emit, control, instructions) {
   const question = textOf(input);
@@ -183,6 +270,12 @@ async function agentTurn(session, input, emit, control, instructions) {
   emit("reasoning.available", { text: cleanup ? TURN_TEXT.cleanupThinking : TURN_TEXT.thinking });
   await sleep(500);
   if (control.stopped) return { status: "cancelled" };
+
+  for (const skill of taggedSkills(instructions)) {
+    emit("tool.started", { tool: "skill_view", preview: `skill_view: ${skill}` });
+    await sleep(400);
+    emit("tool.completed", { tool: "skill_view", duration: 0.4, error: false, preview: `Loaded ${skill}` });
+  }
 
   if (cleanup) {
     emit("tool.started", { tool: "terminal", preview: "du -sh ~/tmp/old-exports" });
@@ -316,7 +409,18 @@ const server = http.createServer(async (req, res) => {
   if (path === "/health" || path === "/v1/health") return send(res, 200, { status: "ok", platform: "hermes-agent", version: "mock" });
   if (!authorized(req)) return send(res, 401, { error: { message: "Invalid API key", code: "invalid_api_key" } });
 
-  if (path === "/v1/capabilities") return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "hermes-agent", features: { run_submission: true } });
+  if (path === "/v1/capabilities") {
+    const endpoints = {
+      run_approval: { method: "POST", path: "/v1/runs/{run_id}/approval" },
+      run_stop: { method: "POST", path: "/v1/runs/{run_id}/stop" },
+      skills: { method: "GET", path: "/v1/skills" },
+      ...(SKILL_DETAIL ? { skill: { method: "GET", path: "/v1/skills/{name}" } } : {}),
+      sessions: { method: "GET", path: "/api/sessions" },
+      session_create: { method: "POST", path: "/api/sessions" },
+      session: { method: "GET", path: "/api/sessions/{session_id}" },
+    };
+    return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "hermes-agent", features: { run_submission: true }, endpoints });
+  }
   if (path === "/api/model/options") {
     return send(res, 200, {
       current_provider: "openai-codex",
@@ -350,11 +454,24 @@ const server = http.createServer(async (req, res) => {
     });
   }
   if (path === "/v1/skills") {
-    return send(res, 200, { object: "list", data: [
-      { name: "github-pr-workflow", description: "Open, review and merge pull requests", category: "software" },
-      { name: "obsidian-notes", description: "Search and write notes in the Obsidian vault", category: "knowledge" },
-      { name: "todoist", description: "Manage Todoist tasks", category: "productivity" },
-    ] });
+    // Stock Hermes passes _find_all_skills() an argument it doesn't take; see docs/setup.md.
+    if (SKILLS_500) return send(res, 500, { error: { message: "Failed to enumerate skills", type: "server_error" } });
+    return send(res, 200, { object: "list", data: SKILLS.map(({ name, description, category }) => ({ name, description, category })) });
+  }
+  if (parts[0] === "v1" && parts[1] === "skills" && parts[2]) {
+    // aiohttp's own answer for a route that doesn't exist.
+    if (!SKILL_DETAIL) {
+      res.writeHead(404, { "Content-Type": "text/plain" });
+      return res.end("404: Not Found");
+    }
+    const name = decodeURIComponent(parts[2]);
+    const skill = SKILLS.find((s) => s.name === name);
+    if (!skill) return send(res, 404, { error: { message: `Skill '${name}' not found.`, type: "not_found_error", code: "skill_not_found" } });
+    const content = `---\nname: ${skill.name}\ndescription: ${skill.description}\n---\n\n${skill.body}`;
+    return send(res, 200, {
+      object: "skill", name: skill.name, description: skill.description, category: skill.category,
+      path: `${skill.category}/${skill.name}/SKILL.md`, content, body: skill.body, linked_files: skill.files ?? {},
+    });
   }
   if (path === "/api/jobs" && req.method === "GET") {
     return send(res, 200, { jobs: [
@@ -406,6 +523,7 @@ const server = http.createServer(async (req, res) => {
       const runId = `run_${randomUUID().replace(/-/g, "")}`;
       const control = { stopped: false };
       runs.set(runId, { status: "running", control });
+      console.log("  chat stream", s.meta.id, "model:", body.provider ?? "-", body.model ?? "(server default)", JSON.stringify(body.model_options ?? {}));
       const keepalive = sse(res, { "X-Hermes-Session-Id": s.meta.id });
       let seq = 0;
       const emit = (name, payload) => {
