@@ -619,11 +619,46 @@ class ChatEngineTest {
         // the app ask the same way, so the surface it was tapped on doesn't change the request.
         assertEquals(listOf("dudan-review-deleg_4"), keys)
         assertEquals(
-            TurnInstructions.build(TurnOrigin(), phoneControl = false, richReplies = true),
+            TurnInstructions.build(TurnOrigin(), phoneControl = null, richReplies = true),
             inputs[0].json()["instructions"]?.jsonPrimitive?.content,
         )
         assertTrue(done.messages.last { it.role == Role.User }.reviewsBackground)
         assertFalse(done.awaitingReview)
+    }
+
+    @Test
+    fun twoPhonesWithDifferentPhoneControlJoinOneReview() {
+        transcript += row("user", "Zoek vluchten")
+        transcript += row("assistant", "Gestart.")
+        transcript += delivery(Deliveries.single("deleg_9"))
+        val hermes = Admissions()
+        script { request ->
+            when {
+                request.path!!.contains("/messages") -> transcriptPage(request)
+                request.path == "/v1/runs" -> hermes.admit(request)
+                request.path == "/v1/runs/run_1/events" -> sse("""{"event":"run.completed","output":"Klaar."}""")
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        // The other phone talks to the same Hermes with the same choices, but has Phone control on.
+        val otherSettings = settings.copy(phoneControl = true)
+        val other = ChatEngine(HermesApi(OkHttpClient()) { otherSettings.server }, scope, listOf(100L)) { otherSettings }
+        val here = open("s_two")
+        val there = runBlocking { withContext(dispatcher) { other.load("s_two"); other.conversation("s_two") } }
+        there.await { it.loaded }
+
+        runBlocking {
+            withContext(dispatcher) {
+                engine.reviewBackground("s_two", "Rond af")
+                other.reviewBackground("s_two", "Rond af")
+            }
+        }
+        val finished = { c: Conversation -> c.messages.lastOrNull()?.let { it.role == Role.Assistant && !it.isStreaming } == true }
+        assertEquals(MessageState.Done, here.await(finished).messages.last().state)
+        assertEquals(MessageState.Done, there.await(finished).messages.last().state)
+        // Both asked under the same key with the same request, so Hermes ran it once.
+        assertEquals(listOf("dudan-review-deleg_9", "dudan-review-deleg_9"), hermes.keys)
+        assertEquals(1, hermes.runs.size)
     }
 
     @Test

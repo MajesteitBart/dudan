@@ -49,6 +49,9 @@ class TurnInstructionsTest {
         val off = TurnInstructions.context(TurnOrigin(), phoneControl = false)
         assertFalse(off, off.contains("set_timer"))
         assertTrue(off, off.contains("turn on Phone control"))
+        // Unknown, as for reviews: nothing about the phone tools either way.
+        val neither = TurnInstructions.context(TurnOrigin(), phoneControl = null)
+        assertFalse(neither, neither.contains("set_timer") || neither.contains("Phone control"))
     }
 
     @Test

@@ -459,11 +459,10 @@ class ChatEngine(
                 // A retried review asks the way it asked before.
                 val model = turn.review?.model ?: settings.modelFor(profileOf(sessionId))
                 val rich = turn.review?.richReplies ?: settings.richReplies
-                val phoneControl = turn.review?.phoneControl ?: settings.phoneControl
-                val instructions = TurnInstructions.build(turn.origin, phoneControl, rich)
+                val instructions = TurnInstructions.build(turn.origin, settings.phoneControl, rich)
                 val events: Flow<AgentEvent> = if (turn.usesRuns) {
                     val runId = if (turn.review == null) api.startRun(sessionId, turn.input, model, instructions)
-                    else admitReview(turn, model, rich, phoneControl, settings)
+                    else admitReview(turn, model, rich, settings)
                     turn.runId = runId
                     if (turn.stopRequested) sendStop(turn)
                     api.runEvents(runId)
@@ -704,27 +703,31 @@ class ChatEngine(
         ("dudan-review-" + result.background?.key.orEmpty().map { if (it.code in 33..126) it else '_' }.joinToString("")).take(240)
 
     /**
-     * Starts a review run under the turn's key, with [model], [rich] and [phoneControl] as that key was
-     * first sent. When Hermes replays a run under that key which ended without finishing, the earlier
-     * attempt really failed, so this one starts afresh under the next key, with the current [settings].
-     * A run that is still going or finished is joined instead. The request is recorded before it goes
-     * out, so a retry after a lost answer asks the same way.
+     * Starts a review run under the turn's key, with [model] and [rich] as that key was first sent. When
+     * Hermes replays a run under that key which ended without finishing, the earlier attempt really
+     * failed, so this one starts afresh under the next key, with the current [settings]. A run that is
+     * still going or finished is joined instead. The request is recorded before it goes out, so a
+     * retry after a lost answer asks the same way.
      */
-    private suspend fun admitReview(turn: Turn, model: ModelChoice, rich: Boolean, phoneControl: Boolean, settings: AppSettings): String {
+    private suspend fun admitReview(turn: Turn, model: ModelChoice, rich: Boolean, settings: AppSettings): String {
         val key = turn.review!!.key
-        remember(turn, ReviewRequest(key, model, rich, phoneControl))
-        val admission = api.admitRun(turn.sessionId, turn.input, model, TurnInstructions.build(turn.origin, phoneControl, rich), key)
+        remember(turn, ReviewRequest(key, model, rich))
+        val admission = api.admitRun(turn.sessionId, turn.input, model, reviewInstructions(turn, rich), key)
         if (!admission.replayed || admission.status !in setOf("failed", "cancelled", "interrupted")) return admission.runId
         val next = ReviewRequest(
             key = key.substringBeforeLast('#') + "#" + ((key.substringAfterLast('#', "1").toIntOrNull() ?: 1) + 1),
             model = settings.modelFor(profileOf(turn.sessionId)),
             richReplies = settings.richReplies,
-            phoneControl = settings.phoneControl,
         )
         remember(turn, next)
-        val instructions = TurnInstructions.build(turn.origin, settings.phoneControl, settings.richReplies)
-        return api.admitRun(turn.sessionId, turn.input, next.model!!, instructions, next.key).runId
+        return api.admitRun(turn.sessionId, turn.input, next.model!!, reviewInstructions(turn, next.richReplies == true), next.key).runId
     }
+
+    /**
+     * A review's instructions leave out Phone control: that setting belongs to each phone, and another
+     * dudan reviewing the same result has to send the same request to join the run.
+     */
+    private fun reviewInstructions(turn: Turn, rich: Boolean) = TurnInstructions.build(turn.origin, phoneControl = null, richReplies = rich)
 
     private fun remember(turn: Turn, request: ReviewRequest) {
         turn.review = request

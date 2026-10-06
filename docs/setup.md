@@ -42,7 +42,7 @@ With Settings > Phone control on, Hermes can act on the phone: open apps and lin
 | `media` | Play, pause, next, previous, and media volume. |
 | `phone_status` | Battery, screen and lock state, ringer and Do Not Disturb, media volume, network, and whether apps can be opened right now. |
 
-Every turn sent from dudan also tells the agent that these tools act on the phone the user is holding, and that a timer, an alarm, an app, directions or music means using them rather than explaining how or scheduling a Hermes task. With Phone control off, the turn says so instead, and the agent points the user to the setting. Turns from other channels don't carry this; there the agent goes by the tool descriptions alone.
+Every turn sent from dudan also tells the agent that these tools act on the phone the user is holding, and that a timer, an alarm, an app, directions or music means using them rather than explaining how or scheduling a Hermes task. With Phone control off, the turn says so instead, and the agent points the user to the setting. Review result and finish leaves this out, so two phones with different settings send the same request and share one run. Turns from other channels don't carry this; there the agent goes by the tool descriptions alone.
 
 The phone runs a small MCP server (Streamable HTTP, `POST /mcp`, port 8643) in a foreground service, with a silent notification while it runs. It only answers connections that arrive on the phone's own Tailscale address, and each request needs a bearer token that the app generates and keeps encrypted with an Android Keystore key. Browser requests, recognized by an `Origin` header, are refused. The service starts again after a reboot or an app update.
 

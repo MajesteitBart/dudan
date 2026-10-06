@@ -108,8 +108,7 @@ class AssistState(
             onResult = { heard ->
                 if (heard.isNotBlank()) {
                     text = listOf(text.trim(), heard.trim()).filter { it.isNotEmpty() }.joinToString(" ")
-                    speakNextReply = true
-                    send()
+                    send(spoken = true)
                 }
             },
         )
@@ -117,7 +116,11 @@ class AssistState(
 
     fun stopListening() = speech.stop()
 
-    fun send() {
+    /**
+     * Sends the question. [spoken] says it was asked out loud, so its reply is read aloud. Each send
+     * sets that afresh: a spoken question that failed or was stopped doesn't make the next typed one spoken.
+     */
+    fun send(spoken: Boolean = false) {
         val message = text.trim()
         val shot = screenshot.takeIf { attachScreenshot }
         if (message.isEmpty() && shot == null) return
@@ -126,6 +129,7 @@ class AssistState(
         text = ""
         attachScreenshot = false
         speech.cancel()
+        speakNextReply = spoken
         if (shot == null) {
             engine.send(id, message, origin = origin())
         } else {
@@ -136,10 +140,12 @@ class AssistState(
         }
     }
 
-    /** Sends what an OpenUI button or follow-up asks for; false while a reply is still running. */
+    /** Sends what an OpenUI button or follow-up asks for; false while a reply is still running. Its reply is shown, not read aloud. */
     fun sendFromReply(message: String): Boolean {
         val id = sessionId ?: return false
         speech.cancel()
+        if (engine.conversation(id).value.isBusy) return false
+        speakNextReply = false
         return engine.send(id, message, origin = origin())
     }
 

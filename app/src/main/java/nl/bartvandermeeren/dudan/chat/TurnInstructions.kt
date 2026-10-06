@@ -26,14 +26,18 @@ object TurnInstructions {
     /** The tool names of dudan's phone MCP server (device/PhoneTools). Hermes shows them as mcp__<server>__<name>. */
     private const val PHONE_TOOLS = "open_app, list_apps, open_link, set_timer, set_alarm, media, phone_status"
 
-    /** Everything a turn sends. A reply that is read aloud gets no OpenUI prompt, since a card can't be heard. */
-    fun build(origin: TurnOrigin, phoneControl: Boolean, richReplies: Boolean): String =
+    /**
+     * Everything a turn sends. A reply that is read aloud gets no OpenUI prompt, since a card can't be heard.
+     * [phoneControl] is null when the turn shouldn't depend on this phone's setting; see [context].
+     */
+    fun build(origin: TurnOrigin, phoneControl: Boolean?, richReplies: Boolean): String =
         listOfNotNull(
             OpenUiPrompt.instructions.takeIf { richReplies && !origin.spoken },
             "## This turn\n\n" + context(origin, phoneControl),
         ).joinToString("\n\n")
 
-    fun context(origin: TurnOrigin, phoneControl: Boolean): String = buildList {
+    /** The turn's context. Without [phoneControl] it says nothing about phone tools. */
+    fun context(origin: TurnOrigin, phoneControl: Boolean?): String = buildList {
         add("The user is talking to you through dudan, the Hermes app on their Android phone.")
         when (origin.surface) {
             TurnOrigin.Surface.App -> Unit
@@ -52,14 +56,16 @@ object TurnInstructions {
             )
         }
         if (origin.screenshot) add("The attached image is a screenshot of their screen from the moment they opened you.")
-        if (phoneControl) {
-            add(
+        when (phoneControl) {
+            true -> add(
                 "If you have the phone tools ($PHONE_TOOLS), they act on this same phone. When they ask for something the phone does, " +
                     "such as a timer or alarm, opening an app, directions or music, do it with those tools " +
                     "instead of explaining how or scheduling a Hermes task.",
             )
-        } else {
-            add("Phone control is off in dudan, so you can't act on this phone. If they ask you to, tell them to turn on Phone control in dudan's settings.")
+            false -> add(
+                "Phone control is off in dudan, so you can't act on this phone. If they ask you to, tell them to turn on Phone control in dudan's settings.",
+            )
+            null -> Unit
         }
     }.joinToString(" ")
 }
