@@ -36,6 +36,7 @@ class AssistState(
 ) {
     val engine: ChatEngine = container.engine
     val speaker = container.speaker
+    val skillCatalog = container.skillCatalog
     val speech = SpeechInput(context)
 
     var settings by mutableStateOf<AppSettings?>(null)
@@ -82,6 +83,8 @@ class AssistState(
             settings = current
             // Load the voice model now, so a spoken reply doesn't wait for it.
             if (current.speakReplies) speaker.warmUp()
+            // The overlay can open without the app ever running, so load the skills for the $ list here too.
+            if (current.isConfigured) skillCatalog.ensureLoaded()
             if (current.isConfigured && current.listenOnInvoke && hasMic()) startListening()
         }
     }

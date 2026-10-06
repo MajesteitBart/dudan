@@ -80,6 +80,7 @@ import nl.bartvandermeeren.dudan.ui.openui.LocalStreaming
 import nl.bartvandermeeren.dudan.ui.components.PlainIconButton
 import nl.bartvandermeeren.dudan.ui.components.DudanMark
 import nl.bartvandermeeren.dudan.ui.components.copyToClipboard
+import nl.bartvandermeeren.dudan.ui.components.highlightSkillTags
 import nl.bartvandermeeren.dudan.ui.components.outlined
 import nl.bartvandermeeren.dudan.ui.components.pane
 import nl.bartvandermeeren.dudan.ui.components.rememberImageBitmap
@@ -92,7 +93,7 @@ import nl.bartvandermeeren.dudan.voice.SpeechText
 private val UserBubbleShape = RoundedCornerShape(topStart = 22.dp, topEnd = 22.dp, bottomEnd = 6.dp, bottomStart = 22.dp)
 
 @Composable
-fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
+fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier, skillSlugs: Set<String> = emptySet()) {
     Column(
         modifier
             .fillMaxWidth()
@@ -109,11 +110,13 @@ fun UserMessageItem(message: UiMessage, modifier: Modifier = Modifier) {
         if (message.text.isNotBlank()) {
             var expanded by rememberSaveable(message.id) { mutableStateOf(false) }
             val long = message.text.length > 420 || message.text.count { it == '\n' } > 6
-            Box(Modifier.pane(UserBubbleShape, LocalAccent.current.bubble)) {
+            val accent = LocalAccent.current
+            val styled = remember(message.text, skillSlugs, accent) { highlightSkillTags(message.text, skillSlugs, accent.soft) }
+            Box(Modifier.pane(UserBubbleShape, accent.bubble)) {
                 Box(Modifier.animateContentSize()) {
                     SelectionContainer {
                         Text(
-                            message.text,
+                            styled,
                             style = MaterialTheme.typography.bodyLarge,
                             color = Palette.TextPrimary,
                             maxLines = if (long && !expanded) 6 else Int.MAX_VALUE,

@@ -13,8 +13,11 @@
     <string name="search_hint">Search your chats</string>
     <string name="no_results">No chats match that.</string>
     <string name="skills">Skills</string>
-    <string name="skills_intro">Skills Hermes can use. Tap one to start a chat with it.</string>
-    <string name="skill_prompt">Use the %1$s skill: </string>
+    <string name="skills_intro">Skills Hermes can use. Tap one to see what it does. Type $ in a message to use one.</string>
+    <string name="skill_use">Use in chat</string>
+    <string name="skill_files">Files</string>
+    <string name="skills_hermes_bug">Hermes couldn\'t list its skills: it answered with error 500. That\'s a known bug in Hermes, and the fix is one line.</string>
+    <string name="skills_hermes_bug_fix">How to fix it</string>
     <string name="scheduled_tasks">Scheduled tasks</string>
     <string name="no_jobs">No scheduled tasks.</string>
     <string name="job_next">next %1$s</string>
@@ -62,6 +65,8 @@
     <string name="attach_camera">Camera</string>
     <string name="attach_photos_detail">Photos and videos</string>
     <string name="attach_camera_detail">Take a photo</string>
+    <string name="attach_skill">Skill</string>
+    <string name="attach_skill_detail">Tag one with $</string>
 
     <!-- Agent work -->
     <string name="status_thinking">Thinking</string>

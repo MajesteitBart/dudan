@@ -11,8 +11,11 @@
     <string name="search_hint">Zoek in je gesprekken</string>
     <string name="no_results">Geen gesprekken gevonden.</string>
     <string name="skills">Skills</string>
-    <string name="skills_intro">Skills die Hermes kan gebruiken. Tik op een skill om er een gesprek mee te beginnen.</string>
-    <string name="skill_prompt">Gebruik de skill %1$s: </string>
+    <string name="skills_intro">Skills die Hermes kan gebruiken. Tik op een skill om te zien wat hij doet. Typ $ in een bericht om er een te gebruiken.</string>
+    <string name="skill_use">Gebruik in chat</string>
+    <string name="skill_files">Bestanden</string>
+    <string name="skills_hermes_bug">Hermes kon zijn skills niet ophalen: het antwoordde met fout 500. Dat is een bekende fout in Hermes, en de oplossing is één regel.</string>
+    <string name="skills_hermes_bug_fix">Zo los je het op</string>
     <string name="scheduled_tasks">Geplande taken</string>
     <string name="no_jobs">Geen geplande taken.</string>
     <string name="job_next">volgende %1$s</string>
@@ -60,6 +63,8 @@
     <string name="attach_camera">Camera</string>
     <string name="attach_photos_detail">Foto\'s en video\'s</string>
     <string name="attach_camera_detail">Maak een foto</string>
+    <string name="attach_skill">Skill</string>
+    <string name="attach_skill_detail">Tag er een met $</string>
 
     <!-- Agent work -->
     <string name="status_thinking">Aan het nadenken</string>

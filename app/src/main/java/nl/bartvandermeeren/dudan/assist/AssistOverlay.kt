@@ -67,7 +67,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.Conversation
 import nl.bartvandermeeren.dudan.chat.Role
+import nl.bartvandermeeren.dudan.chat.SkillTags
 import nl.bartvandermeeren.dudan.data.AppSettings
+import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.ui.chat.AssistantMessageItem
 import nl.bartvandermeeren.dudan.ui.chat.BackgroundResultItem
 import nl.bartvandermeeren.dudan.ui.chat.UserMessageItem
@@ -92,6 +94,8 @@ fun AssistOverlay(state: AssistState) {
     val level by state.speech.level.collectAsState()
     val heard by state.speech.partial.collectAsState()
     val speakingId by state.speaker.speakingId.collectAsState()
+    val skillState by state.skillCatalog.state.collectAsState()
+    val skills = skillState.skills.orEmpty()
     val conversationFlow = remember(state.sessionId) { state.sessionId?.let { state.engine.conversation(it) } ?: emptyConversation }
     val conversation by conversationFlow.collectAsState()
     val settings = state.settings ?: AppSettings()
@@ -152,7 +156,7 @@ fun AssistOverlay(state: AssistState) {
                 if (hasChat) {
                     // Weighted so the composer below always keeps its room when space runs out.
                     Box(Modifier.weight(1f, fill = false)) {
-                        ResponsePanel(state, conversation, settings, speakingId, panel)
+                        ResponsePanel(state, conversation, settings, speakingId, panel, skills)
                     }
                 }
                 val shot = state.screenshot
@@ -205,6 +209,7 @@ fun AssistOverlay(state: AssistState) {
                     containerColor = panel,
                     solidColor = Palette.OverlaySolid,
                     containerWash = Color.Transparent,
+                    skills = skills,
                 )
             }
         }
@@ -212,8 +217,16 @@ fun AssistOverlay(state: AssistState) {
 }
 
 @Composable
-private fun ResponsePanel(state: AssistState, conversation: Conversation, settings: AppSettings, speakingId: String?, panel: Color) {
+private fun ResponsePanel(
+    state: AssistState,
+    conversation: Conversation,
+    settings: AppSettings,
+    speakingId: String?,
+    panel: Color,
+    skills: List<SkillInfo>,
+) {
     val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.58f).dp
+    val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val listState = rememberLazyListState()
     val last = conversation.messages.lastOrNull()
     LaunchedEffect(conversation.messages.size, last?.text?.length, last?.steps?.size) {
@@ -240,7 +253,7 @@ private fun ResponsePanel(state: AssistState, conversation: Conversation, settin
                 ) {
                     itemsIndexed(conversation.messages, key = { _, m -> m.id }) { index, message ->
                         when (message.role) {
-                            Role.User -> UserMessageItem(message)
+                            Role.User -> UserMessageItem(message, skillSlugs = skillSlugs)
                             Role.Background -> BackgroundResultItem(
                                 message = message,
                                 assistantName = settings.assistantName,

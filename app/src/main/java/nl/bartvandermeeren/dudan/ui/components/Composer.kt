@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
@@ -33,11 +34,15 @@ import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.KeyboardArrowDown
 import androidx.compose.material.icons.rounded.MicNone
 import androidx.compose.material.icons.rounded.Stop
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -50,12 +55,17 @@ import androidx.compose.ui.graphics.asImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextRange
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardCapitalization
+import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import nl.bartvandermeeren.dudan.R
+import nl.bartvandermeeren.dudan.chat.SkillTags
+import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 
@@ -101,7 +111,25 @@ fun Composer(
     modelPicker: (@Composable () -> Unit)? = null,
     addMenu: @Composable () -> Unit = {},
     onRetryAttachment: (Attachment) -> Unit = {},
+    /** Hermes' skills: typing `$` lists them, and picking one writes its tag. */
+    skills: List<SkillInfo> = emptyList(),
 ) {
+    // The field keeps its own cursor. Text set from outside (dictation, Use in chat, clearing after a
+    // send) arrives with the cursor at the end.
+    var field by remember { mutableStateOf(TextFieldValue(text, TextRange(text.length))) }
+    val value = if (field.text == text) field else TextFieldValue(text, TextRange(text.length))
+    val query = remember(value.text, value.selection, skills) {
+        if (skills.isEmpty() || !value.selection.collapsed) null else SkillTags.queryAt(value.text, value.selection.start)
+    }
+    val suggestions = remember(query, skills) { query?.let { SkillTags.suggest(it.text, skills) }.orEmpty() }
+    val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
+    fun pickSkill(skill: SkillInfo) {
+        val q = query ?: return
+        val (completed, cursor) = SkillTags.complete(value.text, q, skill)
+        field = TextFieldValue(completed, TextRange(cursor))
+        onTextChange(completed)
+    }
+
     val hasContent = text.isNotBlank() || attachments.isNotEmpty()
     val mode = when {
         busy -> TrailingMode.Busy
@@ -112,6 +140,9 @@ fun Composer(
     val accent = LocalAccent.current
     val container = Modifier.glass(RoundedCornerShape(28.dp), containerColor, solid = solidColor, wash = containerWash)
     Column(modifier.fillMaxWidth().then(container).padding(start = 6.dp, end = 8.dp, top = 6.dp, bottom = 6.dp)) {
+        if (suggestions.isNotEmpty() && !listening) {
+            SkillSuggestions(suggestions, onPick = ::pickSkill)
+        }
         if (attachments.isNotEmpty()) {
             LazyRow(
                 horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -150,9 +181,13 @@ fun Composer(
                 VoiceWaveform(voiceLevel, Modifier.padding(horizontal = 4.dp))
             } else {
                 BasicTextField(
-                    value = text,
-                    onValueChange = onTextChange,
+                    value = value,
+                    onValueChange = {
+                        field = it
+                        if (it.text != text) onTextChange(it.text)
+                    },
                     textStyle = MaterialTheme.typography.bodyLarge.copy(color = Palette.TextPrimary, fontSize = 18.sp),
+                    visualTransformation = remember(skillSlugs, accent) { SkillTagHighlight(skillSlugs, accent.soft) },
                     cursorBrush = SolidColor(accent.soft),
                     maxLines = 8,
                     keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Sentences),
@@ -211,6 +246,35 @@ fun Composer(
             }
         }
     }
+}
+
+/** Skills matching the `$tag` being typed, above the message; the list scrolls once it holds more than a few. */
+@Composable
+private fun SkillSuggestions(skills: List<SkillInfo>, onPick: (SkillInfo) -> Unit) {
+    val accent = LocalAccent.current
+    LazyColumn(Modifier.fillMaxWidth().heightIn(max = 236.dp).padding(top = 4.dp)) {
+        items(skills, key = { it.name }) { skill ->
+            Column(
+                Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(16.dp))
+                    .clickable { onPick(skill) }
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+            ) {
+                Text(
+                    "\$" + SkillTags.slug(skill.name),
+                    style = MaterialTheme.typography.bodyLarge.copy(fontWeight = FontWeight.Medium),
+                    color = accent.soft,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis,
+                )
+                skill.description?.takeIf { it.isNotBlank() }?.let {
+                    Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
+                }
+            }
+        }
+    }
+    HorizontalDivider(color = Palette.Hairline, modifier = Modifier.padding(horizontal = 12.dp, vertical = 4.dp))
 }
 
 /** The active model as a quiet text button in the prompt bar, like beautifului.dev's "Vanilla 1 ⌄". */

@@ -39,6 +39,7 @@ import nl.bartvandermeeren.dudan.appContainer
 import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.chat.Conversation
 import nl.bartvandermeeren.dudan.chat.PreparedImage
+import nl.bartvandermeeren.dudan.chat.SkillTags
 import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.FileRef
@@ -46,6 +47,7 @@ import nl.bartvandermeeren.dudan.data.MAX_ATTACHMENT_BYTES
 import nl.bartvandermeeren.dudan.data.ModelCatalog
 import nl.bartvandermeeren.dudan.data.ModelChoice
 import nl.bartvandermeeren.dudan.data.ModelProfile
+import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.data.UploadClient
 import nl.bartvandermeeren.dudan.ui.components.Attachment
 import nl.bartvandermeeren.dudan.ui.components.ImageCodec
@@ -62,6 +64,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     val engine = container.engine
     val speaker = container.speaker
     val api = container.api
+    val skillCatalog = container.skillCatalog
 
     val settings: StateFlow<AppSettings?> = container.settings.flow
         .stateIn(viewModelScope, SharingStarted.Eagerly, null)
@@ -94,7 +97,11 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
 
     init {
         viewModelScope.launch {
-            settings.collect { s -> if (s?.isConfigured == true && !engine.sessions.value.loadedOnce) engine.refreshSessions() }
+            settings.collect { s ->
+                if (s?.isConfigured != true) return@collect
+                if (!engine.sessions.value.loadedOnce) engine.refreshSessions()
+                skillCatalog.ensureLoaded()
+            }
         }
         viewModelScope.launch {
             // Chats, runs and models belong to one server; switching servers starts clean.
@@ -103,12 +110,14 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                 val server = s?.serverUrl ?: return@collect
                 if (previousServer != null && previousServer != server) {
                     engine.reset()
+                    skillCatalog.reset()
                     modelCatalog.value = null
                     _currentId.value = engine.startNew()
                     composerText = ""
                     clearAttachments()
                     engine.refreshSessions()
                     loadModels()
+                    skillCatalog.refresh()
                 }
                 previousServer = server
             }
@@ -416,6 +425,16 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
         pendingSend?.cancel()
         attachments.forEach { forgetUpload(it.id) }
         attachments.clear()
+    }
+
+    /** Set when the prompt bar should take the focus and show the keyboard; the chat screen clears it. */
+    var focusComposer by mutableStateOf(false)
+
+    /** Starts a chat with [skill]'s tag in the prompt bar, ready for the rest of the message. */
+    fun useSkill(skill: SkillInfo) {
+        newChat()
+        composerText = "\$" + SkillTags.slug(skill.name) + " "
+        focusComposer = true
     }
 
     fun acceptSharedText(text: String) {
