@@ -49,8 +49,8 @@ android {
         minSdk = 31
         targetSdk = 36
         // Public releases restart at 0.1.0; the code keeps counting so 0.9.0 installs still update.
-        versionCode = 16
-        versionName = "0.1.0"
+        versionCode = 17
+        versionName = "0.2.0"
         // Phones are arm64. Debug builds add x86_64 for the emulator.
         ndk { abiFilters += "arm64-v8a" }
     }
