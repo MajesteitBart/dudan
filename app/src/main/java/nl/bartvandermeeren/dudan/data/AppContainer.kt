@@ -65,7 +65,7 @@ class AppContainer(context: Context) {
     val supertonicModel = ModelPackage(appContext, http, appScope, ModelPackage.SUPERTONIC)
 
     /** Speech recognition on the phone, shared by dictation, the overlay and Live. */
-    val orukeet: OrukeetEngine by lazy { OrukeetEngine(orukeetModel) }
+    val orukeet: OrukeetEngine by lazy { OrukeetEngine(orukeetModel, appContext.assets) }
 
     val speaker: Speaker by lazy {
         Speaker(appContext, KokoroVoice(appContext, kokoroModel), SupertonicVoice(appContext, supertonicModel)) { settingsSnapshot.value }

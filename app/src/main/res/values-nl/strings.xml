@@ -162,7 +162,7 @@
     <string name="section_speech_input">Spraakinvoer</string>
     <string name="stt_orukeet">Orukeet</string>
     <string name="stt_system">Android-herkenning</string>
-    <string name="stt_orukeet_detail">Orukeet draait op de telefoon en verstaat 25 talen, waaronder Nederlands en Engels. Het herkent zelf welke taal je spreekt; de instelling voor spraaktaal geldt alleen voor de Android-herkenning. Inspreken in andere apps blijft de herkenning van de telefoon gebruiken.</string>
+    <string name="stt_orukeet_detail">Orukeet draait op de telefoon en verstaat 25 talen, waaronder Nederlands en Engels. Uit zichzelf raadt het welke taal je spreekt, en bij een korte zin kan dat misgaan. Zet de spraaktaal hieronder op nl-NL of en-US en het houdt zich aan Nederlands of Engels. Inspreken in andere apps blijft de herkenning van de telefoon gebruiken.</string>
     <string name="stt_orukeet_ready">Spraakmodel geïnstalleerd</string>
     <string name="stt_orukeet_downloading">Spraakmodel downloaden… %1$d%%</string>
     <string name="stt_orukeet_download">Spraakmodel downloaden (%1$d MB)</string>
@@ -200,7 +200,7 @@
     <string name="speak_replies">Antwoorden voorlezen</string>
     <string name="speak_replies_detail">Na een ingesproken vraag in de assistent-overlay</string>
     <string name="speech_language">Spraaktaal</string>
-    <string name="speech_language_hint">Systeemstandaard, of bijvoorbeeld nl-NL</string>
+    <string name="speech_language_hint">Automatisch, of bijvoorbeeld nl-NL</string>
     <string name="show_all_channels">Gesprekken van alle kanalen tonen</string>
     <string name="show_all_channels_detail">Ook Telegram-, CLI- en andere Hermes-sessies tonen onder Recent</string>
     <string name="accent_color">Accentkleur</string>

@@ -247,7 +247,9 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 }
                 Section(stringResource(R.string.section_voice)) { VoiceSettings(vm, settings) }
                 Section(stringResource(R.string.section_dutch_voice)) { DutchVoiceSettings(vm, settings) }
-                Section(stringResource(R.string.section_speech_input)) { SpeechInputSettings(vm, settings) }
+                Section(stringResource(R.string.section_speech_input)) {
+                    SpeechInputSettings(vm, settings, language) { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } }
+                }
 
                 Section(stringResource(R.string.section_assistant)) {
                     DefaultAssistantStatus()
@@ -257,12 +259,6 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
                         scope.launch { vm.settingsRepository.setSpeakReplies(it) }
                     }
-                    Field(
-                        language,
-                        { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } },
-                        stringResource(R.string.speech_language),
-                        placeholder = stringResource(R.string.speech_language_hint),
-                    )
                 }
 
                 Section(stringResource(R.string.section_replies_files)) { RepliesAndFilesSettings(vm, settings) }
@@ -420,7 +416,7 @@ private fun VoicePicker(voices: List<Pair<String, String>>, selected: String, on
 }
 
 @Composable
-private fun SpeechInputSettings(vm: MainViewModel, settings: AppSettings) {
+private fun SpeechInputSettings(vm: MainViewModel, settings: AppSettings, language: String, onLanguage: (String) -> Unit) {
     val scope = rememberCoroutineScope()
     Segmented(
         options = listOf(SttEngine.Orukeet to stringResource(R.string.stt_orukeet), SttEngine.System to stringResource(R.string.stt_system)),
@@ -434,6 +430,7 @@ private fun SpeechInputSettings(vm: MainViewModel, settings: AppSettings) {
             ModelTexts(R.string.stt_orukeet_ready, R.string.stt_orukeet_downloading, R.string.stt_orukeet_download, R.string.stt_orukeet_crashed),
         )
     }
+    Field(language, onLanguage, stringResource(R.string.speech_language), placeholder = stringResource(R.string.speech_language_hint))
     SpeechPause(settings.speechPauseMs, systemRecognizer = settings.sttEngine == SttEngine.System) {
         scope.launch { vm.settingsRepository.setSpeechPause(it) }
     }
