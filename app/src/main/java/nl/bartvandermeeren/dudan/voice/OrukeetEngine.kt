@@ -1,5 +1,6 @@
 package nl.bartvandermeeren.dudan.voice
 
+import android.content.res.AssetManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -7,6 +8,7 @@ import com.k2fsa.sherpa.onnx.FeatureConfig
 import com.k2fsa.sherpa.onnx.OfflineModelConfig
 import com.k2fsa.sherpa.onnx.OfflineRecognizer
 import com.k2fsa.sherpa.onnx.OfflineRecognizerConfig
+import com.k2fsa.sherpa.onnx.OfflineRecognizerResult
 import com.k2fsa.sherpa.onnx.OfflineTransducerModelConfig
 import com.k2fsa.sherpa.onnx.SileroVadModelConfig
 import com.k2fsa.sherpa.onnx.Vad
@@ -17,14 +19,16 @@ import java.util.concurrent.atomic.AtomicInteger
 /**
  * Orukeet speech recognition on the phone through sherpa-onnx. One recognizer serves the whole
  * process: it loads on first use, decodes on a single worker thread, and goes after a few idle minutes.
+ * The language clips that keep it to one language ([LanguagePrimer]) come from [assets].
  */
-class OrukeetEngine(private val model: ModelPackage) {
+class OrukeetEngine(private val model: ModelPackage, private val assets: AssetManager) {
     private val main = Handler(Looper.getMainLooper())
     private val worker = Executors.newSingleThreadExecutor { Thread(it, "orukeet").apply { priority = Thread.MAX_PRIORITY } }
     private val pending = AtomicInteger()
 
     // Only touched on the worker thread.
     private var recognizer: OfflineRecognizer? = null
+    private val primers = mutableMapOf<String, LanguagePrimer?>()
     private val releaseIdle = Runnable { worker.execute { releaseRecognizer() } }
 
     val isReady: Boolean get() = model.isReady
@@ -40,10 +44,19 @@ class OrukeetEngine(private val model: ModelPackage) {
     }
 
     /**
-     * Transcribes 16 kHz mono audio. [onText] runs on the main thread, with null when decoding failed.
+     * Transcribes 16 kHz mono audio. With a [language] (the speech language setting, such as "nl-NL")
+     * that has a clip, a short utterance is heard as that language; otherwise Orukeet works it out.
+     * [speechSamples] is how much of [samples] is speech, so silence at the end doesn't count toward
+     * [LanguagePrimer.MAX_SAMPLES]. [onText] runs on the main thread, with null when decoding failed.
      * Work whose recording was [cancelled] while it waited in the queue is skipped without a callback.
      */
-    fun transcribe(samples: FloatArray, cancelled: () -> Boolean = { false }, onText: (String?) -> Unit) {
+    fun transcribe(
+        samples: FloatArray,
+        language: String?,
+        speechSamples: Int = samples.size,
+        cancelled: () -> Boolean = { false },
+        onText: (String?) -> Unit,
+    ) {
         pending.incrementAndGet()
         main.removeCallbacks(releaseIdle)
         worker.execute {
@@ -54,14 +67,12 @@ class OrukeetEngine(private val model: ModelPackage) {
             }
             val text = try {
                 val engine = recognizer()
-                val stream = engine.createStream()
-                try {
-                    stream.acceptWaveform(samples, SAMPLE_RATE)
-                    engine.decode(stream)
-                    engine.getResult(stream).text.trim()
-                } finally {
-                    stream.release()
+                val primed = primer(language)?.takeIf { speechSamples <= LanguagePrimer.MAX_SAMPLES }?.let { primer ->
+                    val result = decode(engine, primer.prime(samples))
+                    primer.transcript(result.tokens, result.timestamps)
                 }
+                // Nothing after the clip means Orukeet skipped the utterance; decode it on its own then.
+                primed?.ifEmpty { null } ?: decode(engine, samples).text.trim()
             } catch (e: Throwable) {
                 Log.w(TAG, "transcription failed", e)
                 null
@@ -89,6 +100,31 @@ class OrukeetEngine(private val model: ModelPackage) {
                 debug = false,
             ),
         )
+    }
+
+    private fun decode(engine: OfflineRecognizer, samples: FloatArray): OfflineRecognizerResult {
+        val stream = engine.createStream()
+        try {
+            stream.acceptWaveform(samples, SAMPLE_RATE)
+            engine.decode(stream)
+            return engine.getResult(stream)
+        } finally {
+            stream.release()
+        }
+    }
+
+    /** The clip for [language], loaded once; null without one. Worker thread only. */
+    private fun primer(language: String?): LanguagePrimer? {
+        val code = LanguagePrimer.languageOf(language) ?: return null
+        if (code !in primers) {
+            primers[code] = try {
+                LanguagePrimer(LanguagePrimer.readWav(assets.open(LanguagePrimer.assetPath(code)).use { it.readBytes() }))
+            } catch (e: Exception) {
+                Log.w(TAG, "language clip for $code failed to load", e)
+                null
+            }
+        }
+        return primers[code]
     }
 
     private fun scheduleRelease() {

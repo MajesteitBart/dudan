@@ -107,6 +107,7 @@ class SpeechInput(private val context: Context) {
                 }
             },
             endSilenceMs = pauseMs,
+            language = language,
         )
         local = session
         session.start()

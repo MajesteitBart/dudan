@@ -18,6 +18,7 @@ import android.util.Log
 import com.k2fsa.sherpa.onnx.Vad
 import kotlin.math.log10
 import kotlin.math.max
+import kotlin.math.min
 import kotlin.math.sqrt
 
 /**
@@ -31,6 +32,8 @@ class LocalSpeechSession(
     private val listener: Listener,
     /** Silence after speech that ends the utterance; see [Endpointer]. */
     private val endSilenceMs: Int = Endpointer.DEFAULT_END_SILENCE_MS,
+    /** The speech language setting; see [OrukeetEngine.transcribe]. */
+    private val language: String? = null,
 ) {
     interface Listener {
         fun onListening()
@@ -172,28 +175,43 @@ class LocalSpeechSession(
                     return
                 }
                 event == Endpointer.Event.Ended || event == Endpointer.Event.TooLong -> {
-                    val trailing = endpointer.trailingSilenceMs * SAMPLES_PER_MS - KEEP_SILENCE_MS * SAMPLES_PER_MS
-                    transcribe(audio, speechStart, audio.size - max(0, trailing))
+                    transcribe(audio, speechStart, speechEnd(audio, endpointer))
                     return
                 }
                 finishRequested -> {
-                    // Stopped by hand: decode everything, since quiet speech may never have tripped the detector.
-                    transcribe(audio, if (speechStart >= 0) speechStart else 0, audio.size)
+                    // Stopped by hand: decode everything, since quiet speech may never have tripped the
+                    // detector, or may sit in what it counts as silence.
+                    if (speechStart >= 0) {
+                        transcribe(audio, speechStart, audio.size, speechEnd(audio, endpointer))
+                    } else {
+                        transcribe(audio, 0, audio.size)
+                    }
                     return
                 }
             }
             if (speechStart >= 0 && audio.size - lastPreview >= PREVIEW_EVERY && !engine.isBusy) {
                 lastPreview = audio.size
-                engine.transcribe(audio.copy(speechStart, audio.size), cancelled = { !live }) { text ->
+                val speech = speechEnd(audio, endpointer) - speechStart
+                engine.transcribe(audio.copy(speechStart, audio.size), language, speech, cancelled = { !live }) { text ->
                     if (live && !text.isNullOrBlank()) listener.onPartial(text)
                 }
             }
         }
     }
 
-    private fun transcribe(audio: Recording, from: Int, to: Int) {
+    /**
+     * Where the speech ends by the detector's measure: silence after it beyond [KEEP_SILENCE_MS] is
+     * left out. A short question followed by a pause still counts as short, so it keeps its language
+     * (see [LanguagePrimer.MAX_SAMPLES]).
+     */
+    private fun speechEnd(audio: Recording, endpointer: Endpointer): Int =
+        audio.size - max(0, (endpointer.trailingSilenceMs - KEEP_SILENCE_MS) * SAMPLES_PER_MS)
+
+    /** Decodes [from] until [to], of which [from] until [speechTo] is speech. */
+    private fun transcribe(audio: Recording, from: Int, to: Int, speechTo: Int = to) {
         post { onProcessing() }
-        engine.transcribe(audio.copy(from, max(from, to)), cancelled = { !live }) { text ->
+        val speech = max(0, min(speechTo, to) - from)
+        engine.transcribe(audio.copy(from, max(from, to)), language, speech, cancelled = { !live }) { text ->
             if (!live) return@transcribe
             when {
                 text == null -> listener.onError(SpeechRecognizer.ERROR_CLIENT)
