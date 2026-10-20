@@ -265,7 +265,7 @@ data class SkillDetail(
  * What GET /v1/capabilities says: the model alias Hermes advertises and the names of its endpoints,
  * from `endpoints: {"skills": {"method": "GET", "path": "/v1/skills"}, ...}`.
  */
-data class ServerCapabilities(val model: String?, val endpoints: Set<String>) {
+data class ServerCapabilities(val model: String?, val endpoints: Set<String>, val desktop: DesktopCapabilities? = null) {
     /** GET /v1/skills/{name}, which stock Hermes lacks; tools/hermes-patches adds it. */
     val readsSkills: Boolean get() = "skill" in endpoints
 
@@ -273,6 +273,7 @@ data class ServerCapabilities(val model: String?, val endpoints: Set<String>) {
         fun from(o: JsonObject?): ServerCapabilities = ServerCapabilities(
             model = o?.str("model"),
             endpoints = o?.get("endpoints").asObject()?.filterValues { it is JsonObject }?.keys.orEmpty(),
+            desktop = DesktopCapabilities.from(o),
         )
     }
 }

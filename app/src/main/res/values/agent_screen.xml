@@ -1,0 +1,24 @@
+<resources>
+    <string name="desktop_title">Agent screen</string>
+    <string name="desktop_open">Open</string>
+    <string name="desktop_collapse">Collapse</string>
+    <string name="desktop_take_control">Take control</string>
+    <string name="desktop_hand_back">Return control</string>
+    <string name="desktop_error">Desktop request failed. Input is paused; reconnect before continuing.</string>
+    <string name="desktop_stopped">Stopped</string>
+    <string name="desktop_stale">Reconnecting · last frame, not live</string>
+    <string name="desktop_unavailable">Desktop unavailable</string>
+    <string name="desktop_human">You have control · agent paused</string>
+    <string name="desktop_other_viewer">Another viewer has control</string>
+    <string name="desktop_paused">Watching · agent paused until Return control</string>
+    <string name="desktop_connecting">Connecting…</string>
+    <string name="desktop_live">Live · view only</string>
+    <string name="desktop_last_frame">Last frame: %1$s</string>
+    <string name="desktop_image">Desktop image. When controlling, tap or drag to interact.</string>
+    <string name="desktop_backspace">Delete</string>
+    <string name="desktop_uncertain">Input outcome is uncertain. Review the desktop before returning control.</string>
+    <string name="desktop_type">Type on desktop</string>
+    <string name="desktop_send">Send</string>
+    <string name="desktop_scroll_up">Scroll up</string>
+    <string name="desktop_scroll_down">Scroll down</string>
+</resources>

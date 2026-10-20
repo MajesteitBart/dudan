@@ -1,0 +1,28 @@
+{
+  "capabilities": {
+    "features": {
+      "desktop": { "version": 1, "supported": true, "transports": ["png-poll"], "control": true, "recording": false, "teaching": false }
+    }
+  },
+  "session": {
+    "version": 1,
+    "id": "00000000-0000-4000-8000-000000000001",
+    "session_id": "synthetic-chat",
+    "conversation_id": 1,
+    "task_id": "synthetic-task",
+    "run_id": "synthetic-run",
+    "resource_id": "synthetic-desktop",
+    "state": "live",
+    "agent_paused": false,
+    "epoch": 1,
+    "width": 1280,
+    "height": 800,
+    "last_frame_at": 1000,
+    "expires_at": 3601000,
+    "control_expires_at": null,
+    "problem": null,
+    "transport": "png-poll"
+  },
+  "input": { "lease": "synthetic-lease-never-valid", "epoch": 2, "sequence": 1, "input": { "kind": "tap", "x": 640, "y": 400 } },
+  "error": { "error": { "code": "desktop_agent_fenced", "message": "desktop agent fenced", "type": "invalid_request_error" } }
+}

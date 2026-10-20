@@ -40,6 +40,8 @@ Uploads resume after a dropped connection. Files other than photos need the smal
 
 ## Keep up with the work
 
+With a compatible Clark server, an [Agent screen](docs/agent-screen.md) card shows the task's dedicated desktop. Open it to watch, take control, and explicitly return control to the agent. Existing Hermes servers keep working with this feature hidden.
+
 Watch the agent's steps as it works, expand the details when you need them, and answer approval requests before Hermes runs commands that require your permission. Text and file tasks keep running on the server if your connection drops; dudan catches up when you're back. You'll get a notification when a reply arrives while you're elsewhere.
 
 Search, pin and rename chats. Browse Hermes skills, or type `$` in a message to tell the agent which skill to use. Run, pause or resume scheduled tasks. Conversations from other Hermes channels can appear in your chat list too.

@@ -181,7 +181,7 @@ fun ChatPane(
                         modifier = Modifier.align(Alignment.Center).size(28.dp),
                     )
                     conversation.loadError != null && messages.isEmpty() -> LoadError(conversation.loadError!!, onRetry = vm::reloadCurrent)
-                    else -> MessageList(vm, settings, speakingId, skills)
+                    else -> androidx.compose.runtime.key(settings.serverUrl, settings.apiKey) { MessageList(vm, settings, speakingId, skills) }
                 }
             }
         }
@@ -330,6 +330,7 @@ private fun LoadError(message: String, onRetry: () -> Unit) {
 @Composable
 private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?, skills: List<SkillInfo>) {
     val conversation by vm.conversation.collectAsStateWithLifecycle()
+    val desktops = rememberConversationDesktops(vm.api, conversation.sessionId)
     val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val messages = conversation.messages
     val listState = rememberLazyListState()
@@ -351,6 +352,9 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     }
     LaunchedEffect(follow) {
         if (follow && messages.isNotEmpty() && listState.canScrollForward) listState.animateScrollToItem(messages.size)
+    }
+    LaunchedEffect(desktops.sessions.size) {
+        if (follow && desktops.sessions.isNotEmpty()) listState.animateScrollToItem(messages.size + desktops.sessions.size)
     }
 
     val context = LocalContext.current
@@ -382,6 +386,12 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                             onRetry = vm::retry,
                             onApproval = vm::resolveApproval,
                         )
+                    }
+                }
+                desktops.sessions.forEach { desktop ->
+                    item(key = "desktop:${desktop.id}") {
+                        val visible = listState.layoutInfo.visibleItemsInfo.any { it.key == "desktop:${desktop.id}" }
+                        desktops.capability?.let { capability -> desktops.client?.let { client -> AgentScreenCard(client, desktop, capability, visible, settings.assistantName) } }
                     }
                 }
                 item(key = "bottom") { Spacer(Modifier.height(1.dp)) }
