@@ -59,6 +59,8 @@ adb shell input keyevent 219   # KEYCODE_ASSIST
 
 ## Code map
 
+- Agent desktop: `data/DesktopProtocol.kt` defines versioned capability/session parsing and aspect-fit coordinates; the fixed authenticated routes are in `HermesApi`. `ui/chat/AgentScreen.kt` renders cards in the real conversation and the expanded viewer. `DesktopController` owns frame polling and the control lease for the visible viewer. See [the protocol and acceptance guide](agent-screen.md).
+
 - `data/`: Hermes HTTP client, SSE reader, payload parsing, settings with the API key encrypted by an Android Keystore key. `UploadClient` talks to the upload service; `AttachmentNotes` writes and reads Hermes' file notes; `SkillCatalog` loads Hermes' skill list once per server for the `$` list, the Skills screen and the engine
 - `openui/`: OpenUI Lang parser and evaluator (`OpenUiParser`, `OpenUiRuntime`), the instructions the agent gets (`OpenUiPrompt`) and the markdown export for copy and speech (`OpenUiText`). `ui/openui/` renders the components
 - `chat/`: `ChatEngine` owns every conversation and run for the whole process, shared by the app, the overlay and Live mode; `TurnReducer` folds stream events into a message; `HistoryMapper` turns a Hermes transcript into bubbles; `BackgroundWork` reads which subagents the agent sent off and what they delivered; `TurnInstructions` writes each turn's instructions from a `TurnOrigin` (app, overlay or Live, spoken or not, with or without a screenshot); `SkillTags` finds `$skill` tags and writes the instructions that go with them

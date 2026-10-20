@@ -48,6 +48,70 @@ class HermesApi(
 
     suspend fun capabilities(): ServerCapabilities = ServerCapabilities.from(getJson("v1", "capabilities").asObject())
 
+    // Desktop requests use fixed routes on the configured server. Disable automatic POST retries and redirects.
+    private val desktopHttp by lazy { http.newBuilder().cache(null).retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).callTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build() }
+
+    /** A viewer keeps its original authenticated server, including during release after settings change. */
+    suspend fun desktopClient(): HermesApi {
+        val fixed = server()
+        return HermesApi(desktopHttp) { fixed }
+    }
+
+    suspend fun desktops(sessionId: String): List<DesktopSession> {
+        val root = desktopJson(request("api", "sessions", sessionId, "desktops").get().build())
+        return root["data"].asArray().orEmpty().mapNotNull { it.asObject()?.let { o -> DesktopSession.from(o, sessionId) } }
+    }
+
+    suspend fun desktopDetail(sessionId: String, id: String): DesktopSession =
+        DesktopSession.from(desktopJson(request("api", "sessions", sessionId, "desktops", id).get().build()), sessionId)
+            ?: throw HermesException(0, "Unsupported desktop response")
+
+    suspend fun desktopAction(sessionId: String, id: String, action: String, viewer: String, body: JsonObject = JsonObject(emptyMap())): JsonObject {
+        require(action in setOf("grant", "acquire", "renew", "release", "handback", "input", "stop"))
+        return desktopJson(request("api", "sessions", sessionId, "desktops", id, action)
+            .header("X-Desktop-Viewer", viewer).post(body.toString().toRequestBody("application/json".toMediaType())).build())
+    }
+
+    suspend fun desktopFrame(sessionId: String, id: String, viewer: String, grant: String): ByteArray {
+        val req = request("api", "sessions", sessionId, "desktops", id, "frame")
+            .header("Accept", "image/png").header("X-Desktop-Viewer", viewer).header("X-Desktop-Grant", grant).get().build()
+        val response = desktopHttp.newCall(req).await()
+        try {
+            return withContext(Dispatchers.IO) {
+                if (!response.isSuccessful) throw HermesException(response.code, "Desktop frame unavailable")
+                if (response.body?.contentType()?.toString() != "image/png") throw HermesException(0, "Unsupported desktop frame")
+                val input = response.body!!.byteStream()
+                val output = java.io.ByteArrayOutputStream()
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    if (output.size() + read > 8 * 1024 * 1024) throw HermesException(0, "Desktop frame too large")
+                    output.write(buffer, 0, read)
+                }
+                output.toByteArray()
+            }
+        } finally { response.close() }
+    }
+
+    private suspend fun desktopJson(request: Request): JsonObject {
+        val response = desktopHttp.newCall(request).await()
+        try { return withContext(Dispatchers.IO) {
+            val input = response.body?.byteStream() ?: throw HermesException(0, "Missing desktop response")
+            val output = java.io.ByteArrayOutputStream()
+            val buffer = ByteArray(8192)
+            while (true) {
+                val read = input.read(buffer)
+                if (read < 0) break
+                if (output.size() + read > 1024 * 1024) throw HermesException(0, "Desktop response too large")
+                output.write(buffer, 0, read)
+            }
+            val text = output.toByteArray().toString(Charsets.UTF_8)
+            if (!response.isSuccessful) throw errorFrom(response.code, text)
+            HermesJson.parseToJsonElement(text).asObject() ?: throw HermesException(0, "Invalid desktop response")
+        } } finally { response.close() }
+    }
+
     suspend fun modelOptions(): ModelCatalog {
         val root = getJson("api", "model", "options").asObject() ?: JsonObject(emptyMap())
         return ModelCatalogParser.parse(root)

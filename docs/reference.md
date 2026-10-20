@@ -48,6 +48,8 @@ Copy, share, the reply notification and read-aloud turn each block into the mark
 
 ## Known limits
 
+- [Agent screen](agent-screen.md) requires desktop protocol version 1 from a compatible Clark server. Hermes servers without it show no desktop controls. Watching uses PNG polling; video streaming, recording and teaching are not implemented. After losing control or reconnecting, the agent stays paused until Return control. If its model turn already ended, send a continuation message after handing back.
+
 - Turns with photos use the session chat stream, because that is where Hermes validates image parts. Those turns stop if the connection drops mid-run. Turns with other files are text and use the Runs API.
 - Files other than photos need the upload service on the Hermes host. The model never sees them directly: the agent opens them with its tools, so what it can do with a video or a spreadsheet depends on the tools and skills Hermes has.
 - Background results show up live, with a notification, only while the app process runs. Hermes has no push channel for them, so when Android has stopped dudan or keeps a sleeping phone offline, the result appears the next time you open the chat or return to the app, without a notification. Nothing continues the task until you tap Review result and finish; continuing without the phone would have to happen on the Hermes server.
