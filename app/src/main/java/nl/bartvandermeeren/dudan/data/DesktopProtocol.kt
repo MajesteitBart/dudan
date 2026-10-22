@@ -50,6 +50,10 @@ data class DesktopSession(
 
 /** Aspect-fit coordinates. Touches in the letterbox never become desktop input. */
 object DesktopCoordinates {
+    /** The desktop's width over its height; 16:10 until the server has reported a size. */
+    fun aspect(desktopWidth: Int, desktopHeight: Int): Float =
+        if (desktopWidth > 0 && desktopHeight > 0) desktopWidth.toFloat() / desktopHeight else 16f / 10f
+
     fun map(x: Float, y: Float, viewWidth: Float, viewHeight: Float, desktopWidth: Int, desktopHeight: Int): Pair<Int, Int>? {
         if (!viewWidth.isFinite() || !viewHeight.isFinite() || viewWidth <= 0 || viewHeight <= 0 || desktopWidth <= 0 || desktopHeight <= 0 || !x.isFinite() || !y.isFinite()) return null
         val scale = min(viewWidth / desktopWidth, viewHeight / desktopHeight)

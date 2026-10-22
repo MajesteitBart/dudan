@@ -39,6 +39,8 @@ The mock also runs the upload service's protocol on port 8645 (a second argument
 
 A message with a `$skill` tag gets a `skill_view` step for each tagged skill, and the mock's log shows the `instructions` or `system_message` each turn received. Like a Hermes with the [skills patch](../tools/hermes-patches/README.md), the mock serves `GET /v1/skills/{name}` and lists it in `/v1/capabilities`. Start it with `MOCK_NO_SKILL_DETAIL=1` to leave that endpoint out, as stock Hermes does, or with `MOCK_SKILLS_500=1` to make `GET /v1/skills` fail with stock Hermes' 500.
 
+`MOCK_DESKTOP=1` turns on [Agent screen](agent-screen.md) protocol version 1. The mock then advertises `features.desktop` and adds a conversation with two desktops, one stopped and one live, the way a task that stopped and attached again leaves them. Its frames are drawn from rectangles, so no real page or person is ever on screen, and the live one changes every second. Take control, input, Return control and stop work; `POST .../stop` on the live desktop, for example with curl, shows what a card does when the agent stops while you watch. Grants and control leases are checked as on Clark; `MOCK_DESKTOP_LEASE_MS` shortens a lease from 30 seconds to try what expiry does.
+
 Use the debug build on an x86_64 emulator. Release builds only contain arm64 libraries; the emulator runs those through ARM translation, and Kokoro's native library crashes there while loading.
 
 Questions containing "english" get an English reply from the mock, for testing Kokoro.

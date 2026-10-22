@@ -43,4 +43,15 @@ class DesktopProtocolTest {
         assertNull(DesktopCoordinates.map(0f, 0f, 0f, 100f, 1280, 800))
         assertNull(DesktopCoordinates.map(1280f, 800f, 1280f, 800f, 1280, 800))
     }
+
+    @Test fun previewsTakeTheDesktopsShapeAndSixteenByTenUntilItIsKnown() {
+        assertEquals(1.6f, DesktopCoordinates.aspect(1280, 800), 0.0001f)
+        assertEquals(0.5f, DesktopCoordinates.aspect(400, 800), 0.0001f)
+        assertEquals(1.6f, DesktopCoordinates.aspect(0, 0), 0.0001f)
+        assertEquals(1.6f, DesktopCoordinates.aspect(1280, 0), 0.0001f)
+        // At that shape a preview fills its box exactly: no letterbox to tap into.
+        val (w, h) = 576f to 576f / DesktopCoordinates.aspect(1280, 800)
+        assertEquals(0 to 0, DesktopCoordinates.map(0f, 0f, w, h, 1280, 800))
+        assertEquals(1279 to 799, DesktopCoordinates.map(w - 0.01f, h - 0.01f, w, h, 1280, 800))
+    }
 }
