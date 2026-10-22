@@ -30,7 +30,8 @@ class LanguagePrimerTest {
         assertEquals("en", LanguagePrimer.languageOf("en-US"))
         // No clip, or no setting: Orukeet works the language out itself.
         assertNull(LanguagePrimer.languageOf("de-DE"))
-        assertNull(LanguagePrimer.languageOf("Dutch"))
+        // A language typed by name counts too.
+        assertEquals("nl", LanguagePrimer.languageOf("Dutch"))
         assertNull(LanguagePrimer.languageOf(""))
         assertNull(LanguagePrimer.languageOf(null))
     }

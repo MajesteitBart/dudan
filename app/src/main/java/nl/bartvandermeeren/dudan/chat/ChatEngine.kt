@@ -462,7 +462,7 @@ class ChatEngine(
                 // A retried review asks the way it asked before.
                 val model = turn.review?.model ?: settings.modelFor(profileOf(sessionId))
                 val rich = turn.review?.richReplies ?: settings.richReplies
-                val instructions = TurnInstructions.build(turn.origin, settings.phoneControl, rich)
+                val instructions = TurnInstructions.build(turn.origin, settings.phoneControl, rich, settings.speechLanguage)
                 val events: Flow<AgentEvent> = if (turn.usesRuns) {
                     val runId = if (turn.review == null) api.startRun(sessionId, turn.input, model, withSkills(instructions, turn.text))
                     else admitReview(turn, model, rich, settings)

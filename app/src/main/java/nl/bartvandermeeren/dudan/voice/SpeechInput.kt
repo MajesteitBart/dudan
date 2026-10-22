@@ -2,6 +2,7 @@ package nl.bartvandermeeren.dudan.voice
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -42,9 +43,13 @@ class SpeechInput(private val context: Context) {
     private var candidates: List<android.content.ComponentName> = emptyList()
     private var attempt = 0
 
+    /**
+     * Starts listening in [language], the speech language setting; see [SpeechLanguage]. When Orukeet
+     * can't start (microphone busy, model broken), the phone's recognizer takes over.
+     */
     fun start(language: String?, onResult: (String) -> Unit, onError: (Int) -> Unit = {}) {
         release()
-        this.language = language
+        this.language = SpeechLanguage.normalize(language)
         this.onResult = onResult
         this.onError = onError
         val container = context.appContainer
@@ -54,10 +59,21 @@ class SpeechInput(private val context: Context) {
             startLocal(container.orukeet)
             return
         }
+        startSystem()
+    }
+
+    private fun startSystem() {
         candidates = SpeechRecognizers.candidates(context)
         attempt = 0
+        // The phone's recognizer records in its own process, so the wake word listener lets go of the microphone.
+        if (!pausedWakeWord) {
+            pausedWakeWord = true
+            WakeMic.pause()
+        }
         launch()
     }
+
+    private var pausedWakeWord = false
 
     private fun startLocal(engine: OrukeetEngine) {
         _partial.value = ""
@@ -68,9 +84,12 @@ class SpeechInput(private val context: Context) {
             engine,
             object : LocalSpeechSession.Listener {
                 private val current get() = local === session
+                private var listened = false
 
                 override fun onListening() {
-                    if (current) _phase.value = Phase.Listening
+                    if (!current) return
+                    listened = true
+                    _phase.value = Phase.Listening
                 }
 
                 override fun onLevel(level: Float) {
@@ -99,6 +118,13 @@ class SpeechInput(private val context: Context) {
                 override fun onError(code: Int) {
                     if (!current) return
                     Log.w("DudanSpeech", "Orukeet input error $code")
+                    if (!listened && code != SpeechRecognizer.ERROR_AUDIO) {
+                        // Never got to listen (the detector failed to load): the phone's recognizer still can.
+                        local?.cancel()
+                        local = null
+                        startSystem()
+                        return
+                    }
                     val callback = this@SpeechInput.onError
                     onResult = null
                     this@SpeechInput.onError = null
@@ -120,6 +146,7 @@ class SpeechInput(private val context: Context) {
             val callback = onError
             onResult = null
             onError = null
+            release()
             callback?.invoke(ERROR_UNAVAILABLE)
             return
         }
@@ -133,9 +160,15 @@ class SpeechInput(private val context: Context) {
             // Only a request: Android's docs warn that a recognizer may ignore these and keep its own timing.
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, pauseMs.toLong())
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, pauseMs.toLong())
-            if (!language.isNullOrBlank()) {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
+            language?.let { tag ->
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, tag)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, tag)
+                // Recognizers that detect or switch languages on their own stay with this one.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, false)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, arrayListOf(tag))
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, arrayListOf(tag))
+                }
             }
         }
         _partial.value = ""
@@ -186,6 +219,10 @@ class SpeechInput(private val context: Context) {
         local = null
         recognizer?.runCatching { cancel(); destroy() }
         recognizer = null
+        if (pausedWakeWord) {
+            pausedWakeWord = false
+            WakeMic.release()
+        }
         _phase.value = Phase.Idle
         _level.value = 0f
     }
