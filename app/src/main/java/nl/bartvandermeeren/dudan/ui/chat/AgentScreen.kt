@@ -1,6 +1,8 @@
 package nl.bartvandermeeren.dudan.ui.chat
 
+import androidx.compose.animation.animateContentSize
 import androidx.compose.foundation.Image
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.focusable
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.awaitEachGesture
@@ -24,6 +26,7 @@ import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
@@ -76,17 +79,29 @@ fun AgentScreenCard(api: HermesApi, session: DesktopSession, capability: Desktop
     LaunchedEffect(controller, visible, expanded, lifecycle) {
         if (visible || expanded) lifecycle.repeatOnLifecycle(Lifecycle.State.STARTED) { controller.watch(expanded) }
     }
-    Column(Modifier.fillMaxWidth().padding(horizontal = 16.dp).pane(RoundedCornerShape(22.dp)).padding(12.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically) {
+    val aspect = DesktopCoordinates.aspect(view.session.width, view.session.height)
+    // Small by default: one row with a thumbnail and the state. Tapping it shows the preview in place; Open goes full screen.
+    var inline by rememberSaveable("inline:${session.id}") { mutableStateOf(false) }
+    val stopped = view.session.state == DesktopState.Stopped
+    Column(Modifier.padding(horizontal = 16.dp).widthIn(max = CardMaxWidth).fillMaxWidth().pane(RoundedCornerShape(18.dp))
+        .clickable(enabled = !stopped, onClickLabel = stringResource(if (inline) R.string.desktop_collapse else R.string.desktop_show)) { inline = !inline }
+        .animateContentSize().padding(horizontal = 12.dp, vertical = 8.dp)) {
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+            if (!inline && view.bitmap != null) DesktopSurface(view, false, Modifier.width(64.dp).aspectRatio(aspect)) {}
             Column(Modifier.weight(1f)) {
                 Text(stringResource(R.string.desktop_title), color = Palette.TextPrimary, style = MaterialTheme.typography.titleSmall)
-                Text(agentName, color = Palette.TextSecondary, style = MaterialTheme.typography.labelMedium)
+                Text(if (stopped) stoppedLine(view) else stringResource(statusLabel(view)), color = Palette.TextSecondary, style = MaterialTheme.typography.labelMedium, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
             TextButton(onClick = { expanded = true }, modifier = Modifier.sizeIn(minWidth = 48.dp, minHeight = 48.dp)) { Text(stringResource(R.string.desktop_open)) }
         }
-        val previewHeight = if (LocalConfiguration.current.screenHeightDp < 500) 72.dp else 200.dp
-        DesktopSurface(view, false, Modifier.fillMaxWidth().height(previewHeight)) {}
-        DesktopStatus(view)
+        if (inline && !stopped) {
+            BoxWithConstraints(Modifier.fillMaxWidth().padding(top = 4.dp, bottom = 4.dp)) {
+                val tallest = if (LocalConfiguration.current.screenHeightDp < 500) 120.dp else 360.dp
+                DesktopSurface(view, false, Modifier.width(minOf(maxWidth, tallest * aspect)).aspectRatio(aspect)) {}
+            }
+        }
+        // Folded or not, a retained frame says how old it is, and an uncertain input says so.
+        if (!stopped) DesktopNotes(view)
     }
     if (expanded) {
         Dialog(onDismissRequest = { expanded = false }, properties = DialogProperties(usePlatformDefaultWidth = false)) {
@@ -98,8 +113,10 @@ fun AgentScreenCard(api: HermesApi, session: DesktopSession, capability: Desktop
                         Text(stringResource(R.string.desktop_title), Modifier.weight(1f), color = Palette.TextPrimary, style = MaterialTheme.typography.titleMedium)
                         TextButton(onClick = { expanded = false }, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.desktop_collapse)) }
                     }
-                    DesktopSurface(view, view.controlling && !view.stale,
-                        Modifier.fillMaxWidth().weight(1f)) { input -> scope.launch { controller.send(input) } }
+                    Box(Modifier.fillMaxWidth().weight(1f), contentAlignment = Alignment.Center) {
+                        DesktopSurface(view, view.controlling && !view.stale,
+                            Modifier.aspectRatio(aspect)) { input -> scope.launch { controller.send(input) } }
+                    }
                     Column(Modifier.heightIn(max = controlsHeight).verticalScroll(rememberScrollState())) {
                         DesktopStatus(view)
                         if (view.error) Text(stringResource(R.string.desktop_error), color = MaterialTheme.colorScheme.error)
@@ -122,9 +139,15 @@ fun AgentScreenCard(api: HermesApi, session: DesktopSession, capability: Desktop
     }
 }
 
+private val CardMaxWidth = 600.dp
+
 @Composable
-private fun DesktopStatus(view: DesktopViewState) {
-    val stateLabel = when {
+private fun stoppedLine(view: DesktopViewState): String {
+    val at = view.receivedAt ?: view.session.lastFrameAt ?: return stringResource(R.string.desktop_stopped)
+    return stringResource(R.string.desktop_stopped_at, java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT).format(java.util.Date(at)))
+}
+
+private fun statusLabel(view: DesktopViewState): Int = when {
         view.session.state == DesktopState.Stopped -> R.string.desktop_stopped
         view.stale && view.bitmap != null -> R.string.desktop_stale
         view.error || view.session.state == DesktopState.Unavailable -> R.string.desktop_unavailable
@@ -137,7 +160,16 @@ private fun DesktopStatus(view: DesktopViewState) {
         view.bitmap == null -> R.string.desktop_connecting
         else -> R.string.desktop_live
     }
-    Text(stringResource(stateLabel), Modifier.padding(vertical = 8.dp), color = Palette.TextSecondary, style = MaterialTheme.typography.labelMedium)
+
+@Composable
+private fun DesktopStatus(view: DesktopViewState) {
+    Text(stringResource(statusLabel(view)), Modifier.padding(vertical = 8.dp), color = Palette.TextSecondary, style = MaterialTheme.typography.labelMedium)
+    DesktopNotes(view)
+}
+
+/** What the state line leaves out: an uncertain input, and when the last frame came. */
+@Composable
+private fun DesktopNotes(view: DesktopViewState) {
     if (view.session.problem == "input_uncertain") Text(stringResource(R.string.desktop_uncertain), color = Palette.TextSecondary, style = MaterialTheme.typography.bodySmall)
     if (view.stale && view.receivedAt != null) Text(stringResource(R.string.desktop_last_frame, java.text.DateFormat.getTimeInstance().format(java.util.Date(view.receivedAt))), color = Palette.TextSecondary, style = MaterialTheme.typography.labelSmall)
 }

@@ -1,6 +1,7 @@
 <resources>
     <string name="desktop_title">Agentscherm</string>
     <string name="desktop_open">Openen</string>
+    <string name="desktop_show">Voorbeeld tonen</string>
     <string name="desktop_collapse">Inklappen</string>
     <string name="desktop_take_control">Overnemen</string>
     <string name="desktop_hand_back">Bediening teruggeven</string>
@@ -14,6 +15,7 @@
     <string name="desktop_connecting">Verbinden…</string>
     <string name="desktop_live">Live · alleen meekijken</string>
     <string name="desktop_last_frame">Laatste beeld: %1$s</string>
+    <string name="desktop_stopped_at">Gestopt · laatste beeld %1$s</string>
     <string name="desktop_image">Bureaubladbeeld. Tik of sleep als je de bediening hebt.</string>
     <string name="desktop_type">Typ op het bureaublad</string>
     <string name="desktop_send">Versturen</string>

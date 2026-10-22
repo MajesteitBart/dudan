@@ -1,6 +1,7 @@
 <resources>
     <string name="desktop_title">Agent screen</string>
     <string name="desktop_open">Open</string>
+    <string name="desktop_show">Show preview</string>
     <string name="desktop_collapse">Collapse</string>
     <string name="desktop_take_control">Take control</string>
     <string name="desktop_hand_back">Return control</string>
@@ -14,6 +15,7 @@
     <string name="desktop_connecting">Connecting…</string>
     <string name="desktop_live">Live · view only</string>
     <string name="desktop_last_frame">Last frame: %1$s</string>
+    <string name="desktop_stopped_at">Stopped · last frame %1$s</string>
     <string name="desktop_image">Desktop image. When controlling, tap or drag to interact.</string>
     <string name="desktop_backspace">Delete</string>
     <string name="desktop_uncertain">Input outcome is uncertain. Review the desktop before returning control.</string>

@@ -75,6 +75,7 @@ import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.chat.Role
 import nl.bartvandermeeren.dudan.chat.SkillTags
 import nl.bartvandermeeren.dudan.data.AppSettings
+import nl.bartvandermeeren.dudan.data.DesktopState
 import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.ui.MainViewModel
 import nl.bartvandermeeren.dudan.ui.components.DudanIcons
@@ -331,6 +332,8 @@ private fun LoadError(message: String, onRetry: () -> Unit) {
 private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?, skills: List<SkillInfo>) {
     val conversation by vm.conversation.collectAsStateWithLifecycle()
     val desktops = rememberConversationDesktops(vm.api, conversation.sessionId)
+    // A desktop shows while it works; a stopped one leaves the conversation.
+    val working = remember(desktops.sessions) { desktops.sessions.filter { it.state != DesktopState.Stopped } }
     val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val messages = conversation.messages
     val listState = rememberLazyListState()
@@ -353,8 +356,8 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     LaunchedEffect(follow) {
         if (follow && messages.isNotEmpty() && listState.canScrollForward) listState.animateScrollToItem(messages.size)
     }
-    LaunchedEffect(desktops.sessions.size) {
-        if (follow && desktops.sessions.isNotEmpty()) listState.animateScrollToItem(messages.size + desktops.sessions.size)
+    LaunchedEffect(working.size) {
+        if (follow && working.isNotEmpty()) listState.animateScrollToItem(messages.size + working.size)
     }
 
     val context = LocalContext.current
@@ -388,7 +391,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                         )
                     }
                 }
-                desktops.sessions.forEach { desktop ->
+                working.forEach { desktop ->
                     item(key = "desktop:${desktop.id}") {
                         val visible = listState.layoutInfo.visibleItemsInfo.any { it.key == "desktop:${desktop.id}" }
                         desktops.capability?.let { capability -> desktops.client?.let { client -> AgentScreenCard(client, desktop, capability, visible, settings.assistantName) } }

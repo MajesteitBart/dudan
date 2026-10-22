@@ -29,6 +29,7 @@ import { open, rename, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileReply, openUiReply } from "./openui-demo.mjs";
+import { DESKTOP, DESKTOP_SESSION, desktopFeature, handleDesktop, seedDesktopConversation } from "./desktop.mjs";
 
 const PORT = Number(process.argv[2] ?? 8642);
 const UPLOAD_PORT = Number(process.argv[3] ?? 8645);
@@ -116,6 +117,7 @@ function seed() {
       { id: rowId(), role: "assistant", content: "```typescript\nimport { sqliteTable, text, integer } from 'drizzle-orm/sqlite-core';\n\nexport const accounts = sqliteTable('accounts', {\n  id: text('id').primaryKey(),\n  email: text('email').notNull(),\n});\n```", timestamp: t - 86380 },
     ],
   });
+  if (DESKTOP) sessions.set(DESKTOP_SESSION, seedDesktopConversation(LANG, rowId, t));
 }
 seed();
 
@@ -419,7 +421,7 @@ const server = http.createServer(async (req, res) => {
       session_create: { method: "POST", path: "/api/sessions" },
       session: { method: "GET", path: "/api/sessions/{session_id}" },
     };
-    return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "hermes-agent", features: { run_submission: true }, endpoints });
+    return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "hermes-agent", features: { run_submission: true, ...desktopFeature() }, endpoints });
   }
   if (path === "/api/model/options") {
     return send(res, 200, {
@@ -494,6 +496,7 @@ const server = http.createServer(async (req, res) => {
     sessions.set(id, { meta: { id, source: "api_server", title: body?.title ?? null, started_at: t, last_active: t, pinned: false, message_count: 0 }, messages: [] });
     return send(res, 201, { object: "hermes.session", session: sessions.get(id).meta });
   }
+  if (await handleDesktop(req, res, parts, send, readBody)) return;
   if (parts[0] === "api" && parts[1] === "sessions" && parts[2]) {
     const s = sessions.get(decodeURIComponent(parts[2]));
     if (!s) return send(res, 404, { error: { message: `Session not found: ${parts[2]}`, code: "session_not_found" } });
