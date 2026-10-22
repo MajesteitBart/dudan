@@ -41,9 +41,8 @@ class LanguagePrimer(private val clip: FloatArray) {
 
         /** The clip's language for a speech language setting such as "nl-NL"; null when there's no clip for it. */
         fun languageOf(setting: String?): String? {
-            if (setting.isNullOrBlank()) return null
-            val language = Locale.forLanguageTag(setting.trim().replace('_', '-')).language
-            return language.takeIf { it in languages }
+            val tag = SpeechLanguage.normalize(setting) ?: return null
+            return Locale.forLanguageTag(tag).language.takeIf { it in languages }
         }
 
         fun assetPath(language: String) = "orukeet/primer-$language.wav"

@@ -1,6 +1,7 @@
 package nl.bartvandermeeren.dudan.chat
 
 import nl.bartvandermeeren.dudan.openui.OpenUiPrompt
+import nl.bartvandermeeren.dudan.voice.SpeechLanguage
 
 /**
  * Where a question was asked. Every dudan turn reaches Hermes as a plain API server request, and
@@ -30,14 +31,17 @@ object TurnInstructions {
      * Everything a turn sends. A reply that is read aloud gets no OpenUI prompt, since a card can't be heard.
      * [phoneControl] is null when the turn shouldn't depend on this phone's setting; see [context].
      */
-    fun build(origin: TurnOrigin, phoneControl: Boolean?, richReplies: Boolean): String =
+    fun build(origin: TurnOrigin, phoneControl: Boolean?, richReplies: Boolean, speechLanguage: String? = null): String =
         listOfNotNull(
             OpenUiPrompt.instructions.takeIf { richReplies && !origin.spoken },
-            "## This turn\n\n" + context(origin, phoneControl),
+            "## This turn\n\n" + context(origin, phoneControl, speechLanguage),
         ).joinToString("\n\n")
 
-    /** The turn's context. Without [phoneControl] it says nothing about phone tools. */
-    fun context(origin: TurnOrigin, phoneControl: Boolean?): String = buildList {
+    /**
+     * The turn's context. Without [phoneControl] it says nothing about phone tools. A spoken turn with a
+     * [speechLanguage] setting asks for the reply in that language, the one the user speaks and hears it in.
+     */
+    fun context(origin: TurnOrigin, phoneControl: Boolean?, speechLanguage: String? = null): String = buildList {
         add("The user is talking to you through dudan, the Hermes app on their Android phone.")
         when (origin.surface) {
             TurnOrigin.Surface.App -> Unit
@@ -49,6 +53,9 @@ object TurnInstructions {
         }
         if (origin.spoken) {
             add("Your reply is read aloud, so write it to be heard: short spoken sentences, no tables, code blocks, links or emoji.")
+            SpeechLanguage.normalize(speechLanguage)?.let { SpeechLanguage.englishName(it) }?.let { language ->
+                add("They speak $language to you, so answer in $language unless they ask for another language.")
+            }
         } else {
             add(
                 "dudan renders Markdown, including headings, lists, tables, code blocks and links, so use it where it helps, " +

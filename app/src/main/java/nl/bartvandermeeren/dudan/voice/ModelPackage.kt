@@ -275,6 +275,23 @@ class ModelPackage(context: Context, private val http: OkHttpClient, private val
             ),
         )
 
+        /**
+         * The wake word spotter: k2-fsa's 3.3M-parameter streaming Zipformer for keyword spotting, trained
+         * on GigaSpeech (English), Apache 2.0. Only the int8 build is unpacked. The checksum is of the
+         * archive as downloaded on 2026-10-22; the release doesn't publish one.
+         */
+        val WAKE_WORD = Spec(
+            folder = "wakeword",
+            name = "sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01",
+            url = "https://github.com/k2-fsa/sherpa-onnx/releases/download/kws-models/sherpa-onnx-kws-zipformer-gigaspeech-3.3M-2024-01-01.tar.bz2",
+            sizeBytes = 17_626_723L,
+            sha256 = "f170013b4716e41b62b9bfd809687c207cef798ef9bc6534d524e17af9b6561a",
+            required = listOf(WakeWordListener.ENCODER, WakeWordListener.DECODER, WakeWordListener.JOINER, "tokens.txt", "bpe.model"),
+            wanted = { path ->
+                path in listOf(WakeWordListener.ENCODER, WakeWordListener.DECODER, WakeWordListener.JOINER, "tokens.txt", "bpe.model", "README.md")
+            },
+        )
+
         private const val SUPERTONIC_FILES = "https://huggingface.co/supertone-oss-archive/supertonic-3/resolve/aafc6e32416a594460b32413efc49d7fe4ce6d46"
 
         /**
