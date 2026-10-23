@@ -41,7 +41,6 @@ import dev.chrisbanes.haze.hazeSource
 import dev.chrisbanes.haze.rememberHazeState
 import java.io.File
 import nl.bartvandermeeren.dudan.R
-import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.ui.chat.ChatHostActions
 import nl.bartvandermeeren.dudan.ui.chat.ChatPane
 import nl.bartvandermeeren.dudan.ui.chat.Sidebar
@@ -219,12 +218,8 @@ private fun ChatLayout(
 ) {
     val sessions by vm.sessions.collectAsStateWithLifecycle()
     val currentId by vm.currentId.collectAsStateWithLifecycle()
-    val conversation by vm.conversation.collectAsStateWithLifecycle()
     var dockedOpen by rememberSaveable { mutableStateOf(true) }
     var overlayOpen by rememberSaveable { mutableStateOf(false) }
-    val serverLabel = remember(settings.serverUrl) {
-        HermesApi.normalizeBaseUrl(settings.serverUrl).substringAfter("://").substringBefore('/').substringBefore(':')
-    }
 
     BoxWithConstraints(Modifier.fillMaxSize()) {
         val wide = maxWidth >= 600.dp
@@ -236,12 +231,9 @@ private fun ChatLayout(
                 mode = mode,
                 assistantName = settings.assistantName,
                 userName = settings.userName,
-                serverLabel = serverLabel,
                 sessions = sessions,
                 currentSessionId = currentId,
-                onNewChatSelected = conversation.isNew && conversation.messages.isEmpty(),
                 onClose = { if (mode == SidebarMode.Docked) dockedOpen = false else overlayOpen = false },
-                onNewChat = { vm.newChat(); afterPick() },
                 onSearch = { vm.screen = Screen.Search; afterPick() },
                 onSkills = { vm.screen = Screen.Skills; afterPick() },
                 onJobs = { vm.screen = Screen.Jobs; afterPick() },

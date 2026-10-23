@@ -4,13 +4,16 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.combinedClickable
+import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -18,6 +21,7 @@ import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.AutoAwesome
@@ -25,17 +29,22 @@ import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.DriveFileRenameOutline
 import androidx.compose.material.icons.outlined.PushPin
 import androidx.compose.material.icons.outlined.Schedule
-import androidx.compose.material.icons.outlined.Settings
 import androidx.compose.material.icons.rounded.Close
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.OutlinedTextFieldDefaults
+import androidx.compose.material3.PlainTooltip
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.TooltipAnchorPosition
+import androidx.compose.material3.TooltipBox
+import androidx.compose.material3.TooltipDefaults
+import androidx.compose.material3.rememberTooltipState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -51,6 +60,10 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.Role
+import androidx.compose.ui.semantics.clearAndSetSemantics
+import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -75,12 +88,9 @@ fun Sidebar(
     mode: SidebarMode,
     assistantName: String,
     userName: String,
-    serverLabel: String,
     sessions: SessionsState,
     currentSessionId: String,
-    onNewChatSelected: Boolean,
     onClose: () -> Unit,
-    onNewChat: () -> Unit,
     onSearch: () -> Unit,
     onSkills: () -> Unit,
     onJobs: () -> Unit,
@@ -117,18 +127,16 @@ fun Sidebar(
                 onClick = onClose,
             )
         }
-        Spacer(Modifier.height(12.dp))
-        NavItem(DudanIcons.NewChat, stringResource(R.string.new_chat), selected = onNewChatSelected, onClick = onNewChat)
-        NavItem(Icons.Rounded.Search, stringResource(R.string.search_chats), onClick = onSearch)
-        NavItem(Icons.Outlined.AutoAwesome, stringResource(R.string.skills), onClick = onSkills)
-        NavItem(Icons.Outlined.Schedule, stringResource(R.string.scheduled_tasks), onClick = onJobs)
-        Spacer(Modifier.height(24.dp))
-        Row(Modifier.padding(start = 32.dp, end = 20.dp, bottom = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+        Row(Modifier.padding(start = 32.dp, end = 20.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
             Text(stringResource(R.string.recent), style = MaterialTheme.typography.labelLarge, color = Palette.TextSecondary)
             Spacer(Modifier.weight(1f))
             if (sessions.loading) CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.TextSecondary, modifier = Modifier.size(14.dp))
         }
-        LazyColumn(Modifier.weight(1f).fillMaxWidth()) {
+        LazyColumn(
+            // The top fade stays within the top padding, so a selected first row is never faded at rest.
+            Modifier.weight(1f).fillMaxWidth().fadeEdges(top = 12.dp, bottom = 16.dp),
+            contentPadding = PaddingValues(top = 12.dp, bottom = 12.dp),
+        ) {
             if (sessions.items.isEmpty() && sessions.loadedOnce && !sessions.loading) {
                 item {
                     Text(
@@ -150,30 +158,32 @@ fun Sidebar(
                 )
             }
         }
+        // The tools sit along the bottom edge, where a thumb reaches them on the Fold and on a phone.
+        // New chat lives in the chat's top bar. The avatar opens settings, as it does on the empty chat.
         Row(
             Modifier
                 .fillMaxWidth()
-                .padding(start = 24.dp, end = 12.dp, top = 10.dp, bottom = 12.dp),
+                .padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Avatar(userName.ifBlank { "?" }, size = 48.dp)
-            Column(Modifier.padding(start = 16.dp).weight(1f)) {
-                Text(
-                    userName.ifBlank { stringResource(R.string.you) },
-                    style = MaterialTheme.typography.bodyLarge,
-                    color = Palette.TextPrimary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
-                Text(
-                    serverLabel.uppercase(),
-                    style = MaterialTheme.typography.labelSmall,
-                    color = Palette.TextSecondary,
-                    maxLines = 1,
-                    overflow = TextOverflow.Ellipsis,
-                )
+            ToolButton(Icons.Rounded.Search, stringResource(R.string.search_chats), onClick = onSearch)
+            ToolButton(Icons.Outlined.AutoAwesome, stringResource(R.string.skills), onClick = onSkills)
+            ToolButton(Icons.Outlined.Schedule, stringResource(R.string.scheduled_tasks), onClick = onJobs)
+            Spacer(Modifier.weight(1f))
+            val settingsLabel = stringResource(R.string.settings)
+            LongPressLabel(settingsLabel) {
+                Box(
+                    Modifier
+                        .size(48.dp)
+                        .clip(CircleShape)
+                        .clickable(role = Role.Button, onClick = onSettings)
+                        .semantics { contentDescription = settingsLabel },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Avatar(userName.ifBlank { "?" }, size = 40.dp, modifier = Modifier.clearAndSetSemantics { })
+                }
             }
-            PlainIconButton(Icons.Outlined.Settings, stringResource(R.string.settings), onClick = onSettings)
         }
     }
 }
@@ -183,21 +193,20 @@ private fun Modifier.selectedPane(selected: Boolean, shape: Shape): Modifier =
     if (selected) pane(shape, Palette.Surface, outline = Palette.Hairline) else clip(shape)
 
 @Composable
-private fun NavItem(icon: ImageVector, label: String, selected: Boolean = false, onClick: () -> Unit) {
-    Row(
-        Modifier
-            .fillMaxWidth()
-            .padding(horizontal = 12.dp)
-            .height(56.dp)
-            .selectedPane(selected, RoundedCornerShape(28.dp))
-            .clickable(onClick = onClick)
-            .padding(horizontal = 20.dp),
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Icon(icon, contentDescription = null, tint = Palette.Icon, modifier = Modifier.size(26.dp))
-        Spacer(Modifier.width(20.dp))
-        Text(label, style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp), color = Palette.TextPrimary)
-    }
+private fun ToolButton(icon: ImageVector, label: String, onClick: () -> Unit) {
+    LongPressLabel(label) { PlainIconButton(icon, label, onClick = onClick) }
+}
+
+/** Icon-only buttons say what they are on a long press. */
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+private fun LongPressLabel(label: String, content: @Composable () -> Unit) {
+    TooltipBox(
+        positionProvider = TooltipDefaults.rememberTooltipPositionProvider(TooltipAnchorPosition.Above),
+        tooltip = { PlainTooltip { Text(label) } },
+        state = rememberTooltipState(),
+        content = content,
+    )
 }
 
 @OptIn(ExperimentalFoundationApi::class)
@@ -219,8 +228,8 @@ private fun SessionItem(
             Modifier
                 .fillMaxWidth()
                 .padding(horizontal = 12.dp)
-                .height(52.dp)
-                .selectedPane(selected, RoundedCornerShape(26.dp))
+                .heightIn(min = 48.dp)
+                .selectedPane(selected, RoundedCornerShape(22.dp))
                 .combinedClickable(
                     onClick = onClick,
                     onLongClick = {
@@ -228,7 +237,7 @@ private fun SessionItem(
                         menu = true
                     },
                 )
-                .padding(start = 8.dp, end = 12.dp),
+                .padding(start = 8.dp, end = 12.dp, top = 12.dp, bottom = 12.dp),
             verticalAlignment = Alignment.CenterVertically,
         ) {
             // Superhuman's selection mark: a short bar in the accent at the start of the row.
@@ -240,11 +249,12 @@ private fun SessionItem(
                     .background(if (selected) LocalAccent.current.color else Color.Transparent),
             )
             Spacer(Modifier.width(9.dp))
+            // Two lines with tight leading, so a long title still reads as one row of the list.
             Text(
                 session.displayTitle.ifBlank { stringResource(R.string.untitled_chat) },
-                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp),
+                style = MaterialTheme.typography.bodyLarge.copy(fontSize = 17.sp, lineHeight = 23.sp),
                 color = if (selected) Palette.TextPrimary else Palette.TextSecondary,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
