@@ -69,6 +69,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.ChatEngine
@@ -157,13 +158,16 @@ fun ChatPane(
             title = if (empty) null else session?.displayTitle?.takeIf { it.isNotBlank() } ?: settings.assistantName,
         ) {
             if (empty) {
-                Box(
-                    Modifier
-                        .padding(end = 4.dp)
-                        .clip(CircleShape)
-                        .clickable { vm.screen = nl.bartvandermeeren.dudan.ui.Screen.Settings },
-                ) {
-                    Avatar(settings.userName.ifBlank { "?" }, size = 40.dp, ring = false)
+                // With the sidebar docked open, its avatar already opens settings.
+                if (showMenuButton) {
+                    Box(
+                        Modifier
+                            .padding(end = 4.dp)
+                            .clip(CircleShape)
+                            .clickable { vm.screen = nl.bartvandermeeren.dudan.ui.Screen.Settings },
+                    ) {
+                        Avatar(settings.userName.ifBlank { "?" }, size = 40.dp, ring = false)
+                    }
                 }
             } else {
                 PlainIconButton(DudanIcons.NewChat, stringResource(R.string.new_chat), onClick = vm::newChat, size = 44.dp, iconSize = 24.dp)
@@ -273,11 +277,12 @@ private fun TopBar(
         } else {
             Spacer(Modifier.size(10.dp))
         }
+        // Two tight lines fit the bar, so a long chat title isn't cut off after a few words.
         Text(
             title.orEmpty(),
-            style = MaterialTheme.typography.titleMedium,
+            style = MaterialTheme.typography.titleMedium.copy(lineHeight = 21.sp),
             color = Palette.TextPrimary,
-            maxLines = 1,
+            maxLines = 2,
             overflow = TextOverflow.Ellipsis,
             modifier = Modifier.weight(1f).padding(horizontal = 8.dp),
         )
@@ -420,8 +425,8 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     }
 }
 
-/** Fades the messages out under the title bar and just above the prompt bar, instead of cutting them off. */
-private fun Modifier.fadeEdges(top: Dp, bottom: Dp): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
+/** Fades a scrolling list out at its top and bottom edges, instead of cutting it off. */
+internal fun Modifier.fadeEdges(top: Dp, bottom: Dp): Modifier = graphicsLayer { compositingStrategy = CompositingStrategy.Offscreen }
     .drawWithContent {
         drawContent()
         val h = size.height
