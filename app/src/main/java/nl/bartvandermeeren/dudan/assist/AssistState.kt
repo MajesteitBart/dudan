@@ -10,6 +10,7 @@ import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nl.bartvandermeeren.dudan.R
@@ -21,6 +22,7 @@ import nl.bartvandermeeren.dudan.data.AppVisibility
 import nl.bartvandermeeren.dudan.data.ModelProfile
 import nl.bartvandermeeren.dudan.ui.components.ImageCodec
 import nl.bartvandermeeren.dudan.voice.SpeechInput
+import nl.bartvandermeeren.dudan.voice.WakePhrase
 
 enum class OpenMode { Chat, Voice, Live }
 
@@ -69,7 +71,17 @@ class AssistState(
         }
     }
 
-    fun onShown() {
+    /**
+     * The overlay opened. [wakeWord] says the wake word opened it: then it always listens, also with
+     * Listen right away off, and a wake word while it's already open listens again in the same chat.
+     */
+    fun onShown(wakeWord: Boolean = false) {
+        if (wakeWord && shown) {
+            heardWakeWord = true
+            startListening()
+            return
+        }
+        heardWakeWord = wakeWord
         shown = true
         AppVisibility.overlayShown = true
         container.phoneControl.ensureRunning()
@@ -81,11 +93,12 @@ class AssistState(
         scope.launch {
             val current = container.settings.current()
             settings = current
+            // Listening comes first: the user may already be talking.
+            if (current.isConfigured && (wakeWord || current.listenOnInvoke) && hasMic()) startListening()
             // Load the voice model now, so a spoken reply doesn't wait for it.
             if (current.speakReplies) speaker.warmUp()
             // The overlay can open without the app ever running, so load the skills for the $ list here too.
             if (current.isConfigured) skillCatalog.ensureLoaded()
-            if (current.isConfigured && current.listenOnInvoke && hasMic()) startListening()
         }
     }
 
@@ -100,6 +113,15 @@ class AssistState(
     fun hasMic() = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
     fun startListening() {
+        retries = 0
+        listen()
+    }
+
+    /** The wake word opened this recording, so its last word may lead the transcript. */
+    private var heardWakeWord = false
+    private var retries = 0
+
+    private fun listen() {
         if (!hasMic()) {
             // The overlay can't show a permission prompt; the app can.
             openInApp(null, OpenMode.Voice)
@@ -107,14 +129,40 @@ class AssistState(
         }
         speaker.stop()
         speech.start(
-            settings?.speechLanguage?.ifBlank { null },
-            onResult = { heard ->
+            settings?.speechLanguage,
+            onResult = { result ->
+                val wake = heardWakeWord
+                val heard = if (wake) WakePhrase.stripLeading(result, settings?.wakePhrase.orEmpty()) else result
+                heardWakeWord = false
+                if (wake && heard.isBlank() && shown) {
+                    // Only the wake phrase, then a pause long enough to end the recording: now the question.
+                    listen()
+                    return@start
+                }
                 if (heard.isNotBlank()) {
                     text = listOf(text.trim(), heard.trim()).filter { it.isNotEmpty() }.joinToString(" ")
                     send(spoken = true)
                 }
             },
+            onError = { code ->
+                // Silence ends listening. Anything else (microphone busy, recognizer not ready) gets
+                // another try, so the overlay doesn't drop into typing on a hiccup.
+                if (!shown || SpeechInput.isSilence(code) || retries >= MAX_RETRIES || text.isNotBlank()) {
+                    heardWakeWord = false
+                    return@start
+                }
+                retries++
+                scope.launch {
+                    delay(RETRY_DELAY_MS * retries)
+                    if (shown && !speech.isActive && text.isBlank()) listen()
+                }
+            },
         )
+    }
+
+    private companion object {
+        const val MAX_RETRIES = 2
+        const val RETRY_DELAY_MS = 300L
     }
 
     fun stopListening() = speech.stop()

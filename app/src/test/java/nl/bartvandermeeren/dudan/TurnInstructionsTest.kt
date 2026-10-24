@@ -31,6 +31,17 @@ class TurnInstructionsTest {
     }
 
     @Test
+    fun spokenTurnsAskForTheReplyInTheSpeechLanguage() {
+        val spoken = TurnInstructions.context(TurnOrigin(Surface.Assistant, spoken = true), phoneControl = false, speechLanguage = "nl_NL")
+        assertTrue(spoken, spoken.contains("They speak Dutch to you, so answer in Dutch"))
+        // Typed turns, and no setting: nothing about the language.
+        val typed = TurnInstructions.context(TurnOrigin(Surface.Assistant), phoneControl = false, speechLanguage = "nl-NL")
+        assertFalse(typed, typed.contains("answer in"))
+        val automatic = TurnInstructions.context(TurnOrigin(Surface.Live, spoken = true), phoneControl = false, speechLanguage = "")
+        assertFalse(automatic, automatic.contains("answer in"))
+    }
+
+    @Test
     fun assistantTurnsMentionTheSideButtonAndAnAttachedScreenshot() {
         val text = TurnInstructions.context(TurnOrigin(Surface.Assistant, screenshot = true), phoneControl = false)
         assertTrue(text, text.contains("with the side button"))

@@ -10,6 +10,8 @@
     <!-- Phone control: the MCP server Hermes uses to open apps, set timers and control media. -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <!-- The wake word: listening for "Ok Clark" in the background needs a microphone foreground service. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="com.android.alarm.permission.SET_ALARM" />
     <!-- "Display over other apps" lets Hermes open apps while no dudan window is on screen. -->
@@ -124,6 +126,11 @@
                 android:name="android.speech"
                 android:resource="@xml/recognition_service" />
         </service>
+
+        <service
+            android:name=".assist.WakeWordService"
+            android:exported="false"
+            android:foregroundServiceType="microphone" />
 
         <service
             android:name=".device.PhoneControlService"

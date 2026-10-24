@@ -11,6 +11,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
+import nl.bartvandermeeren.dudan.assist.WakeWordService
 import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.device.PhoneControl
 import nl.bartvandermeeren.dudan.voice.KokoroVoice
@@ -64,6 +65,9 @@ class AppContainer(context: Context) {
 
     val supertonicModel = ModelPackage(appContext, http, appScope, ModelPackage.SUPERTONIC)
 
+    /** The wake word spotter; 18 MB, so it downloads as soon as the wake word is switched on. */
+    val wakeWordModel = ModelPackage(appContext, http, appScope, ModelPackage.WAKE_WORD)
+
     /** Speech recognition on the phone, shared by dictation, the overlay and Live. */
     val orukeet: OrukeetEngine by lazy { OrukeetEngine(orukeetModel, appContext.assets) }
 
@@ -73,8 +77,26 @@ class AppContainer(context: Context) {
 
     val phoneControl = PhoneControl(appContext, settingsSnapshot)
 
+    /**
+     * Starts the wake word listener when it's on. Call when dudan comes on screen or the assistant service
+     * binds: those are the moments Android lets a microphone service start.
+     */
+    fun ensureWakeWord() {
+        if (WakeWordService.listens(settingsSnapshot.value)) WakeWordService.start(appContext)
+    }
+
     init {
         ReplyNotifier(appContext, engine, settings, appScope)
+        appScope.launch {
+            settings.flow.map { WakeWordService.listens(it) }.distinctUntilChanged().collect { on ->
+                if (on) {
+                    wakeWordModel.download()
+                    WakeWordService.start(appContext)
+                } else {
+                    WakeWordService.stop(appContext)
+                }
+            }
+        }
         appScope.launch {
             settings.flow.map { it.phoneControl }.distinctUntilChanged().collect(phoneControl::sync)
         }

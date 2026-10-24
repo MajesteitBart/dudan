@@ -67,12 +67,14 @@ class OrukeetEngine(private val model: ModelPackage, private val assets: AssetMa
             }
             val text = try {
                 val engine = recognizer()
-                val primed = primer(language)?.takeIf { speechSamples <= LanguagePrimer.MAX_SAMPLES }?.let { primer ->
-                    val result = decode(engine, primer.prime(samples))
-                    primer.transcript(result.tokens, result.timestamps)
+                val primer = primer(language)
+                if (primer != null && speechSamples <= LanguagePrimer.MAX_SAMPLES) {
+                    // Nothing after the clip means Orukeet skipped the utterance; decode it on its own then.
+                    primed(engine, primer, samples).ifEmpty { null } ?: decode(engine, samples).text.trim()
+                } else {
+                    val plain = decode(engine, samples).text.trim()
+                    if (primer != null) inLanguage(engine, primer, samples, plain, language) else plain
                 }
-                // Nothing after the clip means Orukeet skipped the utterance; decode it on its own then.
-                primed?.ifEmpty { null } ?: decode(engine, samples).text.trim()
             } catch (e: Throwable) {
                 Log.w(TAG, "transcription failed", e)
                 null
@@ -81,6 +83,25 @@ class OrukeetEngine(private val model: ModelPackage, private val assets: AssetMa
             scheduleRelease()
             main.post { onText(text) }
         }
+    }
+
+    private fun primed(engine: OfflineRecognizer, primer: LanguagePrimer, samples: FloatArray): String {
+        val result = decode(engine, primer.prime(samples))
+        return primer.transcript(result.tokens, result.timestamps)
+    }
+
+    /**
+     * Longer speech is decoded on its own, since behind the clip Orukeet sometimes skips sentences of it.
+     * When that comes out in another language than [language], it's decoded once more behind the clip,
+     * and that wins if it is in the right language. Speech that really is in another language stays as heard.
+     */
+    private fun inLanguage(engine: OfflineRecognizer, primer: LanguagePrimer, samples: FloatArray, plain: String, language: String?): String {
+        val wanted = SpeechLanguage.normalize(language) ?: return plain
+        val heard = SpeechText.guessLanguage(plain) ?: return plain
+        if (SpeechLanguage.sameLanguage(heard, wanted)) return plain
+        val again = primed(engine, primer, samples)
+        val guess = SpeechText.guessLanguage(again) ?: return plain
+        return if (SpeechLanguage.sameLanguage(guess, wanted)) again else plain
     }
 
     /** A voice activity detector for one recording. Cheap to make: the Silero model is 0.6 MB. */
