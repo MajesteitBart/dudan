@@ -168,7 +168,7 @@
     <string name="tts_model_ready">%1$s installed</string>
     <string name="tts_model_downloading">Downloading %1$s… %2$d%%</string>
     <string name="tts_model_download">Download %1$s (%2$d MB)</string>
-    <string name="tts_model_crashed">%1$s crashed while starting on this phone. Its languages use the Android voice until you try again.</string>
+    <string name="tts_model_crashed">%1$s crashed while starting on this phone. Another voice reads its languages until you try again.</string>
     <string name="tts_kokoro">Kokoro</string>
     <string name="tts_system">Android voice</string>
     <string name="model_failed">Download failed: %1$s</string>

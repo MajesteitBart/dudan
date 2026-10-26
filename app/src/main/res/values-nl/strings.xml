@@ -165,7 +165,7 @@
     <string name="tts_model_ready">%1$s geïnstalleerd</string>
     <string name="tts_model_downloading">%1$s downloaden… %2$d%%</string>
     <string name="tts_model_download">%1$s downloaden (%2$d MB)</string>
-    <string name="tts_model_crashed">%1$s crashte bij het starten op deze telefoon. Tot je het opnieuw probeert, leest de Android-stem die talen voor.</string>
+    <string name="tts_model_crashed">%1$s crashte bij het starten op deze telefoon. Tot je het opnieuw probeert, leest een andere stem die talen voor.</string>
     <string name="tts_kokoro">Kokoro</string>
     <string name="tts_system">Android-stem</string>
     <string name="model_failed">Downloaden mislukt: %1$s</string>
