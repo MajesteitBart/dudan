@@ -49,11 +49,23 @@ object VoiceLanguages {
         (own + "en" + voices.keys.sorted()).filter { it != OTHER }.distinct()
 
     /**
-     * The user's own languages: the phone's, then [speechLanguage] (a tag such as "nl-NL", or empty), since
-     * the user talks to dudan in it and replies tend to follow.
+     * The user's own languages: the phone's, then [speechLanguage], since the user talks to dudan in it and
+     * replies tend to follow. That's the setting as typed: a tag such as "nl-NL", a name such as "Dutch",
+     * or empty.
      */
     fun languages(speechLanguage: String, phone: List<String> = phoneLanguages()): List<String> =
-        (phone + code(speechLanguage.trim())).filter { it.isNotEmpty() }.distinct()
+        (phone + listOfNotNull(SpeechLanguage.normalize(speechLanguage)?.let(::code))).filter { it.isNotEmpty() }.distinct()
+
+    /**
+     * The language to read [text] in, as a tag. A tie in the guess goes to [speechLanguage] (the setting as
+     * typed, such as "nl-NL" or "Dutch"), then to [rows]. When the text doesn't tell ("OK", a name), it's
+     * the speech language, and without one the phone's language.
+     */
+    fun replyLanguage(text: String, speechLanguage: String?, rows: List<String>): String {
+        val hint = SpeechLanguage.normalize(speechLanguage)
+        val preferred = (listOfNotNull(hint?.let(::code)) + rows).distinct()
+        return LanguageGuess.guess(text, preferred) ?: hint ?: Locale.getDefault().toLanguageTag()
+    }
 
     /**
      * Who reads a reply in [language]. A language without a row follows Other languages. Automatic takes

@@ -37,6 +37,31 @@ class VoiceLanguagesTest {
     }
 
     @Test
+    fun aSpeechLanguageWrittenAsANameGetsItsRowAndModel() {
+        // Settings takes "Dutch" and "Nederlands" as well as "nl-NL"; each is the Dutch row, not a "dutch" one.
+        assertEquals(listOf("en", "nl"), VoiceLanguages.languages("Dutch", listOf("en")))
+        assertEquals(listOf("en", "nl"), VoiceLanguages.languages("Nederlands", listOf("en")))
+        listOf("Dutch", "Nederlands").forEach {
+            val rows = VoiceLanguages.rows(VoiceLanguages.languages(it, listOf("en")), emptyMap())
+            assertEquals(setOf(VoiceEngine.Kokoro, VoiceEngine.Supertonic), VoiceLanguages.needed(rows, emptyMap()))
+        }
+        // Something that isn't a language gets no row.
+        assertEquals(listOf("en"), VoiceLanguages.languages("Klingon", listOf("en")))
+    }
+
+    @Test
+    fun theSpeechLanguageSettlesTiesAndSilentRepliesHoweverItsWritten() {
+        // "morgen" is Dutch and German; on a German phone the speech language still wins the tie.
+        val rows = VoiceLanguages.rows(VoiceLanguages.languages("Dutch", listOf("de")), emptyMap())
+        assertEquals("nl", VoiceLanguages.replyLanguage("Of morgen.", "Dutch", rows))
+        assertEquals("nl", VoiceLanguages.replyLanguage("Of morgen.", "nl-NL", rows))
+        assertEquals("de", VoiceLanguages.replyLanguage("Of morgen.", "", rows))
+        // A reply that doesn't tell is read in the speech language, as a tag the voices know.
+        assertEquals("nl-NL", VoiceLanguages.replyLanguage("OK", "Nederlands", rows))
+        assertEquals(Resolved(VoiceEngine.Supertonic, "M2"), VoiceLanguages.resolve(VoiceLanguages.code(VoiceLanguages.replyLanguage("OK", "Dutch", rows)), emptyMap(), rows, everything))
+    }
+
+    @Test
     fun automaticTakesTheBestVoiceThatIsInstalled() {
         val rows = listOf("nl", "en")
         assertEquals(Resolved(VoiceEngine.Kokoro, "af_heart"), VoiceLanguages.resolve("en", emptyMap(), rows, everything))

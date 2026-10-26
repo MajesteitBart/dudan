@@ -75,8 +75,8 @@ class Speaker(
 
     /**
      * The reply's language decides the voice. When the text doesn't tell ("OK", a name), [languageHint]
-     * (the speech input language) does, and without one the phone's language. A tie between two
-     * languages goes to [languageHint], then to the phone's own.
+     * (the speech language setting) does, and without one the phone's language. A tie between two
+     * languages goes to [languageHint], then to the phone's own. See [VoiceLanguages.replyLanguage].
      */
     fun speak(id: String, markdown: String, languageHint: String? = null, onDone: (() -> Unit)? = null) {
         val text = SpeechText.withPauses(SpeechText.fromMarkdown(markdown))
@@ -86,9 +86,7 @@ class Speaker(
         }
         val s = settings()
         val rows = VoiceLanguages.rows(VoiceLanguages.languages(s.speechLanguage), s.voices)
-        val hint = languageHint?.trim().orEmpty()
-        val preferred = (listOfNotNull(VoiceLanguages.code(hint).ifBlank { null }) + rows).distinct()
-        val language = LanguageGuess.guess(text, preferred) ?: hint.ifBlank { null } ?: Locale.getDefault().toLanguageTag()
+        val language = VoiceLanguages.replyLanguage(text, languageHint, rows)
         say(id, text, language, resolve(VoiceLanguages.code(language), s.voices, rows), onDone)
     }
 
