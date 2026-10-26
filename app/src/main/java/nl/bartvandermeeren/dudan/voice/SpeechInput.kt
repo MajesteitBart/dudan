@@ -86,7 +86,8 @@ class SpeechInput(private val context: Context) {
                 private val current get() = local === session
 
                 override fun onListening() {
-                    if (current) _phase.value = Phase.Listening
+                    // After a stop() that came while starting, the phase stays Processing.
+                    if (current && _phase.value == Phase.Starting) _phase.value = Phase.Listening
                 }
 
                 override fun onLevel(level: Float) {
@@ -121,14 +122,15 @@ class SpeechInput(private val context: Context) {
                 override fun onStartFailed(failure: LocalSpeechSession.StartFailure) {
                     if (!current) return
                     Log.w("DudanSpeech", "Orukeet could not start: $failure")
-                    if (!failure.phoneRecognizerCanTry) {
-                        fail(failure.code)
-                        return
+                    // Before onListening, only stop() sets Processing.
+                    when (val outcome = startOutcome(failure, stopped = _phase.value == Phase.Processing)) {
+                        is StartOutcome.End -> fail(outcome.code)
+                        StartOutcome.PhoneRecognizer -> {
+                            local?.cancel()
+                            local = null
+                            startSystem()
+                        }
                     }
-                    // The microphone or the detector: the phone's recognizer records in its own process, so it still can.
-                    local?.cancel()
-                    local = null
-                    startSystem()
                 }
             },
             endSilenceMs = pauseMs,
@@ -309,5 +311,25 @@ class SpeechInput(private val context: Context) {
         )
 
         fun isSilence(error: Int) = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+
+        /**
+         * What follows when Orukeet couldn't start recording. The phone's recognizer records in its own
+         * process, so it can still try after a busy microphone or a broken detector. A stop that came
+         * while Orukeet was starting ends voice input as silence: nothing was recorded, and the
+         * overlay doesn't retry after silence.
+         */
+        internal fun startOutcome(failure: LocalSpeechSession.StartFailure, stopped: Boolean): StartOutcome = when {
+            stopped -> StartOutcome.End(SpeechRecognizer.ERROR_NO_MATCH)
+            failure.phoneRecognizerCanTry -> StartOutcome.PhoneRecognizer
+            else -> StartOutcome.End(failure.code)
+        }
+    }
+
+    internal sealed interface StartOutcome {
+        /** The phone's recognizer takes over. */
+        data object PhoneRecognizer : StartOutcome
+
+        /** Voice input ends with [code]. */
+        data class End(val code: Int) : StartOutcome
     }
 }
