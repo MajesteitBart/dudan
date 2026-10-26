@@ -5,6 +5,7 @@ import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
+import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.os.PersistableBundle
@@ -542,13 +543,7 @@ private fun LinkAction(text: String, onClick: () -> Unit) {
 @Composable
 private fun DefaultAssistantStatus() {
     val context = LocalContext.current
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var isDefault by remember { mutableStateOf(false) }
-    LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            isDefault = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
-        }
-    }
+    val isDefault = rememberIsDefaultAssistant()
     // Plain content in the Assistant section: a card inside the section's pane stacked two tints
     // under this text and brought it down to 4.5:1.
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
@@ -631,14 +626,7 @@ private fun WakeWordSettings(vm: MainViewModel, settings: AppSettings) {
     if (settings.sttEngine != SttEngine.Orukeet || orukeet != ModelPackage.State.Ready) {
         Notice(stringResource(R.string.wake_word_wait_for_tone), Palette.SparkAmber)
     }
-    val lifecycle = LocalLifecycleOwner.current.lifecycle
-    var isDefault by remember { mutableStateOf(true) }
-    LaunchedEffect(lifecycle) {
-        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
-            isDefault = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
-        }
-    }
-    if (!isDefault) Notice(stringResource(R.string.wake_word_needs_assistant), Palette.SparkAmber)
+    if (!rememberIsDefaultAssistant()) Notice(stringResource(R.string.wake_word_needs_assistant), Palette.SparkAmber)
 }
 
 /**
@@ -662,7 +650,23 @@ private fun ListenEntrySetting() {
         val hasMic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
         if (value && !hasMic) micPermission.launch(Manifest.permission.RECORD_AUDIO) else turn(value)
     }
+    if (on && !rememberIsDefaultAssistant()) Notice(stringResource(R.string.listen_entry_needs_assistant, name), Palette.SparkAmber)
 }
+
+/** Whether dudan is the default assistant. The user changes that in Android's settings, so it's checked again on each return. */
+@Composable
+private fun rememberIsDefaultAssistant(): Boolean {
+    val context = LocalContext.current
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var isDefault by remember { mutableStateOf(isDefaultAssistant(context)) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) { isDefault = isDefaultAssistant(context) }
+    }
+    return isDefault
+}
+
+private fun isDefaultAssistant(context: Context) =
+    context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
 
 /** A setting's label with the chosen value's name beside it. */
 @Composable

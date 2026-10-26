@@ -214,6 +214,7 @@
     <string name="listen_entry_label" translatable="false">Clark</string>
     <string name="listen_entry">%1$s in the app list</string>
     <string name="listen_entry_detail">Opening %1$s opens the assistant, listening. On Samsung, say \"Hi Bixby, open %1$s\". Bixby listens for its own wake word, so with Wake word off, dudan doesn\'t keep the microphone on. The name comes from the default wake phrase and stays when you change the phrase or the assistant\'s name.</string>
+    <string name="listen_entry_needs_assistant">Make dudan your default assistant, above. Until then, %1$s opens the app, listening, instead of the assistant over the current app.</string>
     <string name="notification_channel_wake_word">Wake word</string>
     <string name="wake_word_notification_title">Listening for \"%1$s\"</string>
     <string name="wake_word_notification_text">Only while the phone is unlocked. Tap to change.</string>
