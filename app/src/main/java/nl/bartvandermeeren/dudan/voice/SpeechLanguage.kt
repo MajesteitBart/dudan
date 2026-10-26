@@ -23,16 +23,21 @@ object SpeechLanguage {
         "nl" to "NL", "en" to "US", "de" to "DE", "fr" to "FR", "es" to "ES", "it" to "IT", "pt" to "PT",
     )
 
-    /** The tag for [setting], or null when it's blank or not a language: then the recognizer works it out. */
+    /**
+     * The tag for [setting], or null when it's blank or not a language: then the recognizer works it out.
+     * A tag with more than a language keeps all of it, such as the script in "sr-Latn" or "zh-Hant" and
+     * the variant in "ca-ES-valencia"; only a bare language gets a region added.
+     */
     fun normalize(setting: String?): String? {
         val raw = setting?.trim().orEmpty()
         if (raw.isEmpty()) return null
         names[raw.lowercase()]?.let { return it }
         val locale = Locale.forLanguageTag(raw.replace('_', '-'))
-        val language = locale.language
-        if (language.length !in 2..3) return null
-        val region = locale.country.ifEmpty { regions[language].orEmpty() }
-        return if (region.isEmpty()) language else "$language-$region"
+        if (locale.language.length !in 2..3) return null
+        val bare = locale.country.isEmpty() && locale.script.isEmpty() && locale.variant.isEmpty()
+        val region = regions[locale.language]
+        if (!bare || region == null) return locale.toLanguageTag()
+        return Locale.Builder().setLocale(locale).setRegion(region).build().toLanguageTag()
     }
 
     /** The language's English name, such as "Dutch", for instructions to the agent. */

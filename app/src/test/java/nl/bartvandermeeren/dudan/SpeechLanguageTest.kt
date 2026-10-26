@@ -21,6 +21,21 @@ class SpeechLanguageTest {
     }
 
     @Test
+    fun scriptsAndVariantsAreKept() {
+        assertEquals("sr-Latn", SpeechLanguage.normalize("sr-Latn"))
+        assertEquals("sr-Latn-RS", SpeechLanguage.normalize("sr_Latn_RS"))
+        assertEquals("zh-Hant", SpeechLanguage.normalize("zh-Hant"))
+        assertEquals("zh-Hant-TW", SpeechLanguage.normalize("zh-hant-tw"))
+        assertEquals("ca-ES-valencia", SpeechLanguage.normalize("ca-ES-valencia"))
+        // A language with a script is already what was meant: no region is added to it.
+        assertEquals("pt-Latn", SpeechLanguage.normalize("pt-Latn"))
+        // Only a bare language gets one.
+        assertEquals("pt-PT", SpeechLanguage.normalize("pt"))
+        assertEquals("pt-BR", SpeechLanguage.normalize("pt-BR"))
+        assertEquals("nl-NL-u-ca-gregory", SpeechLanguage.normalize("nl-u-ca-gregory"))
+    }
+
+    @Test
     fun blankOrUnknownLeavesItToTheRecognizer() {
         assertNull(SpeechLanguage.normalize(null))
         assertNull(SpeechLanguage.normalize(""))
