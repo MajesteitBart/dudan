@@ -3,7 +3,10 @@ package nl.bartvandermeeren.dudan
 import android.speech.SpeechRecognizer
 import nl.bartvandermeeren.dudan.assist.AssistState
 import nl.bartvandermeeren.dudan.assist.AssistState.AfterError
+import nl.bartvandermeeren.dudan.assist.Openings
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
+import org.junit.Assert.assertTrue
 import org.junit.Test
 
 class OverlayListeningTest {
@@ -46,5 +49,43 @@ class OverlayListeningTest {
                 }
             }
         }
+    }
+
+    @Test
+    fun workForTheOpenOverlayRuns() {
+        val openings = Openings()
+        val opening = openings.open()
+        assertTrue(openings.isCurrent(opening))
+        // A retry scheduled now belongs to this opening.
+        assertTrue(openings.isCurrent(openings.latest))
+    }
+
+    @Test
+    fun workForAnEarlierOpeningDoesNotRunWhenTheOverlayOpensAgainWhileOpen() {
+        // The side key, the wake word or Clark while the overlay is still open: the new chat does the listening.
+        val openings = Openings()
+        val first = openings.open()
+        val second = openings.open()
+        assertFalse(openings.isCurrent(first))
+        assertTrue(openings.isCurrent(second))
+    }
+
+    @Test
+    fun workDoesNotRunAfterTheOverlayClosed() {
+        // Settings that finish loading, or a retry that comes due, after the overlay was dismissed.
+        val openings = Openings()
+        val opening = openings.open()
+        openings.close()
+        assertFalse(openings.isCurrent(opening))
+    }
+
+    @Test
+    fun workFromBeforeAClosedOverlayDoesNotRunWhenItOpensAgain() {
+        val openings = Openings()
+        val first = openings.open()
+        openings.close()
+        val second = openings.open()
+        assertFalse(openings.isCurrent(first))
+        assertTrue(openings.isCurrent(second))
     }
 }

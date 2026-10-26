@@ -51,6 +51,30 @@ enum class Opener {
     }
 }
 
+/**
+ * The overlay's openings, so work started for one of them, such as loading the settings or listening
+ * again after a microphone hiccup, doesn't run after the overlay closed or in a later opening.
+ */
+internal class Openings {
+    /** The newest opening. */
+    var latest = 0
+        private set
+    private var open = false
+
+    /** The overlay opened, or was opened again while it was open; returns this opening. */
+    fun open(): Int {
+        open = true
+        return ++latest
+    }
+
+    fun close() {
+        open = false
+    }
+
+    /** Whether work started for [opening] may still run: the overlay is open and wasn't opened again since. */
+    fun isCurrent(opening: Int) = open && opening == latest
+}
+
 /** State and behavior of one assistant overlay, shared by every show/hide cycle of the session. */
 class AssistState(
     private val context: Context,
@@ -97,8 +121,7 @@ class AssistState(
         }
     }
 
-    /** Counts the times the overlay opened, so work started for an earlier opening doesn't run in this one. */
-    private var showCount = 0
+    private val openings = Openings()
 
     /**
      * The overlay opened, or was opened again while it was open. Either way a new chat starts: what the
@@ -106,7 +129,7 @@ class AssistState(
      * app list always listen, also with Listen right away off.
      */
     fun onShown(opener: Opener = Opener.Assist) {
-        val show = ++showCount
+        val opening = openings.open()
         shown = true
         AppVisibility.overlayShown = true
         container.phoneControl.ensureRunning()
@@ -120,7 +143,7 @@ class AssistState(
         scope.launch {
             val current = container.settings.current()
             // Hidden, or opened once more, while the settings loaded: that opening does the listening.
-            if (show != showCount || !shown) return@launch
+            if (!openings.isCurrent(opening)) return@launch
             settings = current
             // Listening comes first: the user may already be talking. Without the microphone, listening
             // opens the app to ask for it, as when the overlay is already open.
@@ -133,6 +156,7 @@ class AssistState(
     }
 
     fun onHidden() {
+        openings.close()
         shown = false
         AppVisibility.overlayShown = false
         speech.cancel()
@@ -201,10 +225,10 @@ class AssistState(
                     }
                     AfterError.Retry -> {
                         retries++
-                        val show = showCount
+                        val opening = openings.latest
                         scope.launch {
                             delay(RETRY_DELAY_MS * retries)
-                            if (show == showCount && shown && !speech.isActive && text.isBlank()) listen()
+                            if (openings.isCurrent(opening) && !speech.isActive && text.isBlank()) listen()
                         }
                     }
                 }
