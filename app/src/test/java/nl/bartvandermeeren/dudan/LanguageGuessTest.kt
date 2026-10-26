@@ -45,6 +45,29 @@ class LanguageGuessTest {
     }
 
     @Test
+    fun wordsEnglishOrDutchShareWithOtherLanguagesOnlyTie() {
+        val phone = listOf("nl", "en")
+        // "er" and "om" are Danish too, "om" Swedish as well.
+        assertEquals("nl", LanguageGuess.guess("Ze is er om zeven uur.", phone))
+        assertEquals("nl", LanguageGuess.guess("Kan er om 8 uur.", phone))
+        // "na" and "de" are both Portuguese.
+        assertEquals("nl", LanguageGuess.guess("Na de lunch.", phone))
+        // "care" is Romanian, "do" Portuguese, "son" Spanish, "pro" Czech, and "I've" leaves Turkish "ve".
+        assertEquals("en", LanguageGuess.guess("Take care!", phone))
+        assertEquals("en", LanguageGuess.guess("How do I do that?", phone))
+        assertEquals("en", LanguageGuess.guess("My son is sick.", phone))
+        assertEquals("en", LanguageGuess.guess("Pro tip: use dark mode.", phone))
+        assertEquals("en", LanguageGuess.guess("I've booked.", phone))
+    }
+
+    @Test
+    fun everyPreviewSentenceIsHeardInItsOwnLanguageOnADutchPhone() {
+        (VoiceLanguages.SUPERTONIC + "en").forEach { language ->
+            assertEquals(language, LanguageGuess.guess(VoiceSamples.text(language, "Bart"), listOf("nl", "en")))
+        }
+    }
+
+    @Test
     fun scriptsSettleTheirLanguages() {
         assertEquals("ru", LanguageGuess.guess("Это ответ на твой вопрос."))
         assertEquals("uk", LanguageGuess.guess("Це відповідь на твоє питання."))

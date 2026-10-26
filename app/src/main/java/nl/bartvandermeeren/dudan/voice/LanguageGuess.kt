@@ -6,10 +6,13 @@ package nl.bartvandermeeren.dudan.voice
  * words and by letters only one of them uses, such as ß or ł.
  *
  * A word several languages use counts for each of them, so it can't tip the balance. When two languages
- * tie, the first of the phone's languages among them wins; with none of them in the tie, it's no guess.
+ * tie, the first of the preferred languages among them wins; with none of them in the tie, it's no guess.
  */
 object LanguageGuess {
-    /** The language code (such as "nl"), or null when the text gives nothing to go on. */
+    /**
+     * The language code (such as "nl"), or null when the text gives nothing to go on. [preferred] settles
+     * ties: the speech language and the phone's languages, most likely first.
+     */
     fun guess(text: String, preferred: List<String> = emptyList()): String? {
         script(text)?.let { return it }
         val scores = mutableMapOf<String, Int>()
@@ -101,16 +104,20 @@ object LanguageGuess {
         put("ėįų", "lt")
     }
 
-    // Function words, greetings and short answers. Words both of two languages use often ("de" in
-    // Dutch, French and Spanish) are listed for each, so they count for all of them. Words that are
-    // just as common in English ("is", "in", "was", "we") stay out entirely, so they don't tip a short reply.
+    // Function words, greetings and short answers. A word several languages use often is listed for
+    // each of them, so in a short reply it ties and the preferred language decides: "de" for Dutch,
+    // French and Spanish, "do" for English and Portuguese, "om" for Dutch, Swedish and Danish. That
+    // holds when the word means something else in each, and for "ve", which "I've" leaves behind.
+    // Words English and Dutch both use all the time ("is", "in", "was", "we") tell neither apart, so
+    // they stay out.
     private val lists = mapOf(
         "en" to "the and not you to that for on with are this it be but also what can as have will from your an or by at " +
             "hello hi thanks thank yes no sure okay great good morning evening night today tomorrow yesterday done please " +
-            "just all there here would could should",
+            "just all there here would could should do care son pro ai per till bus ve",
         "nl" to "de het een en niet je ik van dat die voor op met zijn er maar ook wat kan naar als dit jij wij heb wordt nog " +
             "bij uit goedemorgen goedemiddag goedenavond welterusten hoi hallo doei dag bedankt dank graag prima oké gedaan " +
-            "klopt zeker natuurlijk nee ja goed geen wel veel vandaag morgen gisteren straks misschien alleen altijd komt staat",
+            "klopt zeker natuurlijk nee ja goed geen wel veel vandaag morgen gisteren straks misschien alleen altijd komt staat " +
+            "om ben al dan nu te na",
         "de" to "der die das und ist nicht ich du sie ihr es ein eine einen mit auf für zu von dem den sich auch wenn aber " +
             "oder noch nur wie wird werden sind hast habe hat mir mich dir dich gibt schon heute morgen gestern danke bitte ja " +
             "nein gut hallo guten tag jetzt sehr über bei nach aus im zum zur dass weil diese dieser kein keine",
