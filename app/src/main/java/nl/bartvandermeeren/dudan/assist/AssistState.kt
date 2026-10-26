@@ -27,6 +27,33 @@ import nl.bartvandermeeren.dudan.voice.WakePhrase
 
 enum class OpenMode { Chat, Voice, Live }
 
+/** What opened the overlay. */
+enum class Opener {
+    /** The side button, the assist gesture or another app asking for the assistant. */
+    Assist,
+
+    /** The wake word. The phrase may lead the transcript. */
+    WakeWord,
+
+    /** Clark in the app list, tapped or opened by Bixby. */
+    ListenEntry;
+
+    /**
+     * Whether the overlay listens as it opens: always for the wake word and Clark, else with Listen right
+     * away on. Without the microphone, the side button opens for typing; the wake word and Clark still
+     * listen, which opens the app to ask for the microphone.
+     */
+    fun listens(listenOnInvoke: Boolean, hasMic: Boolean) = this != Assist || (listenOnInvoke && hasMic)
+
+    /** Whether opening it again while the overlay is open listens again in the same chat. */
+    val listensAgain get() = this != Assist
+
+    companion object {
+        /** The opener named in the session's show arguments; the side button names none. */
+        fun from(name: String?) = entries.firstOrNull { it.name == name } ?: Assist
+    }
+}
+
 /** State and behavior of one assistant overlay, shared by every show/hide cycle of the session. */
 class AssistState(
     private val context: Context,
@@ -73,12 +100,12 @@ class AssistState(
     }
 
     /**
-     * The overlay opened. [wakeWord] says the wake word opened it: then it always listens, also with
-     * Listen right away off, and a wake word while it's already open listens again in the same chat.
+     * The overlay opened. When the wake word or Clark in the app list opened it, it always listens,
+     * also with Listen right away off, and either one while it's already open listens again in the same chat.
      */
-    fun onShown(wakeWord: Boolean = false) {
-        if (wakeWord && shown) {
-            startListening(wakeWord = true)
+    fun onShown(opener: Opener = Opener.Assist) {
+        if (opener.listensAgain && shown) {
+            startListening(wakeWord = opener == Opener.WakeWord)
             return
         }
         shown = true
@@ -92,8 +119,9 @@ class AssistState(
         scope.launch {
             val current = container.settings.current()
             settings = current
-            // Listening comes first: the user may already be talking.
-            if (current.isConfigured && (wakeWord || current.listenOnInvoke) && hasMic()) startListening(wakeWord)
+            // Listening comes first: the user may already be talking. Without the microphone, listening
+            // opens the app to ask for it, as when the overlay is already open.
+            if (current.isConfigured && opener.listens(current.listenOnInvoke, hasMic())) startListening(wakeWord = opener == Opener.WakeWord)
             // Load the voice model now, so a spoken reply doesn't wait for it.
             if (current.speakReplies) speaker.warmUp()
             // The overlay can open without the app ever running, so load the skills for the $ list here too.
