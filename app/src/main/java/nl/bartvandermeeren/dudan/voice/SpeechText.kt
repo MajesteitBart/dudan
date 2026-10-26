@@ -45,8 +45,8 @@ object SpeechText {
      */
     fun withPauses(text: String): String = text.lines().joinToString("\n") { line ->
         val trimmed = line.trimEnd()
-        val last = trimmed.trimEnd('"', '\'', ')', ']', '”', '’').lastOrNull()
-        if (last == null || last in ".!?:;,…") trimmed else "$trimmed."
+        val last = trimmed.trimEnd('"', '\'', ')', ']', '”', '’', '」', '』', '）').lastOrNull()
+        if (last == null || last in ".!?:;,…。！？।؟") trimmed else "$trimmed."
     }
 
     /**
@@ -56,7 +56,7 @@ object SpeechText {
      * makes the first piece long. Sentences over [maxLength] are cut, after a comma if possible.
      */
     fun streamingChunks(text: String, maxLength: Int): List<String> {
-        val sentences = text.split(Regex("(?<=[.!?…])\\s+|\\n+"))
+        val sentences = text.split(sentenceEnd)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .flatMap { splitLong(it, maxLength) }
@@ -69,20 +69,32 @@ object SpeechText {
                 chunks += current.toString()
                 current.setLength(0)
             }
-            if (current.isNotEmpty()) current.append(' ')
+            // Japanese runs its sentences together without a space.
+            if (current.isNotEmpty() && current.last() !in WIDE_ENDS) current.append(' ')
             current.append(sentence)
         }
         if (current.isNotEmpty()) chunks += current.toString()
         return chunks
     }
 
-    /** Cuts a sentence longer than [maxLength] after a comma if there is one far enough in, else at a space. */
+    /**
+     * Where a sentence ends: after . ! ? … (and the Hindi and Arabic marks) and a space, or after Japanese
+     * 。！？, which need no space, with a closing quote kept on its sentence (「…です。」).
+     */
+    private val sentenceEnd = Regex("(?<=[.!?…।؟])\\s+|(?<=[。！？][」』）]?)\\s*(?=[^\\s。！？」』）])|\\n+")
+    private const val WIDE_ENDS = "。！？」』）"
+
+    /**
+     * Cuts a sentence longer than [maxLength] after a comma if there is one far enough in (a Japanese 、
+     * too, since Japanese has no spaces), else at a space.
+     */
     private fun splitLong(sentence: String, maxLength: Int): List<String> {
         val parts = mutableListOf<String>()
         var rest = sentence
         while (rest.length > maxLength) {
             val window = rest.substring(0, maxLength)
             val cut = window.lastIndexOf(", ").takeIf { it > maxLength / 3 }?.plus(1)
+                ?: window.indexOfLast { it in "。！？、，" }.takeIf { it > maxLength / 3 }?.plus(1)
                 ?: window.lastIndexOf(' ').takeIf { it > 0 }
                 ?: maxLength
             parts += rest.substring(0, cut).trim()
