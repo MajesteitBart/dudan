@@ -8,6 +8,7 @@ import java.time.temporal.ChronoUnit
 import nl.bartvandermeeren.dudan.data.Cron
 import nl.bartvandermeeren.dudan.data.CronSyntaxException
 import nl.bartvandermeeren.dudan.data.IntervalUnit
+import nl.bartvandermeeren.dudan.data.JobInfo
 import nl.bartvandermeeren.dudan.data.JobSchedule
 
 /** The editor's When choices, in the order the picker shows them. */
@@ -104,6 +105,10 @@ data class ScheduleDraft(
             monthDay = 1,
             cron = "0 9 * * *",
         )
+
+        /** What the editor opens with: a new task's defaults, or [job]'s [schedule] as the picker reads it. */
+        fun opening(job: JobInfo?, schedule: JobSchedule?, now: LocalDateTime): ScheduleDraft =
+            if (job == null) initial(now) else from(schedule, now, fallback = job.scheduleExpr)
 
         /** The draft showing [schedule]; [fallback] fills the custom field when the schedule couldn't be read. */
         fun from(schedule: JobSchedule?, now: LocalDateTime, fallback: String? = null): ScheduleDraft {

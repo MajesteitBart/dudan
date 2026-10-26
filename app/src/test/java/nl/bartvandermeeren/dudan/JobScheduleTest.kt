@@ -312,6 +312,14 @@ class ScheduleDraftTest {
     }
 
     @Test
+    fun theEditorOpensOnDefaultsOrOnTheTask() {
+        assertEquals(ScheduleDraft.initial(now), ScheduleDraft.opening(null, null, now))
+        val job = JobInfo("a", "A", "every 90m", null, true, false, null, null, null, scheduleExpr = "every 90m", scheduleKind = "interval")
+        assertEquals(ScheduleMode.Custom to "every 90m", ScheduleDraft.opening(job, null, now).let { it.mode to it.cron })
+        assertEquals(Daily(time("07:30")), ScheduleDraft.opening(job, Daily(time("07:30")), now).schedule())
+    }
+
+    @Test
     fun survivesBeingSaved() {
         val draft = ScheduleDraft.initial(now).copy(mode = ScheduleMode.Repeat, every = 2, unit = Hours, windowOn = true, daysOn = true, repeatDays = setOf(SATURDAY, SUNDAY), weekDays = setOf(TUESDAY), cron = "1 2 3 4 5")
         assertEquals(draft, ScheduleDraft.decode(draft.encode()))

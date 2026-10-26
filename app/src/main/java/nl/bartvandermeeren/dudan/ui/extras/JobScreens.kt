@@ -303,7 +303,7 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
     var serverPrompt by rememberSaveable { mutableStateOf(job?.prompt.orEmpty()) }
     var promptLoaded by rememberSaveable { mutableStateOf(job == null) }
     var deliver by rememberSaveable { mutableStateOf(initialDeliver) }
-    var draft by rememberSaveable(stateSaver = DraftSaver) { mutableStateOf(ScheduleDraft.from(original, opened, fallback = job?.scheduleExpr)) }
+    var draft by rememberSaveable(stateSaver = DraftSaver) { mutableStateOf(ScheduleDraft.opening(job, original, opened)) }
     var touched by rememberSaveable { mutableStateOf(false) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
@@ -339,7 +339,9 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
     val dirty = if (job == null) name.isNotBlank() || prompt.isNotBlank() || touched else nameChanged || promptChanged || deliverChanged || scheduleChanged
     // An existing task's schedule only has to be right once it's changed: a one-off that has passed can still get a new instruction.
     val scheduleOk = problem == null || (job != null && !touched)
-    val canSave = name.isNotBlank() && prompt.isNotBlank() && promptLoaded && scheduleOk && (job == null || dirty) && !busy
+    // Hermes runs skill-only tasks without a prompt; one of those keeps its empty prompt unless it gets one.
+    val promptOk = prompt.isNotBlank() || (job != null && !promptChanged)
+    val canSave = name.isNotBlank() && promptOk && promptLoaded && scheduleOk && (job == null || dirty) && !busy
 
     fun save() {
         busy = true
