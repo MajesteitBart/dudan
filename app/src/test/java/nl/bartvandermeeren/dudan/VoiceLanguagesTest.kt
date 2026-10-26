@@ -27,6 +27,16 @@ class VoiceLanguagesTest {
     }
 
     @Test
+    fun theSpeechLanguageGetsARowAndItsModel() {
+        // An English phone with speech input in Dutch: Dutch gets a row, and Supertonic downloads for it.
+        val rows = VoiceLanguages.rows(VoiceLanguages.languages("nl-NL", listOf("en")), emptyMap())
+        assertEquals(listOf("en", "nl"), rows)
+        assertEquals(setOf(VoiceEngine.Kokoro, VoiceEngine.Supertonic), VoiceLanguages.needed(rows, emptyMap()))
+        assertEquals(listOf("nl", "en"), VoiceLanguages.languages(" nl_NL ", listOf("nl", "en")))
+        assertEquals(listOf("en"), VoiceLanguages.languages("", listOf("en")))
+    }
+
+    @Test
     fun automaticTakesTheBestVoiceThatIsInstalled() {
         val rows = listOf("nl", "en")
         assertEquals(Resolved(VoiceEngine.Kokoro, "af_heart"), VoiceLanguages.resolve("en", emptyMap(), rows, everything))

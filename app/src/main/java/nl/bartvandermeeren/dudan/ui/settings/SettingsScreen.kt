@@ -343,12 +343,14 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
 }
 
 /**
- * A row for each of the phone's languages, English, and Other languages. Each is Automatic until the user
- * picks an engine or voice for it in its sheet.
+ * A row for each of the phone's languages, the speech language, English, and Other languages. Each is
+ * Automatic until the user picks an engine or voice for it in its sheet.
  */
 @Composable
 private fun VoicesSettings(vm: MainViewModel, settings: AppSettings) {
-    val rows = remember(settings.voices) { VoiceLanguages.rows(VoiceLanguages.phoneLanguages(), settings.voices) }
+    val rows = remember(settings.voices, settings.speechLanguage) {
+        VoiceLanguages.rows(VoiceLanguages.languages(settings.speechLanguage), settings.voices)
+    }
     val ready = rememberVoiceReady(vm)
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     Text(stringResource(R.string.voices_intro), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)

@@ -101,10 +101,11 @@ class AppContainer(context: Context) {
         appScope.launch {
             settings.flow.map { it.phoneControl }.distinctUntilChanged().collect(phoneControl::sync)
         }
-        // Fetch the voice models the phone's languages use on the first unmetered network, also when only
-        // the overlay runs. An English phone gets Kokoro; a Dutch or German one Supertonic as well.
+        // Fetch the voice models the phone's languages and the speech language use on the first unmetered
+        // network, also when only the overlay runs. An English phone gets Kokoro; a Dutch or German one, or
+        // speech input in Dutch or German, Supertonic as well.
         appScope.launch {
-            settings.flow.map { VoiceLanguages.needed(VoiceLanguages.rows(VoiceLanguages.phoneLanguages(), it.voices), it.voices) }
+            settings.flow.map { VoiceLanguages.needed(VoiceLanguages.rows(VoiceLanguages.languages(it.speechLanguage), it.voices), it.voices) }
                 .distinctUntilChanged()
                 .collect { needed ->
                     if (VoiceEngine.Kokoro in needed) kokoroModel.downloadWhenFree() else kokoroModel.stopWaitingForNetwork()

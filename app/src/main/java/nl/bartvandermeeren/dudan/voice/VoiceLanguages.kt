@@ -9,8 +9,8 @@ import nl.bartvandermeeren.dudan.data.VoiceEngine
  * Which voice reads which language. Kokoro reads English, Supertonic 3 reads 31 languages (English and
  * Dutch among them), and Android's voice reads whatever the phone has voices for.
  *
- * Settings shows a row for each of the phone's languages and English. Every other language follows the
- * Other languages row, saved under [OTHER].
+ * Settings shows a row for each of the phone's languages, the speech language and English. Every other
+ * language follows the Other languages row, saved under [OTHER].
  */
 object VoiceLanguages {
     const val OTHER = "*"
@@ -44,9 +44,16 @@ object VoiceLanguages {
         remove(VoiceEngine.System)
     }
 
-    /** The phone's languages in its order, then English, then languages that kept a setting of their own. */
-    fun rows(phone: List<String>, voices: Map<String, LanguageVoice>): List<String> =
-        (phone + "en" + voices.keys.sorted()).filter { it != OTHER }.distinct()
+    /** The user's own [languages] in their order, then English, then languages that kept a setting of their own. */
+    fun rows(own: List<String>, voices: Map<String, LanguageVoice>): List<String> =
+        (own + "en" + voices.keys.sorted()).filter { it != OTHER }.distinct()
+
+    /**
+     * The user's own languages: the phone's, then [speechLanguage] (a tag such as "nl-NL", or empty), since
+     * the user talks to dudan in it and replies tend to follow.
+     */
+    fun languages(speechLanguage: String, phone: List<String> = phoneLanguages()): List<String> =
+        (phone + code(speechLanguage.trim())).filter { it.isNotEmpty() }.distinct()
 
     /**
      * Who reads a reply in [language]. A language without a row follows Other languages. Automatic takes

@@ -58,7 +58,7 @@ class Speaker(
      */
     fun warmUp() {
         val s = settings()
-        val rows = VoiceLanguages.rows(VoiceLanguages.phoneLanguages(), s.voices)
+        val rows = VoiceLanguages.rows(VoiceLanguages.languages(s.speechLanguage), s.voices)
         rows.map { resolve(it, s.voices, rows) }.distinctBy { it.engine }.forEach { (engine, voice) ->
             if (voice != null) sherpa(engine)?.warmUp(voice)
         }
@@ -76,7 +76,7 @@ class Speaker(
     /**
      * The reply's language decides the voice. When the text doesn't tell ("OK", a name), [languageHint]
      * (the speech input language) does, and without one the phone's language. A tie between two
-     * languages goes to the phone's own.
+     * languages goes to [languageHint], then to the phone's own.
      */
     fun speak(id: String, markdown: String, languageHint: String? = null, onDone: (() -> Unit)? = null) {
         val text = SpeechText.withPauses(SpeechText.fromMarkdown(markdown))
@@ -84,10 +84,12 @@ class Speaker(
             onDone?.invoke()
             return
         }
-        val voices = settings().voices
-        val rows = VoiceLanguages.rows(VoiceLanguages.phoneLanguages(), voices)
-        val language = LanguageGuess.guess(text, rows) ?: languageHint?.takeIf { it.isNotBlank() } ?: Locale.getDefault().toLanguageTag()
-        say(id, text, language, resolve(VoiceLanguages.code(language), voices, rows), onDone)
+        val s = settings()
+        val rows = VoiceLanguages.rows(VoiceLanguages.languages(s.speechLanguage), s.voices)
+        val hint = languageHint?.trim().orEmpty()
+        val preferred = (listOfNotNull(VoiceLanguages.code(hint).ifBlank { null }) + rows).distinct()
+        val language = LanguageGuess.guess(text, preferred) ?: hint.ifBlank { null } ?: Locale.getDefault().toLanguageTag()
+        say(id, text, language, resolve(VoiceLanguages.code(language), s.voices, rows), onDone)
     }
 
     /** Reads [text] in [language] (a code such as "de") with [choice], for Preview in Settings. */
