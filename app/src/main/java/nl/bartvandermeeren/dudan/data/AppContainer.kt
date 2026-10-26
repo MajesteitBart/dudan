@@ -19,6 +19,7 @@ import nl.bartvandermeeren.dudan.voice.ModelPackage
 import nl.bartvandermeeren.dudan.voice.OrukeetEngine
 import nl.bartvandermeeren.dudan.voice.Speaker
 import nl.bartvandermeeren.dudan.voice.SupertonicVoice
+import nl.bartvandermeeren.dudan.voice.VoiceLanguages
 import okhttp3.OkHttpClient
 
 /** Process-wide singletons. The chat engine lives here so the app and the assistant overlay share runs. */
@@ -100,16 +101,16 @@ class AppContainer(context: Context) {
         appScope.launch {
             settings.flow.map { it.phoneControl }.distinctUntilChanged().collect(phoneControl::sync)
         }
-        // Kokoro is the default voice: fetch its model on the first unmetered network, also when only the overlay runs.
+        // Fetch the voice models the phone's languages and the speech language use on the first unmetered
+        // network, also when only the overlay runs. An English phone gets Kokoro; a Dutch or German one, or
+        // speech input in Dutch or German, Supertonic as well.
         appScope.launch {
-            settings.flow.map { it.ttsEngine }.distinctUntilChanged().collect { engine ->
-                if (engine == TtsEngine.Kokoro) kokoroModel.downloadWhenFree() else kokoroModel.stopWaitingForNetwork()
-            }
-        }
-        appScope.launch {
-            settings.flow.map { it.dutchTtsEngine }.distinctUntilChanged().collect { engine ->
-                if (engine == DutchTtsEngine.Supertonic) supertonicModel.downloadWhenFree() else supertonicModel.stopWaitingForNetwork()
-            }
+            settings.flow.map { VoiceLanguages.needed(VoiceLanguages.rows(VoiceLanguages.languages(it.speechLanguage), it.voices), it.voices) }
+                .distinctUntilChanged()
+                .collect { needed ->
+                    if (VoiceEngine.Kokoro in needed) kokoroModel.downloadWhenFree() else kokoroModel.stopWaitingForNetwork()
+                    if (VoiceEngine.Supertonic in needed) supertonicModel.downloadWhenFree() else supertonicModel.stopWaitingForNetwork()
+                }
         }
         appScope.launch {
             settings.flow.map { it.sttEngine }.distinctUntilChanged().collect { engine ->

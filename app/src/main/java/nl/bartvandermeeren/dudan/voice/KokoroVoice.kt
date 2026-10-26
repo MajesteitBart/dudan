@@ -44,13 +44,15 @@ class KokoroVoice(context: Context, model: ModelPackage) : SherpaVoice(context, 
         return OfflineTts(config = config)
     }
 
-    override fun synthesize(tts: OfflineTts, text: String, voiceId: String, sink: Sink) {
+    override fun synthesize(tts: OfflineTts, text: String, voiceId: String, language: String, sink: Sink) {
         tts.generateWithCallback(text, voiceFor(voiceId).speakerId, 1.0f, sink)
     }
 
     private fun voiceFor(id: String) = VOICES.firstOrNull { it.id == id } ?: VOICES.first()
 
     companion object {
+        const val DEFAULT = "af_heart"
+
         /** English voices in the Kokoro v1.0 speaker table (ids from the model's id2speaker metadata). */
         val VOICES = listOf(
             Voice("af_heart", 3, "Heart · US"),

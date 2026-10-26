@@ -45,39 +45,8 @@ object SpeechText {
      */
     fun withPauses(text: String): String = text.lines().joinToString("\n") { line ->
         val trimmed = line.trimEnd()
-        val last = trimmed.trimEnd('"', '\'', ')', ']', '”', '’').lastOrNull()
-        if (last == null || last in ".!?:;,…") trimmed else "$trimmed."
-    }
-
-    // Function words, plus the greetings and one-word answers that make up short replies. Words both
-    // languages use ("is", "in", "of", "was", "we", "sorry") stay out, so they don't tip a short reply.
-    private val dutch = setOf(
-        "de", "het", "een", "en", "niet", "je", "ik", "van", "dat", "die", "voor", "op", "met", "zijn", "er",
-        "maar", "ook", "wat", "kan", "naar", "als", "dit", "jij", "wij", "heb", "wordt", "nog", "bij", "uit",
-        "goedemorgen", "goedemiddag", "goedenavond", "welterusten", "hoi", "hallo", "doei", "dag", "bedankt", "dank",
-        "graag", "prima", "oké", "gedaan", "klopt", "zeker", "natuurlijk", "nee", "ja", "goed", "geen", "wel", "veel",
-        "vandaag", "morgen", "gisteren", "straks", "misschien", "alleen", "altijd", "komt", "staat",
-    )
-    private val english = setOf(
-        "the", "and", "not", "you", "to", "that", "for", "on", "with", "are", "this", "it", "be",
-        "but", "also", "what", "can", "as", "have", "will", "from", "your", "an", "or", "by", "at",
-        "hello", "hi", "thanks", "thank", "yes", "no", "sure", "okay", "great", "good", "morning", "evening", "night",
-        "today", "tomorrow", "yesterday", "done", "please", "just", "all", "there", "here", "would", "could", "should",
-    )
-
-    /** Rough language guess from common words; good enough to pick a TTS voice. Null when it's a tie. */
-    fun guessLanguage(text: String): String? {
-        var nl = 0
-        var en = 0
-        text.lowercase().split(Regex("[^\\p{L}]+")).take(400).forEach { word ->
-            if (word in dutch) nl++
-            if (word in english) en++
-        }
-        return when {
-            nl > en -> "nl-NL"
-            en > nl -> "en-US"
-            else -> null
-        }
+        val last = trimmed.trimEnd('"', '\'', ')', ']', '”', '’', '」', '』', '）').lastOrNull()
+        if (last == null || last in ".!?:;,…。！？।؟") trimmed else "$trimmed."
     }
 
     /**
@@ -87,7 +56,7 @@ object SpeechText {
      * makes the first piece long. Sentences over [maxLength] are cut, after a comma if possible.
      */
     fun streamingChunks(text: String, maxLength: Int): List<String> {
-        val sentences = text.split(Regex("(?<=[.!?…])\\s+|\\n+"))
+        val sentences = text.split(sentenceEnd)
             .map { it.trim() }
             .filter { it.isNotEmpty() }
             .flatMap { splitLong(it, maxLength) }
@@ -100,20 +69,32 @@ object SpeechText {
                 chunks += current.toString()
                 current.setLength(0)
             }
-            if (current.isNotEmpty()) current.append(' ')
+            // Japanese runs its sentences together without a space.
+            if (current.isNotEmpty() && current.last() !in WIDE_ENDS) current.append(' ')
             current.append(sentence)
         }
         if (current.isNotEmpty()) chunks += current.toString()
         return chunks
     }
 
-    /** Cuts a sentence longer than [maxLength] after a comma if there is one far enough in, else at a space. */
+    /**
+     * Where a sentence ends: after . ! ? … (and the Hindi and Arabic marks) and a space, or after Japanese
+     * 。！？, which need no space, with a closing quote kept on its sentence (「…です。」).
+     */
+    private val sentenceEnd = Regex("(?<=[.!?…।؟])\\s+|(?<=[。！？][」』）]?)\\s*(?=[^\\s。！？」』）])|\\n+")
+    private const val WIDE_ENDS = "。！？」』）"
+
+    /**
+     * Cuts a sentence longer than [maxLength] after a comma if there is one far enough in (a Japanese 、
+     * too, since Japanese has no spaces), else at a space.
+     */
     private fun splitLong(sentence: String, maxLength: Int): List<String> {
         val parts = mutableListOf<String>()
         var rest = sentence
         while (rest.length > maxLength) {
             val window = rest.substring(0, maxLength)
             val cut = window.lastIndexOf(", ").takeIf { it > maxLength / 3 }?.plus(1)
+                ?: window.indexOfLast { it in "。！？、，" }.takeIf { it > maxLength / 3 }?.plus(1)
                 ?: window.lastIndexOf(' ').takeIf { it > 0 }
                 ?: maxLength
             parts += rest.substring(0, cut).trim()

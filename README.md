@@ -18,7 +18,7 @@ dudan brings your own [Hermes agent](https://github.com/NousResearch/hermes-agen
 
 Make dudan your phone's digital assistant and hold the side button, or say "Ok Clark" (or your own wake phrase), to start talking. The overlay opens over the app you're using, listens to your question and reads the answer aloud. Tap **Ask about screen** to include a screenshot, or take the conversation into the full app.
 
-Voice input handles English, Dutch and more, with speech recognition running on your phone. Choose from 20 built-in English and Dutch voices for replies, use your Bluetooth headset's microphone, or turn on **Live mode** for a hands-free conversation.
+Voice input handles English, Dutch and more, with speech recognition running on your phone. Replies are read aloud in the language they're written in, by voices on your phone for 31 languages, English, Dutch and German among them. Leave each language on Automatic or pick its voice, use your Bluetooth headset's microphone, or turn on **Live mode** for a hands-free conversation.
 
 ## Give your agent a hand on your phone
 

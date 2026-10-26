@@ -10,13 +10,13 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import nl.bartvandermeeren.dudan.data.AppSettings
-import nl.bartvandermeeren.dudan.data.DutchTtsEngine
-import nl.bartvandermeeren.dudan.data.TtsEngine
+import nl.bartvandermeeren.dudan.data.LanguageVoice
+import nl.bartvandermeeren.dudan.data.VoiceEngine
 
 /**
- * Reads replies aloud. English goes to Kokoro and Dutch to Supertonic when they're enabled and
- * downloaded; everything else uses Android's voice. The language is guessed per reply, since Hermes
- * answers in either.
+ * Reads replies aloud with the voice set for the reply's language (see [VoiceLanguages]): Kokoro or
+ * Supertonic on the phone once downloaded, else Android's voice. The language is guessed per reply,
+ * since Hermes can answer in any.
  */
 class Speaker(
     private val context: Context,
@@ -54,17 +54,29 @@ class Speaker(
 
     /**
      * Loads the on-device voices in the background when they will be needed soon (overlay shown, Live
-     * started). Both, since the next reply can be in either language.
+     * started): every engine the language rows use, since the next reply can be in any of them.
      */
     fun warmUp() {
         val s = settings()
-        if (s.ttsEngine == TtsEngine.Kokoro) kokoro.warmUp(s.kokoroVoice)
-        if (s.dutchTtsEngine == DutchTtsEngine.Supertonic) supertonic.warmUp(s.supertonicVoice)
+        val rows = VoiceLanguages.rows(VoiceLanguages.languages(s.speechLanguage), s.voices)
+        rows.map { resolve(it, s.voices, rows) }.distinctBy { it.engine }.forEach { (engine, voice) ->
+            if (voice != null) sherpa(engine)?.warmUp(voice)
+        }
     }
+
+    private fun sherpa(engine: VoiceEngine): SherpaVoice? = when (engine) {
+        VoiceEngine.Kokoro -> kokoro
+        VoiceEngine.Supertonic -> supertonic
+        VoiceEngine.System -> null
+    }
+
+    private fun resolve(language: String, voices: Map<String, LanguageVoice>, rows: List<String>) =
+        VoiceLanguages.resolve(language, voices, rows) { sherpa(it)?.isReady == true }
 
     /**
      * The reply's language decides the voice. When the text doesn't tell ("OK", a name), [languageHint]
-     * (the speech input language) does, and without one the phone's language.
+     * (the speech language setting) does, and without one the phone's language. A tie between two
+     * languages goes to [languageHint], then to the phone's own. See [VoiceLanguages.replyLanguage].
      */
     fun speak(id: String, markdown: String, languageHint: String? = null, onDone: (() -> Unit)? = null) {
         val text = SpeechText.withPauses(SpeechText.fromMarkdown(markdown))
@@ -72,11 +84,21 @@ class Speaker(
             onDone?.invoke()
             return
         }
+        val s = settings()
+        val rows = VoiceLanguages.rows(VoiceLanguages.languages(s.speechLanguage), s.voices)
+        val language = VoiceLanguages.replyLanguage(text, languageHint, rows)
+        say(id, text, language, resolve(VoiceLanguages.code(language), s.voices, rows), onDone)
+    }
+
+    /** Reads [text] in [language] (a code such as "de") with [choice], for Preview in Settings. */
+    fun preview(text: String, language: String, choice: LanguageVoice) {
+        say("preview", text, language, resolve(language, mapOf(language to choice), listOf(language)), null)
+    }
+
+    private fun say(id: String, text: String, language: String, resolved: VoiceLanguages.Resolved, onDone: (() -> Unit)?) {
         stop()
         // Message ids repeat (replaying a reply, Preview twice), so callbacks check this request's token instead.
         val mine = ++token
-        val language = SpeechText.guessLanguage(text) ?: languageHint?.takeIf { it.isNotBlank() } ?: Locale.getDefault().toLanguageTag()
-        val s = settings()
         _speakingId.value = id
         val finished = {
             if (token == mine) {
@@ -84,22 +106,16 @@ class Speaker(
                 onDone?.invoke()
             }
         }
-        val onDevice = when {
-            language.startsWith("en", ignoreCase = true) && s.ttsEngine == TtsEngine.Kokoro -> kokoro to s.kokoroVoice
-            language.startsWith("nl", ignoreCase = true) && s.dutchTtsEngine == DutchTtsEngine.Supertonic -> supertonic to s.supertonicVoice
-            else -> null
-        }
-        val spoken = onDevice?.let { (voice, voiceId) ->
-            voice.speak(text, voiceId) { outcome ->
-                if (token != mine) return@speak
-                when (outcome) {
-                    SherpaVoice.Outcome.Done -> finished()
-                    // The model broke (out of memory, damaged files); say it with Android's voice instead.
-                    SherpaVoice.Outcome.Failed -> speakWithSystem(mine, text, language, finished)
-                    SherpaVoice.Outcome.Stopped -> _speakingId.value = null
-                }
+        val voice = sherpa(resolved.engine)
+        val spoken = voice != null && resolved.voice != null && voice.speak(text, resolved.voice, VoiceLanguages.code(language)) { outcome ->
+            if (token != mine) return@speak
+            when (outcome) {
+                SherpaVoice.Outcome.Done -> finished()
+                // The model broke (out of memory, damaged files); say it with Android's voice instead.
+                SherpaVoice.Outcome.Failed -> speakWithSystem(mine, text, language, finished)
+                SherpaVoice.Outcome.Stopped -> _speakingId.value = null
             }
-        } == true
+        }
         if (!spoken) speakWithSystem(mine, text, language, finished)
     }
 

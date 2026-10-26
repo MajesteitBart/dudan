@@ -20,6 +20,7 @@ import nl.bartvandermeeren.dudan.data.RunOutcome
 import nl.bartvandermeeren.dudan.data.SseReader
 import nl.bartvandermeeren.dudan.ui.chat.prettyModelName
 import nl.bartvandermeeren.dudan.ui.settings.isInsecureRemote
+import nl.bartvandermeeren.dudan.voice.LanguageGuess
 import nl.bartvandermeeren.dudan.voice.SpeechText
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
@@ -272,8 +273,8 @@ class SmallHelpersTest {
     fun speechTextDropsMarkdown() {
         val text = SpeechText.fromMarkdown("## Titel\n- **Vet** en [link](https://x.nl)\n\n```kotlin\ncode()\n```\nKlaar `nu`.")
         assertEquals("Titel\nVet en link\n\n \nKlaar nu.", text)
-        assertEquals("nl-NL", SpeechText.guessLanguage("Ik heb de afspraak voor je in de agenda gezet en het is niet druk."))
-        assertEquals("en-US", SpeechText.guessLanguage("I put the meeting in your calendar and it is not busy."))
+        assertEquals("nl", LanguageGuess.guess("Ik heb de afspraak voor je in de agenda gezet en het is niet druk."))
+        assertEquals("en", LanguageGuess.guess("I put the meeting in your calendar and it is not busy."))
     }
 
     @Test
