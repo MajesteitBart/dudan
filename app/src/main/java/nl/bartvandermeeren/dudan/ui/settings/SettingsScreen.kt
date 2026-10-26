@@ -641,15 +641,26 @@ private fun WakeWordSettings(vm: MainViewModel, settings: AppSettings) {
     if (!isDefault) Notice(stringResource(R.string.wake_word_needs_assistant), Palette.SparkAmber)
 }
 
-/** Clark in the app list, for Bixby to open by name. Android keeps the switch as the entry's state. */
+/**
+ * Clark in the app list, for Bixby to open by name. Android keeps the switch as the entry's state.
+ * Clark always listens, so switching it on asks for the microphone, as the wake word does.
+ */
 @Composable
 private fun ListenEntrySetting() {
     val context = LocalContext.current
     var on by remember { mutableStateOf(ListenActivity.isInAppList(context)) }
+    fun turn(value: Boolean) {
+        ListenActivity.setInAppList(context, value)
+        on = value
+    }
+    val micDenied = stringResource(R.string.mic_permission_needed)
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) turn(true) else Toast.makeText(context, micDenied, Toast.LENGTH_LONG).show()
+    }
     val name = stringResource(R.string.listen_entry_label)
-    Toggle(stringResource(R.string.listen_entry, name), stringResource(R.string.listen_entry_detail, name), on) {
-        ListenActivity.setInAppList(context, it)
-        on = it
+    Toggle(stringResource(R.string.listen_entry, name), stringResource(R.string.listen_entry_detail, name), on) { value ->
+        val hasMic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (value && !hasMic) micPermission.launch(Manifest.permission.RECORD_AUDIO) else turn(value)
     }
 }
 

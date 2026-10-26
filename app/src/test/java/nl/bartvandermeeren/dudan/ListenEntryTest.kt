@@ -10,10 +10,19 @@ import org.junit.Test
 class ListenEntryTest {
     @Test
     fun theListenEntryAndTheWakeWordListenAlsoWithListenRightAwayOff() {
-        assertTrue(Opener.ListenEntry.listens(listenOnInvoke = false))
-        assertTrue(Opener.WakeWord.listens(listenOnInvoke = false))
-        assertFalse(Opener.Assist.listens(listenOnInvoke = false))
-        Opener.entries.forEach { assertTrue(it.listens(listenOnInvoke = true)) }
+        assertTrue(Opener.ListenEntry.listens(listenOnInvoke = false, hasMic = true))
+        assertTrue(Opener.WakeWord.listens(listenOnInvoke = false, hasMic = true))
+        assertFalse(Opener.Assist.listens(listenOnInvoke = false, hasMic = true))
+        Opener.entries.forEach { assertTrue(it.listens(listenOnInvoke = true, hasMic = true)) }
+    }
+
+    @Test
+    fun withoutTheMicrophoneOnlyTheSideButtonOpensForTyping() {
+        // Listening without the microphone opens the app to ask for it. Clark and the wake word were
+        // opened to listen, so they ask; the side button may have been opened to type.
+        assertTrue(Opener.ListenEntry.listens(listenOnInvoke = false, hasMic = false))
+        assertTrue(Opener.WakeWord.listens(listenOnInvoke = false, hasMic = false))
+        assertFalse(Opener.Assist.listens(listenOnInvoke = true, hasMic = false))
     }
 
     @Test

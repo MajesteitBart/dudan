@@ -38,8 +38,12 @@ enum class Opener {
     /** Clark in the app list, tapped or opened by Bixby. */
     ListenEntry;
 
-    /** Whether the overlay listens as it opens: always for the wake word and Clark, else with Listen right away on. */
-    fun listens(listenOnInvoke: Boolean) = this != Assist || listenOnInvoke
+    /**
+     * Whether the overlay listens as it opens: always for the wake word and Clark, else with Listen right
+     * away on. Without the microphone, the side button opens for typing; the wake word and Clark still
+     * listen, which opens the app to ask for the microphone.
+     */
+    fun listens(listenOnInvoke: Boolean, hasMic: Boolean) = this != Assist || (listenOnInvoke && hasMic)
 
     /** Whether opening it again while the overlay is open listens again in the same chat. */
     val listensAgain get() = this != Assist
@@ -115,8 +119,9 @@ class AssistState(
         scope.launch {
             val current = container.settings.current()
             settings = current
-            // Listening comes first: the user may already be talking.
-            if (current.isConfigured && opener.listens(current.listenOnInvoke) && hasMic()) startListening(wakeWord = opener == Opener.WakeWord)
+            // Listening comes first: the user may already be talking. Without the microphone, listening
+            // opens the app to ask for it, as when the overlay is already open.
+            if (current.isConfigured && opener.listens(current.listenOnInvoke, hasMic())) startListening(wakeWord = opener == Opener.WakeWord)
             // Load the voice model now, so a spoken reply doesn't wait for it.
             if (current.speakReplies) speaker.warmUp()
             // The overlay can open without the app ever running, so load the skills for the $ list here too.
