@@ -14,6 +14,7 @@ import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import nl.bartvandermeeren.dudan.voice.Endpointer
+import nl.bartvandermeeren.dudan.voice.WakePhrase
 
 /**
  * Hermes' `reasoning_effort` levels the picker offers, weakest first. A level the model doesn't
@@ -72,6 +73,9 @@ data class AppSettings(
     val userName: String = "",
     val assistantName: String = DEFAULT_ASSISTANT_NAME,
     val listenOnInvoke: Boolean = true,
+    /** Open the assistant by saying [wakePhrase]; see voice/WakeWordListener. */
+    val wakeWord: Boolean = false,
+    val wakePhrase: String = WakePhrase.DEFAULT,
     val speakReplies: Boolean = true,
     val showAllChannels: Boolean = false,
     /** Solid panels instead of frosted glass (see LocalReduceTransparency). */
@@ -137,6 +141,8 @@ class SettingsRepository(private val context: Context) {
         val userName = stringPreferencesKey("user_name")
         val assistantName = stringPreferencesKey("assistant_name")
         val listenOnInvoke = booleanPreferencesKey("listen_on_invoke")
+        val wakeWord = booleanPreferencesKey("wake_word")
+        val wakePhrase = stringPreferencesKey("wake_phrase")
         val speakReplies = booleanPreferencesKey("speak_replies")
         val showAllChannels = booleanPreferencesKey("show_all_channels")
         val reduceTransparency = booleanPreferencesKey("reduce_transparency")
@@ -180,6 +186,8 @@ class SettingsRepository(private val context: Context) {
         userName = this[Keys.userName].orEmpty(),
         assistantName = this[Keys.assistantName]?.takeIf { it.isNotBlank() && it != "aight" } ?: AppSettings.DEFAULT_ASSISTANT_NAME,
         listenOnInvoke = this[Keys.listenOnInvoke] ?: true,
+        wakeWord = this[Keys.wakeWord] ?: false,
+        wakePhrase = this[Keys.wakePhrase]?.takeIf { it.isNotBlank() } ?: WakePhrase.DEFAULT,
         speakReplies = this[Keys.speakReplies] ?: true,
         showAllChannels = this[Keys.showAllChannels] ?: false,
         reduceTransparency = this[Keys.reduceTransparency] ?: false,
@@ -229,6 +237,8 @@ class SettingsRepository(private val context: Context) {
     }
 
     suspend fun setListenOnInvoke(value: Boolean) = context.dataStore.edit { it[Keys.listenOnInvoke] = value }
+    suspend fun setWakeWord(value: Boolean) = context.dataStore.edit { it[Keys.wakeWord] = value }
+    suspend fun setWakePhrase(value: String) = context.dataStore.edit { it[Keys.wakePhrase] = value.trim() }
     suspend fun setSpeakReplies(value: Boolean) = context.dataStore.edit { it[Keys.speakReplies] = value }
     suspend fun setShowAllChannels(value: Boolean) = context.dataStore.edit { it[Keys.showAllChannels] = value }
     suspend fun setReduceTransparency(value: Boolean) = context.dataStore.edit { it[Keys.reduceTransparency] = value }

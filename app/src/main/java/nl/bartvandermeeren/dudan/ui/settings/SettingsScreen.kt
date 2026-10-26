@@ -1,14 +1,18 @@
 package nl.bartvandermeeren.dudan.ui.settings
 
+import android.Manifest
 import android.app.role.RoleManager
 import android.content.ActivityNotFoundException
 import android.content.ClipData
 import android.content.ClipboardManager
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.os.PersistableBundle
 import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.annotation.StringRes
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -81,6 +85,7 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
 import androidx.core.net.toUri
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.compose.LocalLifecycleOwner
@@ -120,6 +125,7 @@ import nl.bartvandermeeren.dudan.ui.theme.Accent
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import nl.bartvandermeeren.dudan.ui.theme.Sky
+import nl.bartvandermeeren.dudan.voice.WakePhrase
 import nl.bartvandermeeren.dudan.voice.Endpointer
 import nl.bartvandermeeren.dudan.voice.ModelPackage
 import nl.bartvandermeeren.dudan.voice.KokoroVoice
@@ -256,6 +262,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     Toggle(stringResource(R.string.listen_on_invoke), stringResource(R.string.listen_on_invoke_detail), settings.listenOnInvoke) {
                         scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
                     }
+                    WakeWordSettings(vm, settings)
                     Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
                         scope.launch { vm.settingsRepository.setSpeakReplies(it) }
                     }
@@ -581,6 +588,55 @@ private fun DefaultAssistantStatus() {
                 .padding(vertical = 6.dp),
         )
     }
+}
+
+/** The wake word on or off, its phrase, its model, and what it needs from Android. */
+@Composable
+private fun WakeWordSettings(vm: MainViewModel, settings: AppSettings) {
+    val context = LocalContext.current
+    val scope = rememberCoroutineScope()
+    val micDenied = stringResource(R.string.mic_permission_needed)
+    val micPermission = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) scope.launch { vm.settingsRepository.setWakeWord(true) } else Toast.makeText(context, micDenied, Toast.LENGTH_LONG).show()
+    }
+    Toggle(stringResource(R.string.wake_word), stringResource(R.string.wake_word_detail, settings.wakePhrase), settings.wakeWord) { on ->
+        val hasMic = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
+        if (on && !hasMic) micPermission.launch(Manifest.permission.RECORD_AUDIO)
+        else scope.launch { vm.settingsRepository.setWakeWord(on) }
+    }
+    if (!settings.wakeWord) return
+    var phrase by rememberSaveable { mutableStateOf(settings.wakePhrase) }
+    Field(
+        phrase,
+        {
+            phrase = it
+            if (WakePhrase.isUsable(it)) scope.launch { vm.settingsRepository.setWakePhrase(it) }
+        },
+        stringResource(R.string.wake_phrase),
+        placeholder = WakePhrase.DEFAULT,
+    )
+    when (WakePhrase.problem(phrase)) {
+        null -> Text(stringResource(R.string.wake_phrase_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+        WakePhrase.Problem.TooShort -> Notice(stringResource(R.string.wake_phrase_too_short), Palette.SparkAmber)
+        WakePhrase.Problem.TooLong -> Notice(stringResource(R.string.wake_phrase_too_long), Palette.SparkAmber)
+    }
+    ModelStatus(
+        context.appContainer.wakeWordModel,
+        ModelTexts(R.string.wake_word_ready, R.string.wake_word_downloading, R.string.wake_word_download, R.string.wake_word_crashed),
+    )
+    // Only Orukeet gets the audio right after the phrase.
+    val orukeet by vm.orukeetModel.state.collectAsStateWithLifecycle()
+    if (settings.sttEngine != SttEngine.Orukeet || orukeet != ModelPackage.State.Ready) {
+        Notice(stringResource(R.string.wake_word_wait_for_tone), Palette.SparkAmber)
+    }
+    val lifecycle = LocalLifecycleOwner.current.lifecycle
+    var isDefault by remember { mutableStateOf(true) }
+    LaunchedEffect(lifecycle) {
+        lifecycle.repeatOnLifecycle(Lifecycle.State.RESUMED) {
+            isDefault = context.getSystemService(RoleManager::class.java)?.isRoleHeld(RoleManager.ROLE_ASSISTANT) == true
+        }
+    }
+    if (!isDefault) Notice(stringResource(R.string.wake_word_needs_assistant), Palette.SparkAmber)
 }
 
 /** A setting's label with the chosen value's name beside it. */

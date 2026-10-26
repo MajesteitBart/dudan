@@ -41,7 +41,29 @@ class LocalSpeechSession(
         fun onPartial(text: String)
         fun onProcessing()
         fun onResult(text: String)
+
+        /** Recording broke or found nothing after [onListening]; a [SpeechRecognizer] error code. */
         fun onError(code: Int)
+
+        /** Recording never started; called instead of [onListening], and nothing follows. */
+        fun onStartFailed(failure: StartFailure)
+    }
+
+    /** Why a recording couldn't start, and whether the phone's recognizer may do better. */
+    enum class StartFailure(
+        /** The [SpeechRecognizer] error code that stands for it. */
+        val code: Int,
+        /** The phone's recognizer records in its own process, so it can still try. */
+        val phoneRecognizerCanTry: Boolean,
+    ) {
+        /** A call holds the audio: any recording, also the phone recognizer's, would only hear the call. */
+        Call(SpeechRecognizer.ERROR_AUDIO, phoneRecognizerCanTry = false),
+
+        /** The microphone didn't open, such as while another app records. */
+        Microphone(SpeechRecognizer.ERROR_AUDIO, phoneRecognizerCanTry = true),
+
+        /** Silero VAD failed to load. */
+        Detector(SpeechRecognizer.ERROR_CLIENT, phoneRecognizerCanTry = true),
     }
 
     /** Where the audio comes from: the microphone, or a test recording in debug builds. */
@@ -51,6 +73,9 @@ class LocalSpeechSession(
 
         /** True when Android hands us zeros because someone else took the microphone. */
         fun isSilenced(): Boolean = false
+
+        /** From another thread: stop recording, so a read that waits for audio returns false. */
+        fun interrupt() = Unit
 
         fun close()
     }
@@ -85,11 +110,19 @@ class LocalSpeechSession(
         // One recording at a time: a cancelled session finishes its cleanup (headset route, focus,
         // microphone) before the next one starts, so it can't undo the new session's setup.
         synchronized(captureLock) {
-            if (live) captureExclusively()
+            if (!live) return
+            // The wake word listener steps aside, or hands over what it heard after the wake word.
+            val afterWakeWord = WakeMic.acquire()
+            try {
+                captureExclusively(afterWakeWord)
+            } finally {
+                afterWakeWord?.close()
+                WakeMic.release()
+            }
         }
     }
 
-    private fun captureExclusively() {
+    private fun captureExclusively(afterWakeWord: AudioSource?) {
         val audio = context.getSystemService(AudioManager::class.java)
         // Music and podcasts pause while we listen, so they don't end up in the transcript.
         val focus = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN_TRANSIENT_EXCLUSIVE)
@@ -105,29 +138,23 @@ class LocalSpeechSession(
             .build()
         if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             // A phone call holds the audio; recording now would only hear the call.
-            post { onError(SpeechRecognizer.ERROR_AUDIO) }
+            post { onStartFailed(StartFailure.Call) }
             return
         }
-        val headset = HeadsetMicrophone.connect(audio) { live }
-        var source: AudioSource? = null
-        var vad: Vad? = null
+        // The wake word was heard on the listener's microphone; what follows it comes from there too.
+        val headset = if (afterWakeWord == null) HeadsetMicrophone.connect(audio) { live } else null
         try {
-            source = TestMicrophone.open(context) ?: openMicrophone(headset?.input)
-            if (source == null) {
-                post { onError(SpeechRecognizer.ERROR_AUDIO) }
-                return
-            }
-            vad = try {
-                engine.newVad()
-            } catch (e: Throwable) {
-                Log.w(TAG, "voice activity detector failed to load", e)
-                post { onError(SpeechRecognizer.ERROR_CLIENT) }
-                return
-            }
-            record(source, vad)
+            recordWithInputs(
+                openSource = { TestMicrophone.open(context) ?: afterWakeWord ?: openMicrophone(headset?.input) },
+                newDetector = engine::newVad,
+                releaseDetector = Vad::release,
+                startFailed = { failure, cause ->
+                    if (cause != null) Log.w(TAG, "recording could not start: $failure", cause)
+                    post { onStartFailed(failure) }
+                },
+                record = ::record,
+            )
         } finally {
-            source?.close()
-            vad?.release()
             headset?.disconnect()
             audio.abandonAudioFocusRequest(focus)
         }
@@ -221,54 +248,6 @@ class LocalSpeechSession(
         }
     }
 
-    @SuppressLint("MissingPermission") // SpeechInput's callers ask for the microphone first.
-    private fun openMicrophone(preferred: AudioDeviceInfo?): AudioSource? {
-        val minimum = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
-        if (minimum <= 0) return null
-        val record = try {
-            AudioRecord(
-                // Tuned for recognition: most phones skip noise suppression and gain control here.
-                MediaRecorder.AudioSource.VOICE_RECOGNITION,
-                SAMPLE_RATE,
-                AudioFormat.CHANNEL_IN_MONO,
-                AudioFormat.ENCODING_PCM_16BIT,
-                max(minimum, SAMPLE_RATE * 2), // one second of 16-bit audio
-            )
-        } catch (e: Exception) {
-            Log.w(TAG, "microphone unavailable", e)
-            return null
-        }
-        if (record.state != AudioRecord.STATE_INITIALIZED) {
-            record.release()
-            return null
-        }
-        if (preferred != null && !record.setPreferredDevice(preferred)) Log.w(TAG, "could not record from the headset")
-        record.startRecording()
-        if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
-            // Another app holds the microphone.
-            record.release()
-            return null
-        }
-        return object : AudioSource {
-            override fun read(window: ShortArray): Boolean {
-                var offset = 0
-                while (offset < window.size) {
-                    val count = record.read(window, offset, window.size - offset, AudioRecord.READ_BLOCKING)
-                    if (count <= 0) return false
-                    offset += count
-                }
-                return true
-            }
-
-            override fun isSilenced() = record.activeRecordingConfiguration?.isClientSilenced == true
-
-            override fun close() {
-                runCatching { record.stop() }
-                record.release()
-            }
-        }
-    }
-
     /**
      * A Bluetooth headset's microphone, routed the way a call routes it, so Live and the side key work
      * with the phone in a pocket. Google's recognizer did this itself; our own recording has to ask.
@@ -344,6 +323,88 @@ class LocalSpeechSession(
         private fun levelOf(rms: Double): Float {
             val db = 20 * log10(rms.coerceAtLeast(1e-6))
             return ((db + 55) / 40).toFloat().coerceIn(0f, 1f)
+        }
+
+        /**
+         * Opens the audio source, then the voice detector, and hands both to [record]; closes them
+         * afterwards. When one of them won't open, [startFailed] says which (with the detector's
+         * exception), and nothing is recorded.
+         */
+        internal fun <D> recordWithInputs(
+            openSource: () -> AudioSource?,
+            newDetector: () -> D,
+            releaseDetector: (D) -> Unit,
+            startFailed: (StartFailure, Throwable?) -> Unit,
+            record: (AudioSource, D) -> Unit,
+        ) {
+            val source = openSource() ?: return startFailed(StartFailure.Microphone, null)
+            try {
+                val detector = try {
+                    newDetector()
+                } catch (e: Throwable) {
+                    return startFailed(StartFailure.Detector, e)
+                }
+                try {
+                    record(source, detector)
+                } finally {
+                    releaseDetector(detector)
+                }
+            } finally {
+                source.close()
+            }
+        }
+
+        /** The microphone, tuned for recognition, as an [AudioSource]; null when it can't be opened. */
+        @SuppressLint("MissingPermission") // The callers check for the microphone permission first.
+        internal fun openMicrophone(preferred: AudioDeviceInfo?): AudioSource? {
+            val minimum = AudioRecord.getMinBufferSize(SAMPLE_RATE, AudioFormat.CHANNEL_IN_MONO, AudioFormat.ENCODING_PCM_16BIT)
+            if (minimum <= 0) return null
+            val record = try {
+                AudioRecord(
+                    // Tuned for recognition: most phones skip noise suppression and gain control here.
+                    MediaRecorder.AudioSource.VOICE_RECOGNITION,
+                    SAMPLE_RATE,
+                    AudioFormat.CHANNEL_IN_MONO,
+                    AudioFormat.ENCODING_PCM_16BIT,
+                    max(minimum, SAMPLE_RATE * 2), // one second of 16-bit audio
+                )
+            } catch (e: Exception) {
+                Log.w(TAG, "microphone unavailable", e)
+                return null
+            }
+            if (record.state != AudioRecord.STATE_INITIALIZED) {
+                record.release()
+                return null
+            }
+            if (preferred != null && !record.setPreferredDevice(preferred)) Log.w(TAG, "could not record from the headset")
+            record.startRecording()
+            if (record.recordingState != AudioRecord.RECORDSTATE_RECORDING) {
+                // Another app holds the microphone.
+                record.release()
+                return null
+            }
+            return object : AudioSource {
+                override fun read(window: ShortArray): Boolean {
+                    var offset = 0
+                    while (offset < window.size) {
+                        val count = record.read(window, offset, window.size - offset, AudioRecord.READ_BLOCKING)
+                        if (count <= 0) return false
+                        offset += count
+                    }
+                    return true
+                }
+
+                override fun isSilenced() = record.activeRecordingConfiguration?.isClientSilenced == true
+
+                override fun interrupt() {
+                    runCatching { record.stop() }
+                }
+
+                override fun close() {
+                    runCatching { record.stop() }
+                    record.release()
+                }
+            }
         }
     }
 }

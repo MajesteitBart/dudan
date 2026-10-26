@@ -8,12 +8,17 @@ import java.nio.ByteOrder
 /**
  * Debug builds only: when files/debug-mic.wav exists, voice input plays that recording in real time
  * instead of opening the microphone, so the emulator can test recognition end to end. Silence
- * follows the recording, like a person who stopped talking.
+ * follows the recording, like a person who stopped talking. files/debug-wake.wav does the same for
+ * the wake word listener, once: it's renamed after it played, so the listener doesn't wake itself again.
  */
 object TestMicrophone {
-    fun open(context: Context): LocalSpeechSession.AudioSource? {
-        val file = File(context.filesDir, "debug-mic.wav").takeIf { it.exists() } ?: return null
+    const val VOICE_INPUT = "debug-mic.wav"
+    const val WAKE_WORD = "debug-wake.wav"
+
+    fun open(context: Context, name: String = VOICE_INPUT): LocalSpeechSession.AudioSource? {
+        val file = File(context.filesDir, name).takeIf { it.exists() } ?: return null
         val samples = runCatching { readWav(file.readBytes()) }.getOrNull() ?: return null
+        if (name == WAKE_WORD) file.renameTo(File(context.filesDir, "$name.played"))
         var position = 0
         return object : LocalSpeechSession.AudioSource {
             override fun read(window: ShortArray): Boolean {

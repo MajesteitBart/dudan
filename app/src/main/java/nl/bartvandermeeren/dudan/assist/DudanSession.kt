@@ -102,7 +102,7 @@ class DudanSession(context: Context) :
         super.onShow(args, showFlags)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_START)
         lifecycleRegistry.handleLifecycleEvent(Lifecycle.Event.ON_RESUME)
-        state.onShown()
+        state.onShown(wakeWord = args?.getBoolean(DudanVoiceInteractionService.EXTRA_WAKE_WORD) == true)
     }
 
     override fun onHandleScreenshot(screenshot: Bitmap?) {

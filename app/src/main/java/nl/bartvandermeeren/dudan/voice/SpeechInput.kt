@@ -2,6 +2,7 @@ package nl.bartvandermeeren.dudan.voice
 
 import android.content.Context
 import android.content.Intent
+import android.os.Build
 import android.os.Bundle
 import android.speech.RecognitionListener
 import android.speech.RecognizerIntent
@@ -34,19 +35,35 @@ class SpeechInput(private val context: Context) {
     private var local: LocalSpeechSession? = null
     private var onResult: ((String) -> Unit)? = null
     private var onError: ((Int) -> Unit)? = null
+    private var onListening: (() -> Unit)? = null
 
     val isActive: Boolean get() = _phase.value != Phase.Idle
+
+    /**
+     * This voice input went to the phone's recognizer; stays set after it ended, until the next start.
+     * That recognizer records in its own process, so it doesn't get the audio after a wake word: it
+     * only hears what's said once it listens.
+     */
+    var usesPhoneRecognizer = false
+        private set
 
     private var language: String? = null
     private var pauseMs = Endpointer.DEFAULT_END_SILENCE_MS
     private var candidates: List<android.content.ComponentName> = emptyList()
     private var attempt = 0
 
-    fun start(language: String?, onResult: (String) -> Unit, onError: (Int) -> Unit = {}) {
+    /**
+     * Starts listening in [language], the speech language setting; see [SpeechLanguage]. When Orukeet
+     * can't start (microphone busy, detector broken), the phone's recognizer takes over. [onListening]
+     * runs once recording has started.
+     */
+    fun start(language: String?, onResult: (String) -> Unit, onError: (Int) -> Unit = {}, onListening: () -> Unit = {}) {
         release()
-        this.language = language
+        this.language = SpeechLanguage.normalize(language)
         this.onResult = onResult
         this.onError = onError
+        this.onListening = onListening
+        usesPhoneRecognizer = false
         val container = context.appContainer
         val settings = container.settingsSnapshot.value
         pauseMs = settings.speechPauseMs
@@ -54,10 +71,23 @@ class SpeechInput(private val context: Context) {
             startLocal(container.orukeet)
             return
         }
+        startSystem()
+    }
+
+    private fun startSystem() {
+        usesPhoneRecognizer = true
         candidates = SpeechRecognizers.candidates(context)
         attempt = 0
+        // The phone's recognizer records in its own process, so the wake word listener lets go of the
+        // microphone, and of the audio after a wake word: only Orukeet can take that.
+        if (!pausedWakeWord) {
+            pausedWakeWord = true
+            WakeMic.pause()
+        }
         launch()
     }
+
+    private var pausedWakeWord = false
 
     private fun startLocal(engine: OrukeetEngine) {
         _partial.value = ""
@@ -70,7 +100,11 @@ class SpeechInput(private val context: Context) {
                 private val current get() = local === session
 
                 override fun onListening() {
-                    if (current) _phase.value = Phase.Listening
+                    // After a stop() that came while starting, the phase stays Processing.
+                    if (current && _phase.value == Phase.Starting) {
+                        _phase.value = Phase.Listening
+                        onListening?.invoke()
+                    }
                 }
 
                 override fun onLevel(level: Float) {
@@ -99,11 +133,21 @@ class SpeechInput(private val context: Context) {
                 override fun onError(code: Int) {
                     if (!current) return
                     Log.w("DudanSpeech", "Orukeet input error $code")
-                    val callback = this@SpeechInput.onError
-                    onResult = null
-                    this@SpeechInput.onError = null
-                    release()
-                    callback?.invoke(code)
+                    fail(code)
+                }
+
+                override fun onStartFailed(failure: LocalSpeechSession.StartFailure) {
+                    if (!current) return
+                    Log.w("DudanSpeech", "Orukeet could not start: $failure")
+                    // Before onListening, only stop() sets Processing.
+                    when (val outcome = startOutcome(failure, stopped = _phase.value == Phase.Processing)) {
+                        is StartOutcome.End -> fail(outcome.code)
+                        StartOutcome.PhoneRecognizer -> {
+                            local?.cancel()
+                            local = null
+                            startSystem()
+                        }
+                    }
                 }
             },
             endSilenceMs = pauseMs,
@@ -113,14 +157,20 @@ class SpeechInput(private val context: Context) {
         session.start()
     }
 
+    /** Ends this voice input with [code]. */
+    private fun fail(code: Int) {
+        val callback = onError
+        onResult = null
+        onError = null
+        release()
+        callback?.invoke(code)
+    }
+
     /** Starts the current candidate recognizer; falls back to the on-device one when none is installed. */
     private fun launch() {
         val created = SpeechRecognizers.create(context, candidates.getOrNull(attempt))
         if (created == null) {
-            val callback = onError
-            onResult = null
-            onError = null
-            callback?.invoke(ERROR_UNAVAILABLE)
+            fail(ERROR_UNAVAILABLE)
             return
         }
         recognizer = created
@@ -133,9 +183,15 @@ class SpeechInput(private val context: Context) {
             // Only a request: Android's docs warn that a recognizer may ignore these and keep its own timing.
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_COMPLETE_SILENCE_LENGTH_MILLIS, pauseMs.toLong())
             putExtra(RecognizerIntent.EXTRA_SPEECH_INPUT_POSSIBLY_COMPLETE_SILENCE_LENGTH_MILLIS, pauseMs.toLong())
-            if (!language.isNullOrBlank()) {
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE, language)
-                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, language)
+            language?.let { tag ->
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE, tag)
+                putExtra(RecognizerIntent.EXTRA_LANGUAGE_PREFERENCE, tag)
+                // Recognizers that detect or switch languages on their own stay with this one.
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                    putExtra(RecognizerIntent.EXTRA_ENABLE_LANGUAGE_DETECTION, false)
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_DETECTION_ALLOWED_LANGUAGES, arrayListOf(tag))
+                    putExtra(RecognizerIntent.EXTRA_LANGUAGE_SWITCH_ALLOWED_LANGUAGES, arrayListOf(tag))
+                }
             }
         }
         _partial.value = ""
@@ -182,17 +238,25 @@ class SpeechInput(private val context: Context) {
     }
 
     private fun release() {
+        onListening = null
         local?.cancel()
         local = null
         recognizer?.runCatching { cancel(); destroy() }
         recognizer = null
+        if (pausedWakeWord) {
+            pausedWakeWord = false
+            WakeMic.release()
+        }
         _phase.value = Phase.Idle
         _level.value = 0f
     }
 
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
+            // After a stop() that came while starting, the phase stays Processing.
+            if (_phase.value != Phase.Starting) return
             _phase.value = Phase.Listening
+            onListening?.invoke()
         }
 
         override fun onBeginningOfSpeech() = Unit
@@ -268,5 +332,25 @@ class SpeechInput(private val context: Context) {
         )
 
         fun isSilence(error: Int) = error == SpeechRecognizer.ERROR_NO_MATCH || error == SpeechRecognizer.ERROR_SPEECH_TIMEOUT
+
+        /**
+         * What follows when Orukeet couldn't start recording. The phone's recognizer records in its own
+         * process, so it can still try after a busy microphone or a broken detector. A stop that came
+         * while Orukeet was starting ends voice input as silence: nothing was recorded, and the
+         * overlay doesn't retry after silence.
+         */
+        internal fun startOutcome(failure: LocalSpeechSession.StartFailure, stopped: Boolean): StartOutcome = when {
+            stopped -> StartOutcome.End(SpeechRecognizer.ERROR_NO_MATCH)
+            failure.phoneRecognizerCanTry -> StartOutcome.PhoneRecognizer
+            else -> StartOutcome.End(failure.code)
+        }
+    }
+
+    internal sealed interface StartOutcome {
+        /** The phone's recognizer takes over. */
+        data object PhoneRecognizer : StartOutcome
+
+        /** Voice input ends with [code]. */
+        data class End(val code: Int) : StartOutcome
     }
 }
