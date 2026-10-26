@@ -49,37 +49,6 @@ object SpeechText {
         if (last == null || last in ".!?:;,…") trimmed else "$trimmed."
     }
 
-    // Function words, plus the greetings and one-word answers that make up short replies. Words both
-    // languages use ("is", "in", "of", "was", "we", "sorry") stay out, so they don't tip a short reply.
-    private val dutch = setOf(
-        "de", "het", "een", "en", "niet", "je", "ik", "van", "dat", "die", "voor", "op", "met", "zijn", "er",
-        "maar", "ook", "wat", "kan", "naar", "als", "dit", "jij", "wij", "heb", "wordt", "nog", "bij", "uit",
-        "goedemorgen", "goedemiddag", "goedenavond", "welterusten", "hoi", "hallo", "doei", "dag", "bedankt", "dank",
-        "graag", "prima", "oké", "gedaan", "klopt", "zeker", "natuurlijk", "nee", "ja", "goed", "geen", "wel", "veel",
-        "vandaag", "morgen", "gisteren", "straks", "misschien", "alleen", "altijd", "komt", "staat",
-    )
-    private val english = setOf(
-        "the", "and", "not", "you", "to", "that", "for", "on", "with", "are", "this", "it", "be",
-        "but", "also", "what", "can", "as", "have", "will", "from", "your", "an", "or", "by", "at",
-        "hello", "hi", "thanks", "thank", "yes", "no", "sure", "okay", "great", "good", "morning", "evening", "night",
-        "today", "tomorrow", "yesterday", "done", "please", "just", "all", "there", "here", "would", "could", "should",
-    )
-
-    /** Rough language guess from common words; good enough to pick a TTS voice. Null when it's a tie. */
-    fun guessLanguage(text: String): String? {
-        var nl = 0
-        var en = 0
-        text.lowercase().split(Regex("[^\\p{L}]+")).take(400).forEach { word ->
-            if (word in dutch) nl++
-            if (word in english) en++
-        }
-        return when {
-            nl > en -> "nl-NL"
-            en > nl -> "en-US"
-            else -> null
-        }
-    }
-
     /**
      * Splits text for a voice that synthesizes a whole piece before playing it: a sentence per piece, so
      * the first starts quickly and each next one is ready before the one before it ends. A sentence

@@ -9,9 +9,10 @@ import com.k2fsa.sherpa.onnx.OfflineTtsSupertonicModelConfig
 import java.io.File
 
 /**
- * Supertonic 3 speech on the phone through sherpa-onnx, for Dutch replies. Numbers, times and amounts
- * are written out first, since Supertonic misreads digits. The first sentence is synthesized on its
- * own so speech starts quickly; the rest follows in larger pieces while the previous one plays.
+ * Supertonic 3 speech on the phone through sherpa-onnx, in any of its 31 languages. In Dutch, numbers,
+ * times and amounts are written out first, since Supertonic misreads digits. The first sentence is
+ * synthesized on its own so speech starts quickly; the rest follows in larger pieces while the previous
+ * one plays.
  */
 class SupertonicVoice(context: Context, model: ModelPackage) : SherpaVoice(context, model, "supertonic") {
     data class Voice(val id: String, val speakerId: Int, val female: Boolean, val number: Int)
@@ -41,15 +42,16 @@ class SupertonicVoice(context: Context, model: ModelPackage) : SherpaVoice(conte
         return OfflineTts(config = config)
     }
 
-    override fun synthesize(tts: OfflineTts, text: String, voiceId: String, sink: Sink) {
+    override fun synthesize(tts: OfflineTts, text: String, voiceId: String, language: String, sink: Sink) {
         val config = GenerationConfig(
             silenceScale = 1.0f,
             speed = SPEED,
             sid = voiceFor(voiceId).speakerId,
             numSteps = STEPS,
-            extra = mapOf("lang" to "nl"),
+            extra = mapOf("lang" to language),
         )
-        SpeechText.streamingChunks(DutchText.normalize(text), MAX_CHUNK).forEachIndexed { index, chunk ->
+        val spoken = if (language == "nl") DutchText.normalize(text) else text
+        SpeechText.streamingChunks(spoken, MAX_CHUNK).forEachIndexed { index, chunk ->
             if (!sink.active) return
             if (index > 0) sink.pause(PAUSE_SECONDS)
             tts.generateWithConfigAndCallback(chunk, config, sink)
@@ -59,6 +61,8 @@ class SupertonicVoice(context: Context, model: ModelPackage) : SherpaVoice(conte
     private fun voiceFor(id: String) = VOICES.firstOrNull { it.id == id } ?: VOICES.first()
 
     companion object {
+        const val DEFAULT = "M2"
+
         /** Denoising steps. Naturalness rises steeply up to 8 and barely after; each step costs time. */
         private const val STEPS = 8
         /** Supertonic's own default pace. */

@@ -47,11 +47,39 @@ internal fun storedEffort(saved: String?, legacy: String?, default: ReasoningEff
 /** Which default model a chat uses: regular chats, or chats started from the assistant (side key, overlay). */
 enum class ModelProfile { Chats, Assistant }
 
-/** How replies are read aloud. Kokoro runs on the phone; System is Android's text-to-speech. */
-enum class TtsEngine { Kokoro, System }
+/** Who reads replies aloud. Kokoro and Supertonic run on the phone; System is Android's text-to-speech. */
+enum class VoiceEngine { Kokoro, Supertonic, System }
 
-/** How Dutch replies are read aloud. Supertonic runs on the phone; System is Android's text-to-speech. */
-enum class DutchTtsEngine { Supertonic, System }
+/**
+ * The voice for one language's replies. A null [engine] is Automatic: the best voice the phone has for
+ * that language (see voice/VoiceLanguages). A null [voice], or one the engine doesn't have, is the
+ * engine's default voice.
+ */
+data class LanguageVoice(val engine: VoiceEngine? = null, val voice: String? = null) {
+    val isDefault: Boolean get() = engine == null && voice == null
+}
+
+/** Language voices saved as "en:Kokoro:am_fenrir,nl::M1"; an empty field is null. */
+internal fun encodeVoices(voices: Map<String, LanguageVoice>): String = voices
+    .filterValues { !it.isDefault }
+    .entries.joinToString(",") { (language, v) -> "$language:${v.engine?.name.orEmpty()}:${v.voice.orEmpty()}" }
+
+internal fun decodeVoices(raw: String): Map<String, LanguageVoice> = raw.split(',').mapNotNull { entry ->
+    val parts = entry.split(':')
+    if (parts.size != 3 || parts[0].isBlank()) return@mapNotNull null
+    val engine = parts[1].takeIf { it.isNotEmpty() }?.let { name -> VoiceEngine.entries.firstOrNull { it.name == name } }
+    parts[0] to LanguageVoice(engine, parts[2].takeIf { it.isNotEmpty() })
+}.toMap().filterValues { !it.isDefault }
+
+/**
+ * Before voices were set per language there was an English voice (Kokoro or Android) and a Dutch one
+ * (Supertonic or Android). Kokoro and Supertonic were the defaults, so they become Automatic; a picked
+ * voice or the Android voice carries over.
+ */
+internal fun legacyVoices(englishEngine: String?, kokoroVoice: String?, dutchEngine: String?, supertonicVoice: String?): Map<String, LanguageVoice> = mapOf(
+    "en" to LanguageVoice(VoiceEngine.System.takeIf { englishEngine == "System" }, kokoroVoice?.takeIf { it.isNotBlank() }),
+    "nl" to LanguageVoice(VoiceEngine.System.takeIf { dutchEngine == "System" }, supertonicVoice?.takeIf { it.isNotBlank() }),
+).filterValues { !it.isDefault }
 
 /** Who turns speech into text. Orukeet runs on the phone; System is Android's speech recognizer. */
 enum class SttEngine { Orukeet, System }
@@ -89,10 +117,8 @@ data class AppSettings(
     val model: ModelChoice = ModelChoice(),
     /** Default for chats started from the assistant; quick answers matter more there. */
     val assistantModel: ModelChoice = ModelChoice(effort = ReasoningEffort.Low),
-    val ttsEngine: TtsEngine = TtsEngine.Kokoro,
-    val kokoroVoice: String = DEFAULT_KOKORO_VOICE,
-    val dutchTtsEngine: DutchTtsEngine = DutchTtsEngine.Supertonic,
-    val supertonicVoice: String = DEFAULT_SUPERTONIC_VOICE,
+    /** Voices by language code ("en", "nl", or VoiceLanguages.OTHER); a language left out is Automatic. */
+    val voices: Map<String, LanguageVoice> = emptyMap(),
     val sttEngine: SttEngine = SttEngine.Orukeet,
     /** How long the user can pause before voice input decides they're done. */
     val speechPauseMs: Int = Endpointer.DEFAULT_END_SILENCE_MS,
@@ -118,8 +144,6 @@ data class AppSettings(
 
     companion object {
         const val DEFAULT_ASSISTANT_NAME = "dudan"
-        const val DEFAULT_KOKORO_VOICE = "af_heart"
-        const val DEFAULT_SUPERTONIC_VOICE = "M2"
     }
 }
 
@@ -151,10 +175,11 @@ class SettingsRepository(private val context: Context) {
         val speechLanguage = stringPreferencesKey("speech_language")
         val chatsModel = ModelKeys("")
         val assistantModel = ModelKeys("fast_")
-        val ttsEngine = stringPreferencesKey("tts_engine")
-        val kokoroVoice = stringPreferencesKey("kokoro_voice")
-        val dutchTtsEngine = stringPreferencesKey("dutch_tts_engine")
-        val supertonicVoice = stringPreferencesKey("supertonic_voice")
+        val voices = stringPreferencesKey("language_voices")
+        val legacyTtsEngine = stringPreferencesKey("tts_engine")
+        val legacyKokoroVoice = stringPreferencesKey("kokoro_voice")
+        val legacyDutchTtsEngine = stringPreferencesKey("dutch_tts_engine")
+        val legacySupertonicVoice = stringPreferencesKey("supertonic_voice")
         val sttEngine = stringPreferencesKey("stt_engine")
         val speechPauseMs = intPreferencesKey("speech_pause_ms")
         val phoneControl = booleanPreferencesKey("phone_control")
@@ -180,6 +205,9 @@ class SettingsRepository(private val context: Context) {
         fast = this[keys.fast] ?: false,
     )
 
+    private fun Preferences.readVoices(): Map<String, LanguageVoice> = this[Keys.voices]?.let(::decodeVoices)
+        ?: legacyVoices(this[Keys.legacyTtsEngine], this[Keys.legacyKokoroVoice], this[Keys.legacyDutchTtsEngine], this[Keys.legacySupertonicVoice])
+
     private fun Preferences.toSettings() = AppSettings(
         serverUrl = this[Keys.serverUrl].orEmpty(),
         apiKey = this[Keys.apiKey]?.let(SecretBox::decrypt).orEmpty(),
@@ -196,10 +224,7 @@ class SettingsRepository(private val context: Context) {
         speechLanguage = this[Keys.speechLanguage].orEmpty(),
         model = readModel(Keys.chatsModel, null),
         assistantModel = readModel(Keys.assistantModel, ReasoningEffort.Low),
-        ttsEngine = this[Keys.ttsEngine]?.let { runCatching { TtsEngine.valueOf(it) }.getOrNull() } ?: TtsEngine.Kokoro,
-        kokoroVoice = this[Keys.kokoroVoice]?.takeIf { it.isNotBlank() } ?: AppSettings.DEFAULT_KOKORO_VOICE,
-        dutchTtsEngine = this[Keys.dutchTtsEngine]?.let { runCatching { DutchTtsEngine.valueOf(it) }.getOrNull() } ?: DutchTtsEngine.Supertonic,
-        supertonicVoice = this[Keys.supertonicVoice]?.takeIf { it.isNotBlank() } ?: AppSettings.DEFAULT_SUPERTONIC_VOICE,
+        voices = readVoices(),
         sttEngine = this[Keys.sttEngine]?.let { runCatching { SttEngine.valueOf(it) }.getOrNull() } ?: SttEngine.Orukeet,
         speechPauseMs = this[Keys.speechPauseMs]?.coerceIn(Endpointer.END_SILENCE_RANGE_MS) ?: Endpointer.DEFAULT_END_SILENCE_MS,
         phoneControl = this[Keys.phoneControl] ?: false,
@@ -245,10 +270,17 @@ class SettingsRepository(private val context: Context) {
     suspend fun setAccent(name: String) = context.dataStore.edit { it[Keys.accent] = name }
     suspend fun setSky(name: String) = context.dataStore.edit { it[Keys.sky] = name }
     suspend fun setSpeechLanguage(value: String) = context.dataStore.edit { it[Keys.speechLanguage] = value.trim() }
-    suspend fun setTtsEngine(value: TtsEngine) = context.dataStore.edit { it[Keys.ttsEngine] = value.name }
-    suspend fun setKokoroVoice(value: String) = context.dataStore.edit { it[Keys.kokoroVoice] = value }
-    suspend fun setDutchTtsEngine(value: DutchTtsEngine) = context.dataStore.edit { it[Keys.dutchTtsEngine] = value.name }
-    suspend fun setSupertonicVoice(value: String) = context.dataStore.edit { it[Keys.supertonicVoice] = value }
+
+    /** Saves [language]'s voice; Automatic removes its entry. The old per-engine keys go on the first save. */
+    suspend fun setVoice(language: String, voice: LanguageVoice) = context.dataStore.edit {
+        val voices = it.readVoices().toMutableMap()
+        if (voice.isDefault) voices.remove(language) else voices[language] = voice
+        it[Keys.voices] = encodeVoices(voices)
+        it.remove(Keys.legacyTtsEngine)
+        it.remove(Keys.legacyKokoroVoice)
+        it.remove(Keys.legacyDutchTtsEngine)
+        it.remove(Keys.legacySupertonicVoice)
+    }
     suspend fun setSttEngine(value: SttEngine) = context.dataStore.edit { it[Keys.sttEngine] = value.name }
     suspend fun setSpeechPause(ms: Int) = context.dataStore.edit { it[Keys.speechPauseMs] = ms.coerceIn(Endpointer.END_SILENCE_RANGE_MS) }
     suspend fun setRichReplies(value: Boolean) = context.dataStore.edit { it[Keys.richReplies] = value }

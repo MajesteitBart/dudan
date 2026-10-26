@@ -41,14 +41,17 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
         .setOnAudioFocusChangeListener { }
         .build()
 
+    /** Whether the model is downloaded and didn't crash the app while loading. */
+    val isReady: Boolean get() = model.isReady
+
     /** Voices with the same key share one loaded engine; a voice with another key reloads it. */
     protected abstract fun engineKey(voiceId: String): Any
 
     /** Loads the engine for [voiceId] from [ModelPackage.dir]. Runs on the worker thread. */
     protected abstract fun loadEngine(voiceId: String): OfflineTts
 
-    /** Synthesizes [text] into [sink], which plays it; stop early once [Sink.active] turns false. */
-    protected abstract fun synthesize(tts: OfflineTts, text: String, voiceId: String, sink: Sink)
+    /** Synthesizes [text] in [language] into [sink], which plays it; stop early once [Sink.active] turns false. */
+    protected abstract fun synthesize(tts: OfflineTts, text: String, voiceId: String, language: String, sink: Sink)
 
     /** Loads the model ahead of time, so the first reply doesn't wait for it. */
     fun warmUp(voiceId: String) {
@@ -60,10 +63,11 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
     }
 
     /**
-     * Speaks [text]; returns false when the model can't be used, so the caller falls back to Android's
-     * voice. [onDone] runs once on the main thread; Failed means synthesis broke while still current.
+     * Speaks [text] in [language] (a code such as "nl"); returns false when the model can't be used, so the
+     * caller falls back to Android's voice. [onDone] runs once on the main thread; Failed means synthesis
+     * broke while still current.
      */
-    fun speak(text: String, voiceId: String, onDone: (Outcome) -> Unit): Boolean {
+    fun speak(text: String, voiceId: String, language: String, onDone: (Outcome) -> Unit): Boolean {
         if (!model.isReady) return false
         val mine = generation.incrementAndGet()
         silence()
@@ -84,7 +88,7 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
                 focused = true
                 val sink = Sink(output, current)
                 try {
-                    synthesize(tts, text, voiceId, sink)
+                    synthesize(tts, text, voiceId, language, sink)
                 } finally {
                     sink.finish()
                 }
@@ -242,9 +246,12 @@ abstract class SherpaVoice(context: Context, protected val model: ModelPackage, 
         /** Output latency after the last frame leaves the buffer; Bluetooth headsets need the most. */
         private const val TAIL_MARGIN_MS = 300L
 
-        private val attributes: AudioAttributes = AudioAttributes.Builder()
-            .setUsage(AudioAttributes.USAGE_ASSISTANT)
-            .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
-            .build()
+        // Lazy, so the voice lists on the subclasses can be read without Android, as in unit tests.
+        private val attributes: AudioAttributes by lazy {
+            AudioAttributes.Builder()
+                .setUsage(AudioAttributes.USAGE_ASSISTANT)
+                .setContentType(AudioAttributes.CONTENT_TYPE_SPEECH)
+                .build()
+        }
     }
 }

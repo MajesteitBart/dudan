@@ -2,7 +2,6 @@ package nl.bartvandermeeren.dudan
 
 import nl.bartvandermeeren.dudan.voice.SpeechText
 import org.junit.Assert.assertEquals
-import org.junit.Assert.assertNull
 import org.junit.Test
 
 class SpeechTextTest {
@@ -10,25 +9,6 @@ class SpeechTextTest {
     fun listItemsAndHeadingsGetAPause() {
         val text = SpeechText.withPauses(SpeechText.fromMarkdown("## Today\n\n- Standup at 9\n- Lunch with Anna"))
         assertEquals("Today.\nStandup at 9.\nLunch with Anna.", text)
-    }
-
-    @Test
-    fun shortRepliesArePlacedByLanguage() {
-        assertEquals("nl-NL", SpeechText.guessLanguage("Goedemorgen!"))
-        assertEquals("nl-NL", SpeechText.guessLanguage("Prima, gedaan."))
-        assertEquals("en-US", SpeechText.guessLanguage("Thanks, done."))
-        // Nothing to go on: the caller falls back to the speech input or phone language.
-        assertNull(SpeechText.guessLanguage("OK"))
-        // Words both languages use don't count for either.
-        assertNull(SpeechText.guessLanguage("In Amsterdam."))
-        assertEquals("nl-NL", SpeechText.guessLanguage("Of morgen."))
-        assertEquals("nl-NL", SpeechText.guessLanguage("Het was leuk."))
-    }
-
-    @Test
-    fun thePreviewSentencesPickTheirOwnVoice() {
-        assertEquals("en-US", SpeechText.guessLanguage("Hi Bart, this is how I sound when I read a reply aloud."))
-        assertEquals("nl-NL", SpeechText.guessLanguage("Hoi Bart, zo klink ik als ik een antwoord in het Nederlands voorlees."))
     }
 
     @Test

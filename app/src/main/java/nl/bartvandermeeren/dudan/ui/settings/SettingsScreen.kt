@@ -96,6 +96,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
+import java.util.Locale
 import kotlin.math.roundToInt
 import nl.bartvandermeeren.dudan.BuildConfig
 import nl.bartvandermeeren.dudan.R
@@ -104,11 +105,11 @@ import nl.bartvandermeeren.dudan.assist.ListenActivity
 import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.HermesApi
+import nl.bartvandermeeren.dudan.data.LanguageVoice
 import nl.bartvandermeeren.dudan.data.ModelProfile
-import nl.bartvandermeeren.dudan.data.DutchTtsEngine
 import nl.bartvandermeeren.dudan.data.SttEngine
-import nl.bartvandermeeren.dudan.data.TtsEngine
 import nl.bartvandermeeren.dudan.data.UploadClient
+import nl.bartvandermeeren.dudan.data.VoiceEngine
 import nl.bartvandermeeren.dudan.device.PhoneControl
 import nl.bartvandermeeren.dudan.device.Tailnet
 import nl.bartvandermeeren.dudan.ui.MainViewModel
@@ -119,6 +120,8 @@ import nl.bartvandermeeren.dudan.ui.components.DudanMark
 import nl.bartvandermeeren.dudan.ui.components.CtaButton
 import nl.bartvandermeeren.dudan.ui.components.Segmented
 import nl.bartvandermeeren.dudan.ui.components.GlassDropdownMenu
+import nl.bartvandermeeren.dudan.ui.components.GlassSheet
+import nl.bartvandermeeren.dudan.ui.components.SheetChoice
 import nl.bartvandermeeren.dudan.ui.components.PlainIconButton
 import nl.bartvandermeeren.dudan.ui.components.Toggle
 import nl.bartvandermeeren.dudan.ui.components.glass
@@ -132,6 +135,8 @@ import nl.bartvandermeeren.dudan.voice.Endpointer
 import nl.bartvandermeeren.dudan.voice.ModelPackage
 import nl.bartvandermeeren.dudan.voice.KokoroVoice
 import nl.bartvandermeeren.dudan.voice.SupertonicVoice
+import nl.bartvandermeeren.dudan.voice.VoiceLanguages
+import nl.bartvandermeeren.dudan.voice.VoiceSamples
 
 private sealed interface TestState {
     data object Idle : TestState
@@ -253,8 +258,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 Section(stringResource(R.string.section_models)) {
                     ModelProfile.entries.forEach { profile -> ModelDefaultRow(vm, settings, profile) }
                 }
-                Section(stringResource(R.string.section_voice)) { VoiceSettings(vm, settings) }
-                Section(stringResource(R.string.section_dutch_voice)) { DutchVoiceSettings(vm, settings) }
+                Section(stringResource(R.string.section_voices)) { VoicesSettings(vm, settings) }
                 Section(stringResource(R.string.section_speech_input)) {
                     SpeechInputSettings(vm, settings, language) { language = it; scope.launch { vm.settingsRepository.setSpeechLanguage(it) } }
                 }
@@ -338,57 +342,193 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
     if (picking) ModelPickerSheet(vm, settings, initialProfile = profile, onDismiss = { picking = false })
 }
 
+/**
+ * A row for each of the phone's languages, English, and Other languages. Each is Automatic until the user
+ * picks an engine or voice for it in its sheet.
+ */
 @Composable
-private fun VoiceSettings(vm: MainViewModel, settings: AppSettings) {
+private fun VoicesSettings(vm: MainViewModel, settings: AppSettings) {
+    val rows = remember(settings.voices) { VoiceLanguages.rows(VoiceLanguages.phoneLanguages(), settings.voices) }
+    val ready = rememberVoiceReady(vm)
+    var editing by rememberSaveable { mutableStateOf<String?>(null) }
+    Text(stringResource(R.string.voices_intro), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+    Column {
+        rows.forEach { language ->
+            val choice = settings.voices[language] ?: LanguageVoice()
+            val shown = choice.engine ?: VoiceLanguages.resolve(language, settings.voices, rows, ready).engine
+            VoiceRow(
+                title = languageName(language),
+                detail = if (choice.engine == null) stringResource(R.string.voices_automatic_engine, engineName(shown)) else engineName(shown),
+                value = voiceName(shown, VoiceLanguages.voiceFor(shown, choice.voice)),
+                onClick = { editing = language },
+            )
+        }
+        val other = settings.voices[VoiceLanguages.OTHER] ?: LanguageVoice()
+        val supertonic = ready(VoiceEngine.Supertonic)
+        VoiceRow(
+            title = stringResource(R.string.voices_other),
+            detail = when (val engine = other.engine) {
+                null -> stringResource(
+                    R.string.voices_automatic_engine,
+                    if (supertonic) stringResource(R.string.voices_other_engines) else engineName(VoiceEngine.System),
+                )
+                else -> engineName(engine)
+            },
+            value = (other.engine ?: VoiceEngine.Supertonic.takeIf { supertonic })?.let { voiceName(it, VoiceLanguages.voiceFor(it, other.voice)) },
+            onClick = { editing = VoiceLanguages.OTHER },
+        )
+    }
+    val needed = VoiceLanguages.needed(rows, settings.voices)
+    if (VoiceEngine.Kokoro in needed) ModelStatus(vm.kokoroModel, voiceModelTexts(engineName(VoiceEngine.Kokoro)))
+    if (VoiceEngine.Supertonic in needed) ModelStatus(vm.supertonicModel, voiceModelTexts(engineName(VoiceEngine.Supertonic)))
+    editing?.let { language -> VoiceSheet(vm, settings, language, rows, ready) { editing = null } }
+}
+
+/** Whether each engine can speak right now: its model downloaded and not crashed. */
+@Composable
+private fun rememberVoiceReady(vm: MainViewModel): (VoiceEngine) -> Boolean {
+    val kokoro by vm.kokoroModel.state.collectAsStateWithLifecycle()
+    val supertonic by vm.supertonicModel.state.collectAsStateWithLifecycle()
+    return { engine ->
+        when (engine) {
+            VoiceEngine.Kokoro -> kokoro == ModelPackage.State.Ready
+            VoiceEngine.Supertonic -> supertonic == ModelPackage.State.Ready
+            VoiceEngine.System -> true
+        }
+    }
+}
+
+/** A language with who reads it underneath, and its voice in the accent color; tap to change. */
+@Composable
+private fun VoiceRow(title: String, detail: String, value: String?, onClick: () -> Unit) {
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .clickable(onClick = onClick)
+            .padding(vertical = 8.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        Column(Modifier.weight(1f).padding(end = 16.dp)) {
+            Text(title, style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
+            Text(detail, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+        }
+        if (value != null) Text(value, style = MaterialTheme.typography.labelLarge, color = LocalAccent.current.soft)
+    }
+}
+
+/** Who reads one language (Automatic or a fixed engine) and with which voice, with Preview. */
+@Composable
+private fun VoiceSheet(
+    vm: MainViewModel,
+    settings: AppSettings,
+    language: String,
+    rows: List<String>,
+    ready: (VoiceEngine) -> Boolean,
+    onDismiss: () -> Unit,
+) {
+    val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    val model = vm.kokoroModel
-    val modelState by model.state.collectAsStateWithLifecycle()
-    Segmented(
-        options = listOf(TtsEngine.Kokoro to stringResource(R.string.tts_kokoro), TtsEngine.System to stringResource(R.string.tts_system)),
-        selected = settings.ttsEngine,
-        onSelect = { scope.launch { vm.settingsRepository.setTtsEngine(it) } },
-    )
-    if (settings.ttsEngine != TtsEngine.Kokoro) return
-    Text(stringResource(R.string.tts_kokoro_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-    ModelStatus(
-        model,
-        ModelTexts(R.string.tts_kokoro_ready, R.string.tts_kokoro_downloading, R.string.tts_kokoro_download, R.string.tts_kokoro_crashed),
-    )
-    val preview = stringResource(R.string.tts_preview_text, settings.userName.ifBlank { "there" })
-    VoicePicker(
-        voices = KokoroVoice.VOICES.map { it.id to it.label },
-        selected = settings.kokoroVoice,
-        onSelect = { scope.launch { vm.settingsRepository.setKokoroVoice(it) } },
-        onPreview = { vm.speaker.speak("preview", preview, "en-US") }.takeIf { modelState == ModelPackage.State.Ready },
-    )
+    val other = language == VoiceLanguages.OTHER
+    val choice = settings.voices[language] ?: LanguageVoice()
+    fun save(voice: LanguageVoice) {
+        scope.launch { vm.settingsRepository.setVoice(language, voice) }
+    }
+    // Other languages previews in a language without a row of its own, German when it can.
+    val spoken = if (other) PREVIEW_OTHER.firstOrNull { it !in rows } ?: PREVIEW_OTHER.first() else language
+    val name = if (other) stringResource(R.string.voices_other) else languageName(language)
+    GlassSheet(onDismiss) {
+        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 10.dp)) {
+            Text(name, style = MaterialTheme.typography.titleLarge, color = Palette.TextPrimary)
+            Text(
+                if (other) stringResource(R.string.voices_sheet_other_detail) else stringResource(R.string.voices_sheet_detail, name),
+                style = MaterialTheme.typography.bodySmall,
+                color = Palette.TextSecondary,
+            )
+        }
+        val automatic = VoiceLanguages.resolve(spoken, emptyMap(), listOf(spoken), ready).engine
+        SheetChoice(
+            title = stringResource(R.string.voices_automatic),
+            subtitle = if (other) stringResource(R.string.voices_other_automatic_detail) else stringResource(R.string.voices_automatic_detail, engineName(automatic)),
+            selected = choice.engine == null,
+            onClick = { save(choice.copy(engine = null)) },
+            singleLine = false,
+        )
+        VoiceLanguages.engines(language).forEach { engine ->
+            SheetChoice(
+                title = engineName(engine),
+                subtitle = engineDetail(engine),
+                selected = choice.engine == engine,
+                onClick = { save(choice.copy(engine = engine)) },
+                singleLine = false,
+            )
+        }
+        val shown = VoiceLanguages.preferred(language, choice)
+        val preview = VoiceSamples.text(spoken, settings.userName)
+        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            if (shown == VoiceEngine.System) {
+                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                    LinkAction(stringResource(R.string.tts_system_settings)) {
+                        runCatching { context.startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                    }
+                    LinkAction(stringResource(R.string.tts_preview)) { vm.speaker.preview(preview, spoken, choice) }
+                }
+            } else {
+                VoicePicker(
+                    voices = voiceList(shown),
+                    selected = VoiceLanguages.voiceFor(shown, choice.voice).orEmpty(),
+                    onSelect = { save(choice.copy(voice = it)) },
+                    onPreview = { vm.speaker.preview(preview, spoken, choice) }.takeIf { ready(shown) },
+                )
+                ModelStatus(if (shown == VoiceEngine.Kokoro) vm.kokoroModel else vm.supertonicModel, voiceModelTexts(engineName(shown)))
+            }
+        }
+    }
+}
+
+/** Languages the Other languages sheet can preview in, first choice first. */
+private val PREVIEW_OTHER = listOf("de", "fr", "es", "it", "pt")
+
+/** [language]'s name in the language Settings is shown in, which isn't always the phone's. */
+@Composable
+private fun languageName(language: String): String {
+    val ui = stringResource(R.string.ui_language)
+    return remember(language, ui) { VoiceLanguages.displayName(language, Locale.forLanguageTag(ui)) }
 }
 
 @Composable
-private fun DutchVoiceSettings(vm: MainViewModel, settings: AppSettings) {
-    val scope = rememberCoroutineScope()
-    val model = vm.supertonicModel
-    val modelState by model.state.collectAsStateWithLifecycle()
-    Segmented(
-        options = listOf(DutchTtsEngine.Supertonic to stringResource(R.string.tts_supertonic), DutchTtsEngine.System to stringResource(R.string.tts_system)),
-        selected = settings.dutchTtsEngine,
-        onSelect = { scope.launch { vm.settingsRepository.setDutchTtsEngine(it) } },
-    )
-    if (settings.dutchTtsEngine != DutchTtsEngine.Supertonic) return
-    Text(stringResource(R.string.tts_supertonic_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-    ModelStatus(
-        model,
-        ModelTexts(R.string.tts_supertonic_ready, R.string.tts_supertonic_downloading, R.string.tts_supertonic_download, R.string.tts_supertonic_crashed),
-    )
-    val preview = stringResource(R.string.tts_preview_text_nl, settings.userName.ifBlank { "daar" })
-    VoicePicker(
-        voices = SupertonicVoice.VOICES.map { voice ->
-            voice.id to stringResource(if (voice.female) R.string.voice_female else R.string.voice_male, voice.number)
-        },
-        selected = settings.supertonicVoice,
-        onSelect = { scope.launch { vm.settingsRepository.setSupertonicVoice(it) } },
-        onPreview = { vm.speaker.speak("preview", preview, "nl-NL") }.takeIf { modelState == ModelPackage.State.Ready },
-    )
+private fun engineName(engine: VoiceEngine): String = stringResource(
+    when (engine) {
+        VoiceEngine.Kokoro -> R.string.tts_kokoro
+        VoiceEngine.Supertonic -> R.string.tts_supertonic
+        VoiceEngine.System -> R.string.tts_system
+    },
+)
+
+@Composable
+private fun engineDetail(engine: VoiceEngine): String = stringResource(
+    when (engine) {
+        VoiceEngine.Kokoro -> R.string.tts_kokoro_detail
+        VoiceEngine.Supertonic -> R.string.tts_supertonic_detail
+        VoiceEngine.System -> R.string.tts_system_detail
+    },
+)
+
+/** The engine's voices as id to label; none for Android's voice. */
+@Composable
+private fun voiceList(engine: VoiceEngine): List<Pair<String, String>> = when (engine) {
+    VoiceEngine.Kokoro -> KokoroVoice.VOICES.map { it.id to it.label }
+    VoiceEngine.Supertonic -> SupertonicVoice.VOICES.map { voice ->
+        voice.id to stringResource(if (voice.female) R.string.voice_female else R.string.voice_male, voice.number)
+    }
+    VoiceEngine.System -> emptyList()
 }
+
+@Composable
+private fun voiceName(engine: VoiceEngine, id: String?): String? = voiceList(engine).firstOrNull { it.first == id }?.second
+
+private fun voiceModelTexts(engine: String) =
+    ModelTexts(R.string.tts_model_ready, R.string.tts_model_downloading, R.string.tts_model_download, R.string.tts_model_crashed, name = engine)
 
 /** The voice in use with a menu of [voices] (id to label), and Preview once the model is in. */
 @Composable
@@ -488,23 +628,26 @@ private fun SpeechPause(savedMs: Int, systemRecognizer: Boolean, onSave: (Int) -
     }
 }
 
-/** The wording for one on-device model's status. */
+/** The wording for one on-device model's status. With a [name], each text takes it as its first argument. */
 private class ModelTexts(
     @param:StringRes val ready: Int,
     @param:StringRes val downloading: Int,
     @param:StringRes val download: Int,
     @param:StringRes val crashed: Int,
+    val name: String? = null,
 )
 
 /** Installed, downloading, missing, failed or crashed, with the action that fits. */
 @Composable
 private fun ModelStatus(model: ModelPackage, texts: ModelTexts) {
     val modelState by model.state.collectAsStateWithLifecycle()
+    @Composable
+    fun text(@StringRes id: Int, vararg args: Any): String = stringResource(id, *listOfNotNull(texts.name).toTypedArray(), *args)
     when (val state = modelState) {
-        ModelPackage.State.Ready -> Notice(stringResource(texts.ready), Palette.Success, ok = true)
+        ModelPackage.State.Ready -> Notice(text(texts.ready), Palette.Success, ok = true)
         is ModelPackage.State.Downloading -> Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             Text(
-                stringResource(texts.downloading, (state.fraction * 100).toInt()),
+                text(texts.downloading, (state.fraction * 100).toInt()),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.TextSecondary,
             )
@@ -515,13 +658,13 @@ private fun ModelStatus(model: ModelPackage, texts: ModelTexts) {
                 modifier = Modifier.fillMaxWidth(),
             )
         }
-        ModelPackage.State.Missing -> LinkAction(stringResource(texts.download, (model.sizeBytes / 1_000_000).toInt())) { model.download() }
+        ModelPackage.State.Missing -> LinkAction(text(texts.download, (model.sizeBytes / 1_000_000).toInt())) { model.download() }
         is ModelPackage.State.Failed -> {
             Notice(stringResource(R.string.model_failed, state.message), Palette.Danger, error = true)
             LinkAction(stringResource(R.string.action_retry)) { model.download() }
         }
         ModelPackage.State.Crashed -> {
-            Notice(stringResource(texts.crashed), Palette.Danger, error = true)
+            Notice(text(texts.crashed), Palette.Danger, error = true)
             LinkAction(stringResource(R.string.action_retry)) { model.retryAfterCrash() }
         }
     }
