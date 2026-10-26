@@ -61,9 +61,16 @@ New task, at the bottom of the screen, opens the editor; so does tapping a task 
 - Daily, Weekly and Monthly: a time, plus the days of the week or the day of the month. Months without that day are skipped, as cron does.
 - Custom: a five-field cron (minute, hour, day of the month, month, day of the week, with Sunday as 0), checked as you type.
 
-Under the picker the editor says what the schedule means and lists its next three runs, or says why it can't be saved yet, such as a time that has passed. Delete asks first. Back asks before it throws away changes.
+Under the picker the editor says what the schedule means and lists its next three runs on the phone's clock, or says why it can't be saved yet, such as a time that has passed or one the clocks skip when summer time starts. Delete asks first. Back asks before it throws away changes, and waits while a save or delete is under way.
 
-dudan sends a schedule as a cron, or for Once as a local date-time with the phone's UTC offset, such as `2026-10-27T09:00:00+01:00`, together with the phone's time zone. An edit sends only the fields that changed. A schedule you don't touch isn't sent, so one the picker can't show, like Hermes' `every 90m`, stays as it is when you only change the instruction. When the server refuses something, such as a cron it doesn't accept, the editor shows its reason.
+dudan sends a schedule as a cron, or for Once as a local date-time with the phone's UTC offset, such as `2026-10-27T09:00:00+01:00`, together with the phone's time zone. An edit sends only the fields that changed. A schedule you don't change isn't sent, so one the picker can't show, like Hermes' `every 90m`, stays as it is when you only change the instruction. Picking what is already picked, or going to another choice and back, is no change. When the server refuses something, such as a cron it doesn't accept, the editor shows its reason above Save.
+
+To edit a task, dudan first loads its whole instruction, since Clark's list cuts it at 600 characters. Until that has loaded, the instruction can't be changed and Save stays off; when loading fails, the editor says why and offers Retry. Only a server without the single-task endpoint falls back to the list's instruction.
+
+A schedule the editor doesn't change keeps running the way the server runs it:
+
+- A Clark task on another time zone's clock, such as Europe/Amsterdam on a phone set to Europe/London, keeps that clock. The editor names the zone after the sentence ("Every day at 09:00 (Europe/Amsterdam)") and shows the runs on the phone's clock (08:00), as the list does. A changed schedule goes out with the phone's time zone, and the editor says so under the preview.
+- Hermes counts `every N minutes` on from the task's last run rather than keeping to the clock. For such a task the editor counts its next runs on from the server's next run. A schedule picked instead goes out as a cron that keeps to the clock, and the editor says so.
 
 What each server offers:
 
@@ -85,7 +92,7 @@ When dudan can't load the capabilities, it shows the controls and lets the serve
 - A chat shows its latest 500 rows, Hermes' default page. Background results land at the end, so they always show. After a restart, dudan reads older pages to find background work that is still out, but only work started in the last six hours; results of older work appear when you open the chat, not live.
 - Uploads run while dudan is open. When Android stops the app during a large upload, pick the file again; the service deletes the abandoned part after 24 hours.
 - Hermes' API server doesn't expand skills in a message the way Telegram's `/skill-name` does, so the agent loads each tagged skill itself, with one `skill_view` call per skill. Hermes puts a turn's instructions in the system prompt, ahead of the chat history, so a turn with tags can't reuse the provider's prompt cache for that history.
-- The editor works out a task's next runs on the phone's clock. A Hermes set to another time zone runs the same cron on its own clock, so its runs differ from the preview by the zones' difference.
+- Hermes doesn't say which time zone it runs a cron in. The editor works out a Hermes task's next runs on the phone's clock, so for a Hermes set to another time zone they differ from the real runs by the zones' difference.
 - Stock Hermes answers the skill list with HTTP 500 until upstream merges a one-line fix. Without the list, the Skills screen explains the error and `$` tags stay plain text. See [Skills](setup.md#skills).
 - OpenUI blocks can't fetch data: `Query` renders its defaults, and `Mutation` and `@Run` do nothing. dudan draws the chat library's common components; card blocks such as `SnippetCardBlock` show their text without their layout, and icons cover a few dozen lucide names.
 - The wake word only listens while the phone is unlocked with the screen on, and pauses during calls and while voice input records. On a locked phone it stays off on purpose: the agent can act on the phone and on its server, so anyone near the phone could use it. The microphone stays open while it listens, so Android shows its microphone dot and dudan keeps a notification up. The spotter knows English sounds only: a phrase works best as two or three words spelled the way they sound in English, and can have at most five. It needs dudan to be the default assistant to open the overlay and to come back after a restart.

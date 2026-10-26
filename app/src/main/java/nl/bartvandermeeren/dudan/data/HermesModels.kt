@@ -1,5 +1,6 @@
 package nl.bartvandermeeren.dudan.data
 
+import java.time.ZoneId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -313,6 +314,9 @@ data class JobInfo(
     val nameEditable: Boolean = true,
     val deliver: String? = null,
 ) {
+    /** The zone whose clock the server runs this task's cron on, when it says and it's a zone Java knows. */
+    val zoneId: ZoneId? get() = timezone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+
     companion object {
         fun from(o: JsonObject): JobInfo? {
             val id = o.str("id") ?: return null

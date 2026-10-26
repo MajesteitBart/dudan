@@ -29,6 +29,12 @@ class ScheduleText(locale: Locale) {
         is JobSchedule.Custom -> schedule.cron.trim()
     }
 
+    /** [describe], naming [clock] when a recurring schedule runs on another zone's clock than the phone's [zone]. */
+    fun describe(schedule: JobSchedule, today: LocalDate, clock: ZoneId?, zone: ZoneId): String {
+        val described = describe(schedule, today)
+        return if (schedule !is JobSchedule.Once && clock != null && clock != zone) "$described ($clock)" else described
+    }
+
     /** "Tue 27 Oct" or "di 27 okt", with the year when it isn't [today]'s. */
     fun date(date: LocalDate, today: LocalDate): String {
         val day = shortDay(date.dayOfWeek)
@@ -58,9 +64,7 @@ class ScheduleText(locale: Locale) {
      */
     fun summary(job: JobInfo, zone: ZoneId, today: LocalDate): String? {
         val schedule = JobSchedule.parse(job, zone) ?: return job.schedule
-        val described = describe(schedule, today)
-        val jobZone = job.timezone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
-        return if (schedule !is JobSchedule.Once && jobZone != null && jobZone != zone) "$described ($jobZone)" else described
+        return describe(schedule, today, job.zoneId, zone)
     }
 
     /**
@@ -91,7 +95,7 @@ class ScheduleText(locale: Locale) {
     /** "on weekdays", "op ma, wo en vr", "on Mon to Thu", for an interval limited to some days. */
     private fun onDays(days: Set<DayOfWeek>): String = when {
         days == JobSchedule.WEEKDAYS -> if (dutch) "op werkdagen" else "on weekdays"
-        days == JobSchedule.WEEKEND -> if (dutch) "in het weekend" else "at weekends"
+        days == JobSchedule.WEEKEND -> if (dutch) "in het weekend" else "on weekends"
         else -> (if (dutch) "op " else "on ") + (consecutive(days, ::shortDay) ?: list(days.sorted().map(::shortDay)))
     }
 
@@ -99,6 +103,8 @@ class ScheduleText(locale: Locale) {
         val t = time(at)
         val sorted = days.sorted()
         return when {
+            // Not a schedule anyone saves (the editor asks for a day first), but never a sentence with a hole in it.
+            days.isEmpty() -> if (dutch) "Nooit" else "Never"
             days.size == 7 -> if (dutch) "Elke dag om $t" else "Every day at $t"
             days == JobSchedule.WEEKDAYS -> if (dutch) "Op werkdagen om $t" else "Weekdays at $t"
             days == JobSchedule.WEEKEND -> if (dutch) "In het weekend om $t" else "Weekends at $t"

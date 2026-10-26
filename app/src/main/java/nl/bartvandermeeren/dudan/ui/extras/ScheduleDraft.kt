@@ -1,8 +1,10 @@
 package nl.bartvandermeeren.dudan.ui.extras
 
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
+import java.time.ZoneId
 import java.time.ZonedDateTime
 import java.time.temporal.ChronoUnit
 import nl.bartvandermeeren.dudan.data.Cron
@@ -17,6 +19,8 @@ enum class ScheduleMode { Once, Repeat, Daily, Weekly, Monthly, Custom }
 /** Why the picked schedule can't be saved. */
 sealed interface ScheduleProblem {
     data object Past : ScheduleProblem
+    /** A one-off at a time the clocks skip (spring forward); it would go out, and run, an hour later. */
+    data object Skipped : ScheduleProblem
     data object NoDays : ScheduleProblem
     data object BadWindow : ScheduleProblem
     /** [field] 0 to 4 with the [token] that broke it, or null when the count of fields is wrong. */
@@ -58,9 +62,16 @@ data class ScheduleDraft(
         ScheduleMode.Custom -> JobSchedule.Custom(cron)
     }
 
-    /** What stops this from being saved at [now], or null. A custom cron is checked for runs in the next eight years. */
+    /**
+     * What stops this from being saved at [now], or null. [now]'s zone is the clock the schedule runs on: the phone's
+     * for a one-off. A custom cron is checked for runs in the next eight years.
+     */
     fun problem(now: ZonedDateTime): ScheduleProblem? = when (mode) {
-        ScheduleMode.Once -> ScheduleProblem.Past.takeIf { !once.isAfter(now.toLocalDateTime()) }
+        ScheduleMode.Once -> when {
+            !once.isAfter(now.toLocalDateTime()) -> ScheduleProblem.Past
+            now.zone.rules.getValidOffsets(once.truncatedTo(ChronoUnit.MINUTES)).isEmpty() -> ScheduleProblem.Skipped
+            else -> null
+        }
         ScheduleMode.Repeat -> when {
             windowOn && windowStart > windowEnd -> ScheduleProblem.BadWindow
             daysOn && repeatDays.isEmpty() -> ScheduleProblem.NoDays
@@ -166,4 +177,50 @@ data class ScheduleDraft(
 
         private fun days(mask: Int): Set<DayOfWeek> = DayOfWeek.entries.filter { mask and (1 shl it.value) != 0 }.toSet()
     }
+}
+
+/**
+ * The editor's [draft] against [opening], the draft it opened with, for [job] (null for a new task) whose schedule
+ * the picker read as [original] (null when it couldn't), at [now] on a phone in [zone].
+ */
+class ScheduleEdit(
+    private val job: JobInfo?,
+    original: JobSchedule?,
+    opening: ScheduleDraft,
+    draft: ScheduleDraft,
+    private val zone: ZoneId,
+    private val now: Instant,
+) {
+    val schedule: JobSchedule = draft.schedule()
+    val wire: String = schedule.wire(zone)
+
+    /**
+     * Whether the picked schedule differs from the one the editor opened with. Worked out rather than set on each
+     * tap, so tapping what's already picked, or going Daily, Weekly and back to Daily, changes nothing.
+     */
+    val touched: Boolean = schedule != opening.schedule()
+
+    /** A schedule the picker can't show that stays as it is, such as Hermes' `every 90m`. */
+    val keeps: Boolean = job != null && !touched && original == null
+
+    /** Whether saving sends the schedule: only when it now says something other than what the server has. */
+    val changed: Boolean = touched && wire != original?.wire(zone)
+
+    /**
+     * The clock the cron runs on. One that isn't sent stays on the task's own zone, when the server names one; one
+     * that is goes with the phone's zone, and a one-off carries the phone's offset.
+     */
+    val clock: ZoneId = if (job != null && !changed && schedule !is JobSchedule.Once) job.zoneId ?: zone else zone
+
+    val problem: ScheduleProblem? = draft.problem(now.atZone(clock))
+
+    /** An existing task's schedule only has to be right once it's touched: a passed one-off can still get a new instruction. */
+    val ok: Boolean = problem == null || (job != null && !touched)
+
+    /**
+     * The next [count] runs on the phone's clock. Hermes counts an unchanged `every Nm` on from its last run, so those
+     * come from the server's next run; everything else from the cron on [clock]. Empty for a one-off.
+     */
+    fun nextRuns(count: Int): List<LocalDateTime> =
+        job?.takeIf { !changed }?.let { JobSchedule.intervalRuns(it, zone, count) } ?: schedule.nextRuns(clock, zone, now, count)
 }

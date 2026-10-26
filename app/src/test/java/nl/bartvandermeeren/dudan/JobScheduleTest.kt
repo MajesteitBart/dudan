@@ -7,6 +7,7 @@ import java.time.DayOfWeek.SUNDAY
 import java.time.DayOfWeek.THURSDAY
 import java.time.DayOfWeek.TUESDAY
 import java.time.DayOfWeek.WEDNESDAY
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalDateTime
 import java.time.LocalTime
@@ -26,15 +27,32 @@ import nl.bartvandermeeren.dudan.data.JobSchedule.Once
 import nl.bartvandermeeren.dudan.data.JobSchedule.Weekly
 import nl.bartvandermeeren.dudan.data.ScheduleText
 import nl.bartvandermeeren.dudan.ui.extras.ScheduleDraft
+import nl.bartvandermeeren.dudan.ui.extras.ScheduleEdit
 import nl.bartvandermeeren.dudan.ui.extras.ScheduleMode
 import nl.bartvandermeeren.dudan.ui.extras.ScheduleProblem
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
 private val AMSTERDAM: ZoneId = ZoneId.of("Europe/Amsterdam")
+private val LONDON: ZoneId = ZoneId.of("Europe/London")
+private val NEW_YORK: ZoneId = ZoneId.of("America/New_York")
 private fun time(text: String) = LocalTime.parse(text)
+private fun strings(times: List<LocalDateTime>) = times.map { it.toString() }
+
+/** A Hermes task that runs every [minutes] minutes, counted on from its last run. */
+private fun hermesInterval(minutes: Int, nextRunAt: String?) = JobInfo(
+    "c1b2c3d4e5f6", "Inbox", "every ${minutes}m", "Check mail", true, false, nextRunAt, null, null,
+    scheduleExpr = "every ${minutes}m", scheduleKind = "interval",
+)
+
+/** A task in Clark's shape, on [timezone]'s clock. */
+private fun clarkJob(cron: String, timezone: String) = JobInfo(
+    "brief", "brief", "$cron ($timezone)", "Brief me", true, false, null, null, null,
+    scheduleExpr = cron, scheduleKind = "cron", timezone = timezone, nameEditable = false,
+)
 
 class JobScheduleTest {
     /** Every preset the picker makes, with the cron it sends. */
@@ -157,6 +175,32 @@ class JobScheduleTest {
     }
 
     @Test
+    fun previewRunsOnTheTasksClockShownOnThePhones() {
+        val after = LocalDateTime.of(2026, 10, 26, 14, 7).atZone(AMSTERDAM).toInstant()
+        // 09:00 in Amsterdam is 08:00 on a phone in London.
+        assertEquals(listOf("2026-10-27T08:00", "2026-10-28T08:00", "2026-10-29T08:00"), strings(Daily(time("09:00")).nextRuns(AMSTERDAM, LONDON, after, 3)))
+        // New York keeps summer time a week longer than Amsterdam: five hours apart that week, six after.
+        assertEquals(listOf("2026-10-27T14:00", "2026-10-28T14:00"), strings(Daily(time("09:00")).nextRuns(NEW_YORK, AMSTERDAM, after, 2)))
+        val november = LocalDateTime.of(2026, 11, 1, 23, 0).atZone(AMSTERDAM).toInstant()
+        assertEquals(listOf("2026-11-02T15:00"), strings(Daily(time("09:00")).nextRuns(NEW_YORK, AMSTERDAM, november, 1)))
+        assertEquals(emptyList<LocalDateTime>(), Once(LocalDateTime.of(2026, 10, 27, 9, 0)).nextRuns(AMSTERDAM, AMSTERDAM, after, 3))
+    }
+
+    @Test
+    fun hermesIntervalsCountOnFromTheServersNextRun() {
+        // Hermes' microseconds and all; not the even hours a cron for every two hours keeps to.
+        val job = hermesInterval(120, "2026-10-26T13:17:00.123456+01:00")
+        assertEquals(listOf("2026-10-26T13:17", "2026-10-26T15:17", "2026-10-26T17:17"), strings(JobSchedule.intervalRuns(job, AMSTERDAM, 3)!!))
+        assertEquals(listOf("2026-10-26T12:17"), strings(JobSchedule.intervalRuns(job, LONDON, 1)!!))
+        // 90 minutes isn't a preset, but Hermes still says when it runs.
+        assertEquals(listOf("2026-10-26T13:17", "2026-10-26T14:47"), strings(JobSchedule.intervalRuns(hermesInterval(90, "2026-10-26T12:17:00Z"), AMSTERDAM, 2)!!))
+        // Without a next run there's nothing to count from.
+        assertEquals(emptyList<LocalDateTime>(), JobSchedule.intervalRuns(hermesInterval(120, null), AMSTERDAM, 3))
+        assertEquals(emptyList<LocalDateTime>(), JobSchedule.intervalRuns(hermesInterval(120, "soon"), AMSTERDAM, 3))
+        assertNull(JobSchedule.intervalRuns(clarkJob("0 */2 * * *", "Europe/Amsterdam"), AMSTERDAM, 3))
+    }
+
+    @Test
     fun weekdayFieldsCompressRuns() {
         assertEquals("1-5", JobSchedule.weekdayField(JobSchedule.WEEKDAYS))
         assertEquals("0,6", JobSchedule.weekdayField(JobSchedule.WEEKEND))
@@ -199,6 +243,20 @@ class ScheduleTextTest {
     }
 
     @Test
+    fun weeklyWithoutDaysIsStillASentence() {
+        assertEquals("Never" to "Nooit", both(Weekly(emptySet(), time("09:00"))))
+    }
+
+    @Test
+    fun namesTheClockARecurringScheduleRunsOn() {
+        assertEquals("Every day at 09:00 (Europe/Amsterdam)", en.describe(Daily(time("09:00")), today, AMSTERDAM, LONDON))
+        assertEquals("Every day at 09:00", en.describe(Daily(time("09:00")), today, AMSTERDAM, AMSTERDAM))
+        assertEquals("Every day at 09:00", en.describe(Daily(time("09:00")), today, null, LONDON))
+        // A one-off is already on the phone's clock.
+        assertEquals("Once on Tue 27 Oct at 09:00", en.describe(Once(LocalDateTime.of(2026, 10, 27, 9, 0)), today, AMSTERDAM, LONDON))
+    }
+
+    @Test
     fun describesIntervals() {
         assertEquals("Every 30 minutes, 07:00–22:59" to "Elke 30 minuten, 07:00–22:59", both(Interval(30, Minutes, 7..22)))
         assertEquals("Every minute" to "Elke minuut", both(Interval(1, Minutes)))
@@ -208,7 +266,7 @@ class ScheduleTextTest {
             "Every 15 minutes on weekdays, 09:00–17:59" to "Elke 15 minuten op werkdagen, 09:00–17:59",
             both(Interval(15, Minutes, 9..17, JobSchedule.WEEKDAYS)),
         )
-        assertEquals("Every hour at weekends" to "Elk uur in het weekend", both(Interval(1, Hours, null, JobSchedule.WEEKEND)))
+        assertEquals("Every hour on weekends" to "Elk uur in het weekend", both(Interval(1, Hours, null, JobSchedule.WEEKEND)))
         assertEquals("Every 4 hours on Mon, Wed and Fri" to "Elke 4 uur op ma, wo en vr", both(Interval(4, Hours, null, setOf(MONDAY, WEDNESDAY, FRIDAY))))
         assertEquals("Every 5 minutes on Mon to Thu" to "Elke 5 minuten op ma t/m do", both(Interval(5, Minutes, null, setOf(MONDAY, TUESDAY, WEDNESDAY, THURSDAY))))
     }
@@ -289,6 +347,21 @@ class ScheduleDraftTest {
     }
 
     @Test
+    fun aOneOffTheClocksSkipCantBeSaved() {
+        // Amsterdam goes from 02:00 to 03:00 on 28 March 2027; 02:30 would go out, and run, as 03:30.
+        val draft = ScheduleDraft.initial(now).copy(mode = ScheduleMode.Once)
+        assertEquals(ScheduleProblem.Skipped, draft.copy(once = LocalDateTime.of(2027, 3, 28, 2, 30)).problem(zonedNow))
+        assertEquals("2027-03-28T03:30:00+02:00", Once(LocalDateTime.of(2027, 3, 28, 2, 30)).wire(AMSTERDAM))
+        assertNull(draft.copy(once = LocalDateTime.of(2027, 3, 28, 3, 0)).problem(zonedNow))
+        // 02:30 on the day the clocks go back happens twice, but it does happen.
+        assertNull(draft.copy(once = LocalDateTime.of(2027, 10, 31, 2, 30)).problem(zonedNow))
+        // London's clocks skip 01:00 to 02:00 that night instead.
+        val london = now.atZone(LONDON)
+        assertNull(draft.copy(once = LocalDateTime.of(2027, 3, 28, 2, 30)).problem(london))
+        assertEquals(ScheduleProblem.Skipped, draft.copy(once = LocalDateTime.of(2027, 3, 28, 1, 30)).problem(london))
+    }
+
+    @Test
     fun quickChoicesForOnce() {
         assertEquals(LocalDateTime.of(2026, 10, 26, 15, 10), ScheduleDraft.inAnHour(now))
         assertEquals(LocalDateTime.of(2026, 10, 26, 15, 10), ScheduleDraft.inAnHour(LocalDateTime.of(2026, 10, 26, 14, 10, 30)))
@@ -329,5 +402,97 @@ class ScheduleDraftTest {
     fun thePreviewRunsInThePhonesZone() {
         val runs = Cron.parse(Weekly(JobSchedule.WEEKDAYS, time("07:30")).cron()!!).nextRuns(AMSTERDAM, ZonedDateTime.of(now, AMSTERDAM).toInstant(), 3)
         assertEquals(listOf("2026-10-27T07:30", "2026-10-28T07:30", "2026-10-29T07:30"), runs.map { it.toLocalDateTime().toString() })
+    }
+}
+
+class ScheduleEditTest {
+    private val now = LocalDateTime.of(2026, 10, 26, 14, 7)
+    private val instant: Instant = now.atZone(AMSTERDAM).toInstant()
+
+    /** The editor opened on [job] on a phone in [zone], with [change] done to its draft. */
+    private fun edit(job: JobInfo?, zone: ZoneId = AMSTERDAM, change: (ScheduleDraft) -> ScheduleDraft = { it }): ScheduleEdit {
+        val original = job?.let { JobSchedule.parse(it, zone) }
+        val opening = ScheduleDraft.opening(job, original, now)
+        return ScheduleEdit(job, original, opening, change(opening), zone, instant)
+    }
+
+    @Test
+    fun tappingWhatsPickedChangesNothing() {
+        // Hermes' every 90m opens as its text under Custom; tapping Custom again keeps it, so the instruction can still be saved.
+        val ninety = hermesInterval(90, "2026-10-26T15:00:00+01:00")
+        val tapped = edit(ninety) { it.withMode(ScheduleMode.Custom) }
+        assertFalse(tapped.touched)
+        assertTrue(tapped.keeps)
+        assertTrue(tapped.ok)
+        assertFalse(tapped.changed)
+        // Typing in it is a change, and that has to be a cron.
+        val typed = edit(ninety) { it.copy(cron = "every 91m") }
+        assertTrue(typed.touched)
+        assertFalse(typed.keeps)
+        assertFalse(typed.ok)
+        // A one-off that has passed keeps its date when Once is tapped again, so a new instruction can still be saved.
+        val passed = JobInfo("d", "Dentist", null, "Remind me", true, true, null, null, null, scheduleExpr = "2026-10-20T09:00:00+02:00", scheduleKind = "once")
+        val once = edit(passed) { it.withMode(ScheduleMode.Once).copy(once = it.once) }
+        assertEquals(ScheduleProblem.Past, once.problem)
+        assertTrue(once.ok)
+        assertFalse(edit(passed) { it.copy(once = it.once.plusMinutes(5)) }.ok)
+    }
+
+    @Test
+    fun aDetourBackToTheSameScheduleChangesNothing() {
+        val job = clarkJob("0 9 * * *", "Europe/Amsterdam")
+        val detour = edit(job) { it.withMode(ScheduleMode.Weekly).copy(weekDays = setOf(MONDAY)).withMode(ScheduleMode.Daily) }
+        assertFalse(detour.touched)
+        assertFalse(detour.changed)
+        val moved = edit(job) { it.copy(time = time("09:30")) }
+        assertTrue(moved.touched && moved.changed)
+        assertEquals("30 9 * * *", moved.wire)
+        // A new task is touched once it's off its defaults.
+        assertFalse(edit(null).touched)
+        assertTrue(edit(null) { it.withMode(ScheduleMode.Weekly) }.touched)
+    }
+
+    @Test
+    fun anUnchangedCronRunsOnTheTasksOwnClock() {
+        // Clark runs this on Amsterdam's clock; the phone is in London, an hour behind.
+        val amsterdam = edit(clarkJob("0 9 * * *", "Europe/Amsterdam"), LONDON)
+        assertEquals(AMSTERDAM, amsterdam.clock)
+        assertEquals(listOf("2026-10-27T08:00", "2026-10-28T08:00", "2026-10-29T08:00"), strings(amsterdam.nextRuns(3)))
+        assertEquals("Every day at 09:00 (Europe/Amsterdam)", ScheduleText(Locale.ENGLISH).describe(amsterdam.schedule, now.toLocalDate(), amsterdam.clock, LONDON))
+        // New York is five hours behind Amsterdam that week.
+        val newYork = edit(clarkJob("0 9 * * *", "America/New_York"))
+        assertEquals(NEW_YORK, newYork.clock)
+        assertEquals("2026-10-27T14:00", newYork.nextRuns(1).single().toString())
+        // Switching away and back is no change either.
+        assertEquals(AMSTERDAM, edit(clarkJob("0 9 * * *", "Europe/Amsterdam"), LONDON) { it.withMode(ScheduleMode.Repeat).withMode(ScheduleMode.Daily) }.clock)
+    }
+
+    @Test
+    fun aChangedCronGoesWithThePhonesClock() {
+        // Saving sends the phone's zone along with the new schedule, so the preview is on the phone's clock.
+        val changed = edit(clarkJob("0 9 * * *", "Europe/Amsterdam"), LONDON) { it.copy(time = time("09:30")) }
+        assertTrue(changed.changed)
+        assertEquals(LONDON, changed.clock)
+        assertEquals("2026-10-27T09:30", changed.nextRuns(1).single().toString())
+        // Hermes names no zone and runs its own clock; a new task is on the phone's.
+        assertEquals(LONDON, edit(hermesInterval(30, null), LONDON).clock)
+        assertEquals(LONDON, edit(null, LONDON).clock)
+        // A one-off carries the phone's offset whatever the task's zone.
+        assertEquals(LONDON, edit(clarkJob("at 2026-10-27T09:00", "Europe/Amsterdam").copy(scheduleKind = "once"), LONDON).clock)
+    }
+
+    @Test
+    fun anUntouchedHermesIntervalRunsWhenHermesSays() {
+        // It last ran at 13:17, so Hermes runs it next at 15:17; a cron for every two hours would say 16:00.
+        val job = hermesInterval(120, "2026-10-26T15:17:00+01:00")
+        val untouched = edit(job)
+        assertEquals(Interval(2, Hours), untouched.schedule)
+        assertEquals(listOf("2026-10-26T15:17", "2026-10-26T17:17", "2026-10-26T19:17"), strings(untouched.nextRuns(3)))
+        // Picked again in the picker, it goes out as a cron, which keeps to the clock.
+        val changed = edit(job) { it.copy(every = 3) }
+        assertEquals("0 */3 * * *", changed.wire)
+        assertEquals(listOf("2026-10-26T15:00", "2026-10-26T18:00", "2026-10-26T21:00"), strings(changed.nextRuns(3)))
+        // Without a next run from the server the preview has no times rather than made-up ones.
+        assertEquals(emptyList<LocalDateTime>(), edit(hermesInterval(120, null)).nextRuns(3))
     }
 }

@@ -182,6 +182,19 @@ class JobsApiTest {
     }
 
     @Test
+    fun onlyAServerWithoutTheEndpointFallsBackToTheListsPrompt() {
+        // A Clark from before job management has no such route.
+        assertTrue(HermesApi.lacksJobEndpoint(HermesApi.errorFrom(404, """{"error": {"code": "not_found", "message": "No such endpoint."}}""")))
+        // Hermes says "Job not found" without a code, but its list carries whole prompts.
+        assertTrue(HermesApi.lacksJobEndpoint(HermesApi.errorFrom(404, """{"error": "Job not found"}""")))
+        // Clark knows the route but not the task; that, a server error or a dropped connection is a failure to retry,
+        // since the list's prompt may be cut short.
+        assertFalse(HermesApi.lacksJobEndpoint(HermesApi.errorFrom(404, """{"error": {"code": "job_not_found", "message": "Clark has no job brief."}}""")))
+        assertFalse(HermesApi.lacksJobEndpoint(HermesApi.errorFrom(503, "")))
+        assertFalse(HermesApi.lacksJobEndpoint(java.net.SocketTimeoutException("timeout")))
+    }
+
+    @Test
     fun theListIsOneRequest() = runBlocking {
         val server = MockWebServer()
         server.enqueue(MockResponse().setBody("""{"jobs": [{"id": "a"}], "delivery_targets": [{"id": "t", "label": "T"}]}"""))

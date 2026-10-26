@@ -59,6 +59,7 @@ import androidx.compose.material3.rememberTimePickerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
@@ -74,8 +75,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringArrayResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.LiveRegionMode
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.semantics.contentDescription
+import androidx.compose.ui.semantics.liveRegion
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
@@ -87,13 +90,11 @@ import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.ZoneId
 import java.time.ZoneOffset
-import java.time.ZonedDateTime
 import java.time.format.TextStyle
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.userMessage
-import nl.bartvandermeeren.dudan.data.Cron
 import nl.bartvandermeeren.dudan.data.DELIVER_NOWHERE
 import nl.bartvandermeeren.dudan.data.DeliveryTarget
 import nl.bartvandermeeren.dudan.data.HermesApi
@@ -294,7 +295,6 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
     val text = remember(locale) { ScheduleText(locale) }
     val opened = remember { LocalDateTime.now(zone) }
     val original = remember(job?.id) { job?.let { JobSchedule.parse(it, zone) } }
-    val originalWire = remember(original) { original?.wire(zone) }
     val initialDeliver = remember(job?.id) { job?.deliver?.takeIf { it.isNotBlank() } ?: DELIVER_NOWHERE }
 
     var name by rememberSaveable { mutableStateOf(job?.name.orEmpty()) }
@@ -302,46 +302,43 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
     // What the server has, to tell whether the prompt changed. The list may cut it short; GET /api/jobs/{id} doesn't.
     var serverPrompt by rememberSaveable { mutableStateOf(job?.prompt.orEmpty()) }
     var promptLoaded by rememberSaveable { mutableStateOf(job == null) }
+    var loadError by remember { mutableStateOf<String?>(null) }
+    var loadAttempt by remember { mutableIntStateOf(0) }
     var deliver by rememberSaveable { mutableStateOf(initialDeliver) }
-    var draft by rememberSaveable(stateSaver = DraftSaver) { mutableStateOf(ScheduleDraft.opening(job, original, opened)) }
-    var touched by rememberSaveable { mutableStateOf(false) }
+    // Saved, since `opened`, and a new task's defaults with it, is another moment after the app is recreated.
+    val openingDraft = rememberSaveable(saver = DraftSaver) { ScheduleDraft.opening(job, original, opened) }
+    var draft by rememberSaveable(stateSaver = DraftSaver) { mutableStateOf(openingDraft) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var confirmDelete by remember { mutableStateOf(false) }
     var confirmDiscard by remember { mutableStateOf(false) }
 
-    // An older Clark has no single-task endpoint; the list's prompt is all there is then.
-    LaunchedEffect(job?.id) {
+    // Clark's list cuts a prompt at 600 characters, so saving an edit of the list's prompt would cut it for good. Only a
+    // server without the single-task endpoint falls back to it; any other failure keeps Save off and offers Retry.
+    LaunchedEffect(job?.id, loadAttempt) {
         if (job == null || promptLoaded) return@LaunchedEffect
-        val full = try {
-            vm.api.job(job.id).prompt
+        loadError = null
+        try {
+            vm.api.job(job.id).prompt?.let { full ->
+                if (prompt == serverPrompt) prompt = full
+                serverPrompt = full
+            }
+            promptLoaded = true
         } catch (e: CancellationException) {
             throw e
-        } catch (_: Exception) {
-            null
+        } catch (e: Exception) {
+            if (HermesApi.lacksJobEndpoint(e)) promptLoaded = true else loadError = e.jobMessage()
         }
-        if (full != null) {
-            if (prompt == serverPrompt) prompt = full
-            serverPrompt = full
-        }
-        promptLoaded = true
     }
 
-    val now = ZonedDateTime.now(zone)
-    val schedule = draft.schedule()
-    val problem = draft.problem(now)
-    val wire = schedule.wire(zone)
-    val keepsSchedule = job != null && !touched && original == null
-    val scheduleChanged = touched && wire != originalWire
+    val edit = ScheduleEdit(job, original, openingDraft, draft, zone, Instant.now())
     val nameChanged = job != null && job.nameEditable && name.trim() != job.name
     val promptChanged = prompt.trim() != serverPrompt.trim()
     val deliverChanged = targets.isNotEmpty() && deliver != initialDeliver
-    val dirty = if (job == null) name.isNotBlank() || prompt.isNotBlank() || touched else nameChanged || promptChanged || deliverChanged || scheduleChanged
-    // An existing task's schedule only has to be right once it's changed: a one-off that has passed can still get a new instruction.
-    val scheduleOk = problem == null || (job != null && !touched)
+    val dirty = if (job == null) name.isNotBlank() || prompt.isNotBlank() || edit.touched else nameChanged || promptChanged || deliverChanged || edit.changed
     // Hermes runs skill-only tasks without a prompt; one of those keeps its empty prompt unless it gets one.
     val promptOk = prompt.isNotBlank() || (job != null && !promptChanged)
-    val canSave = name.isNotBlank() && promptOk && promptLoaded && scheduleOk && (job == null || dirty) && !busy
+    val canSave = name.isNotBlank() && promptOk && promptLoaded && edit.ok && (job == null || dirty) && !busy
 
     fun save() {
         busy = true
@@ -349,11 +346,11 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
         scope.launch {
             try {
                 if (job == null) {
-                    vm.api.createJob(JobDraft(name.trim(), wire, prompt.trim(), zone.id, deliver.takeIf { targets.isNotEmpty() }))
+                    vm.api.createJob(JobDraft(name.trim(), edit.wire, prompt.trim(), zone.id, deliver.takeIf { targets.isNotEmpty() }))
                 } else {
                     val changes = JobChanges(
                         name = name.trim().takeIf { nameChanged },
-                        schedule = wire.takeIf { scheduleChanged },
+                        schedule = edit.wire.takeIf { edit.changed },
                         prompt = prompt.trim().takeIf { promptChanged },
                         timezone = zone.id,
                         deliver = deliver.takeIf { deliverChanged },
@@ -389,7 +386,8 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
 
     fun back() {
         when {
-            busy -> onDone(true)
+            // The request runs in this editor's scope, so leaving would cancel it. Its answer closes the editor.
+            busy -> Unit
             dirty -> confirmDiscard = true
             else -> onDone(false)
         }
@@ -419,26 +417,34 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
             ) {
                 EditorCard(null) {
                     val fixedName = job != null && !job.nameEditable
-                    EditorField(name, { name = it }, stringResource(R.string.job_name), stringResource(R.string.job_name_hint), readOnly = fixedName)
+                    EditorField(name, { name = it; error = null }, stringResource(R.string.job_name), stringResource(R.string.job_name_hint), readOnly = fixedName)
                     if (fixedName) Text(stringResource(R.string.job_name_fixed), style = MaterialTheme.typography.bodySmall, color = Palette.TextTertiary)
                     EditorField(
-                        prompt, { prompt = it }, stringResource(R.string.job_prompt), stringResource(R.string.job_prompt_hint),
+                        prompt, { prompt = it; error = null }, stringResource(R.string.job_prompt), stringResource(R.string.job_prompt_hint),
                         readOnly = !promptLoaded, singleLine = false,
-                        trailing = if (!promptLoaded) ({ CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.TextSecondary, modifier = Modifier.size(18.dp)) }) else null,
+                        trailing = if (!promptLoaded && loadError == null) ({ CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.TextSecondary, modifier = Modifier.size(18.dp)) }) else null,
                     )
                 }
                 EditorCard(stringResource(R.string.job_when)) {
-                    ScheduleSection(draft, text, zone) { draft = it; touched = true }
+                    // An unreadable schedule that's kept isn't drawn as an error under "this stays as it is".
+                    ScheduleSection(draft, text, zone, cronError = !edit.keeps && edit.problem != null && draft.cron.isNotBlank()) { draft = it; error = null }
                     HorizontalDivider(color = Palette.Hairline)
-                    SchedulePreview(job, keepsSchedule, schedule, problem, text, zone)
+                    SchedulePreview(job, edit, text, zone)
                 }
                 if (targets.isNotEmpty()) {
                     EditorCard(stringResource(R.string.job_deliver)) {
-                        DeliveryChoices(targets, initialDeliver, deliver) { deliver = it }
+                        DeliveryChoices(targets, initialDeliver, deliver) { deliver = it; error = null }
                     }
                 }
-                error?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.Danger, modifier = Modifier.padding(horizontal = 8.dp)) }
             }
+            // Between the form and the buttons, so a refusal shows where Save was tapped, above the keyboard too.
+            loadError?.let { message ->
+                Row(Modifier.fillMaxWidth().padding(start = 24.dp, end = 12.dp, top = 8.dp), verticalAlignment = Alignment.CenterVertically) {
+                    EditorError(message, Modifier.weight(1f))
+                    TextButton(onClick = { loadAttempt++ }) { Text(stringResource(R.string.action_retry)) }
+                }
+            }
+            error?.let { EditorError(it, Modifier.fillMaxWidth().padding(start = 24.dp, end = 24.dp, top = 8.dp)) }
             // Delete and Save along the bottom edge, where a thumb reaches them on a big screen too.
             Row(
                 Modifier.fillMaxWidth().padding(horizontal = 16.dp, vertical = 12.dp),
@@ -476,6 +482,12 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
             dismissButton = { TextButton(onClick = { confirmDiscard = false }) { Text(stringResource(R.string.job_keep_editing)) } },
         )
     }
+}
+
+/** A request that failed, read out when it appears. */
+@Composable
+private fun EditorError(message: String, modifier: Modifier) {
+    Text(message, style = MaterialTheme.typography.bodyMedium, color = Palette.Danger, modifier = modifier.semantics { liveRegion = LiveRegionMode.Polite })
 }
 
 /** Servers refuse a task in a sentence (a bad cron, a file written by hand); show that sentence as it is. */
@@ -546,7 +558,7 @@ private fun EditorField(
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun ScheduleSection(draft: ScheduleDraft, text: ScheduleText, zone: ZoneId, onChange: (ScheduleDraft) -> Unit) {
+private fun ScheduleSection(draft: ScheduleDraft, text: ScheduleText, zone: ZoneId, cronError: Boolean, onChange: (ScheduleDraft) -> Unit) {
     // Once · Repeat · Daily · Weekly · Monthly · Custom: one row on a big screen, two on a narrow one.
     FlowRow(
         Modifier.selectableGroup(),
@@ -582,7 +594,7 @@ private fun ScheduleSection(draft: ScheduleDraft, text: ScheduleText, zone: Zone
         ScheduleMode.Custom -> EditorField(
             draft.cron, { onChange(draft.copy(cron = it)) }, stringResource(R.string.schedule_cron), "30 7 * * 1-5",
             code = true,
-            isError = draft.problem(ZonedDateTime.now(zone)) != null && draft.cron.isNotBlank(),
+            isError = cronError,
             supporting = stringResource(R.string.schedule_cron_hint),
         )
     }
@@ -729,34 +741,55 @@ private fun MonthDayGrid(selected: Int, onPick: (Int) -> Unit) {
     }
 }
 
-/** What the picked schedule means, and when it runs next on the phone's clock. */
+/**
+ * What the picked schedule means and when it runs next, on the phone's clock. A cron runs on the edit's clock: the
+ * task's own zone while its schedule is unchanged, which the sentence names when it isn't the phone's [zone]. Once
+ * the schedule has changed, notes say what saving it does to the task's clock.
+ */
 @Composable
-private fun SchedulePreview(job: JobInfo?, keepsSchedule: Boolean, schedule: JobSchedule, problem: ScheduleProblem?, text: ScheduleText, zone: ZoneId) {
+private fun SchedulePreview(job: JobInfo?, edit: ScheduleEdit, text: ScheduleText, zone: ZoneId) {
+    val schedule = edit.schedule
+    val problem = edit.problem
     val today = LocalDate.now(zone)
-    if (keepsSchedule) {
-        Text(stringResource(R.string.job_schedule_kept, job?.schedule ?: job?.scheduleExpr.orEmpty()), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
-        return
-    }
+    val runs = remember(job, schedule, edit.clock, edit.changed) { edit.nextRuns(3) }
     Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-        if (problem !is ScheduleProblem.Syntax && problem != ScheduleProblem.Never) {
-            Text(text.describe(schedule, today), style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
-        }
-        if (problem != null) {
-            Text(problemText(problem), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
-        } else if (schedule !is JobSchedule.Once) {
-            val runs = remember(schedule) {
-                schedule.cron()?.let(Cron::parseOrNull)?.nextRuns(zone, Instant.now(), 3)?.map { it.toLocalDateTime() }.orEmpty()
+        if (edit.keeps) {
+            // Hermes' `every 90m` still says when it runs next.
+            Text(stringResource(R.string.job_schedule_kept, job?.schedule ?: job?.scheduleExpr.orEmpty()), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+            NextRuns(runs, text, today)
+        } else {
+            // A sentence about a schedule that can't run would only contradict the error under it.
+            if (problem !is ScheduleProblem.Syntax && problem != ScheduleProblem.Never && problem != ScheduleProblem.NoDays) {
+                Text(text.describe(schedule, today, edit.clock, zone), style = MaterialTheme.typography.bodyLarge, color = Palette.TextPrimary)
             }
-            if (runs.isNotEmpty()) {
-                Text(stringResource(R.string.schedule_next, text.runs(runs, today)), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+            if (problem != null) {
+                Text(problemText(problem), style = MaterialTheme.typography.bodyMedium, color = Palette.Danger)
+            } else {
+                NextRuns(runs, text, today)
+            }
+            if (job != null && edit.changed && schedule !is JobSchedule.Once) {
+                if (job.scheduleKind == "interval" && (schedule is JobSchedule.Interval || schedule is JobSchedule.Custom)) {
+                    Text(stringResource(R.string.schedule_interval_note), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+                }
+                val jobZone = job.zoneId
+                if (jobZone != null && jobZone != zone) {
+                    Text(stringResource(R.string.schedule_zone_note, zone.id, jobZone.id), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+                }
             }
         }
     }
 }
 
 @Composable
+private fun NextRuns(runs: List<LocalDateTime>, text: ScheduleText, today: LocalDate) {
+    if (runs.isEmpty()) return
+    Text(stringResource(R.string.schedule_next, text.runs(runs, today)), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+}
+
+@Composable
 private fun problemText(problem: ScheduleProblem): String = when (problem) {
     ScheduleProblem.Past -> stringResource(R.string.schedule_past)
+    ScheduleProblem.Skipped -> stringResource(R.string.schedule_skipped)
     ScheduleProblem.NoDays -> stringResource(R.string.schedule_no_days)
     ScheduleProblem.BadWindow -> stringResource(R.string.schedule_bad_window)
     ScheduleProblem.Never -> stringResource(R.string.cron_error_never)

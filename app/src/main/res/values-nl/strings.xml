@@ -60,7 +60,7 @@
     <string name="schedule_window">Alleen op bepaalde uren</string>
     <string name="schedule_window_detail">Bijvoorbeeld niet \'s nachts</string>
     <string name="schedule_from">Van</string>
-    <string name="schedule_until">tot</string>
+    <string name="schedule_until">Tot</string>
     <string name="schedule_days_toggle">Alleen op bepaalde dagen</string>
     <string name="schedule_days_detail">Bijvoorbeeld alleen op werkdagen</string>
     <string name="schedule_days">Dagen</string>
@@ -73,6 +73,9 @@
     <string name="schedule_cron_hint">Minuut, uur, dag, maand, weekdag. Zo is 30 7 * * 1-5 om 07:30 op werkdagen; zondag is 0.</string>
     <string name="schedule_next">Volgende: %1$s</string>
     <string name="schedule_past">Dit moment is al voorbij. Kies een later tijdstip.</string>
+    <string name="schedule_skipped">Op die dag slaat de klok dit tijdstip over. Kies een ander tijdstip.</string>
+    <string name="schedule_zone_note">Bij opslaan volgt deze taak de tijdzone van je telefoon, %1$s, in plaats van %2$s.</string>
+    <string name="schedule_interval_note">Zo opgeslagen wordt de taak op vaste kloktijden uitgevoerd, niet meer geteld vanaf de vorige keer.</string>
     <string name="schedule_no_days">Kies minstens één dag.</string>
     <string name="schedule_bad_window">Het eerste uur moet voor het laatste liggen.</string>
     <string name="cron_error_fields">Gebruik vijf velden: minuut, uur, dag van de maand, maand en dag van de week.</string>

@@ -1,6 +1,7 @@
 package nl.bartvandermeeren.dudan.data
 
 import java.time.DayOfWeek
+import java.time.Instant
 import java.time.LocalDateTime
 import java.time.LocalTime
 import java.time.OffsetDateTime
@@ -45,6 +46,13 @@ sealed interface JobSchedule {
     /** The `schedule` value for the server: a cron, or for [Once] an ISO date-time with [zone]'s offset at that time. */
     fun wire(zone: ZoneId): String = cron() ?: (this as Once).dateTime.truncatedTo(ChronoUnit.MINUTES).atZone(zone).format(ISO_WITH_OFFSET)
 
+    /**
+     * The next [count] runs after [after] when the server runs this cron on [clock]'s wall time, as times on the
+     * phone's [zone], the way the list shows `next_run_at`. Empty for [Once] and for a cron that never runs.
+     */
+    fun nextRuns(clock: ZoneId, zone: ZoneId, after: Instant, count: Int): List<LocalDateTime> =
+        cron()?.let(Cron::parseOrNull)?.nextRuns(clock, after, count)?.map { it.withZoneSameInstant(zone).toLocalDateTime() }.orEmpty()
+
     companion object {
         /** What the picker offers; [MINUTE_STEPS_ALL] and [HOUR_STEPS] are what a parsed cron may use. */
         val MINUTE_STEPS = listOf(5, 10, 15, 20, 30)
@@ -77,8 +85,21 @@ sealed interface JobSchedule {
             return fromCron(text)
         }
 
-        fun parse(job: JobInfo, zone: ZoneId): JobSchedule? =
-            parse(job.scheduleExpr, job.scheduleKind, job.timezone?.let { runCatching { ZoneId.of(it) }.getOrNull() }, zone)
+        fun parse(job: JobInfo, zone: ZoneId): JobSchedule? = parse(job.scheduleExpr, job.scheduleKind, job.zoneId, zone)
+
+        /**
+         * The next [count] runs of a Hermes `every Nm` task on the phone's [zone]. Hermes adds the minutes to the last
+         * run instead of keeping to the clock, so they count on from the server's `next_run_at`, not from a cron. Null
+         * when [job] isn't such a task; empty when the server doesn't say when it runs next.
+         */
+        fun intervalRuns(job: JobInfo, zone: ZoneId, count: Int): List<LocalDateTime>? {
+            if (job.scheduleKind != "interval") return null
+            val minutes = job.scheduleExpr?.trim()?.lowercase()?.let(EVERY_MINUTES::matchEntire)?.groupValues?.get(1)?.toLongOrNull()
+            val next = job.nextRunAt?.trim()?.let { runCatching { OffsetDateTime.parse(it) }.getOrNull() }
+            if (minutes == null || minutes <= 0 || next == null) return emptyList()
+            val first = next.atZoneSameInstant(zone)
+            return (0 until count).map { first.plusMinutes(minutes * it).toLocalDateTime().truncatedTo(ChronoUnit.MINUTES) }
+        }
 
         /** The most specific preset that runs at exactly the cron's times, else [Custom]; null when it isn't a cron. */
         fun fromCron(text: String): JobSchedule? {

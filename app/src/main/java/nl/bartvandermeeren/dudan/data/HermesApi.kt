@@ -334,7 +334,7 @@ class HermesApi(
     /** The tasks, paused and disabled ones included, and where their results can go; one request. */
     suspend fun jobs(): JobList = JobList.from(getJson("api", "jobs", query = mapOf("include_disabled" to "true")).asObject())
 
-    /** One task with its whole prompt; the list may cut it short. An older Clark answers 404. */
+    /** One task with its whole prompt; the list may cut it short. A server without this endpoint answers 404, see [lacksJobEndpoint]. */
     suspend fun job(id: String): JobInfo = jobFrom(getJson("api", "jobs", id))
 
     suspend fun createJob(draft: JobDraft): JobInfo? =
@@ -445,6 +445,13 @@ class HermesApi(
             if (url.endsWith("/v1")) url = url.removeSuffix("/v1")
             return url
         }
+
+        /**
+         * Whether [e], from [job], says the server has no GET /api/jobs/{id} at all rather than no such task: a 404
+         * without Clark's `job_not_found`. Then the list's prompt is all there is. Hermes says "Job not found" without a
+         * code, but its list carries whole prompts.
+         */
+        fun lacksJobEndpoint(e: Throwable): Boolean = e is HermesException && e.status == 404 && e.code != "job_not_found"
 
         internal fun errorFrom(status: Int, body: String): HermesException {
             val root = runCatching { HermesJson.parseToJsonElement(body) }.getOrNull().asObject()
