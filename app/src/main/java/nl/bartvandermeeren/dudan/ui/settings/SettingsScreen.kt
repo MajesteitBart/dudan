@@ -440,49 +440,53 @@ private fun VoiceSheet(
     val spoken = if (other) PREVIEW_OTHER.firstOrNull { it !in rows } ?: PREVIEW_OTHER.first() else language
     val name = if (other) stringResource(R.string.voices_other) else languageName(language)
     GlassSheet(onDismiss) {
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 10.dp)) {
-            Text(name, style = MaterialTheme.typography.titleLarge, color = Palette.TextPrimary)
-            Text(
-                if (other) stringResource(R.string.voices_sheet_other_detail) else stringResource(R.string.voices_sheet_detail, name),
-                style = MaterialTheme.typography.bodySmall,
-                color = Palette.TextSecondary,
-            )
-        }
-        val automatic = VoiceLanguages.resolve(spoken, emptyMap(), listOf(spoken), ready).engine
-        SheetChoice(
-            title = stringResource(R.string.voices_automatic),
-            subtitle = if (other) stringResource(R.string.voices_other_automatic_detail) else stringResource(R.string.voices_automatic_detail, engineName(automatic)),
-            selected = choice.engine == null,
-            onClick = { save(choice.copy(engine = null)) },
-            singleLine = false,
-        )
-        VoiceLanguages.engines(language).forEach { engine ->
+        // A sheet stops at the window's height, so the body scrolls to keep the voice picker in reach in
+        // landscape or with large text. GlassSheet itself doesn't scroll: the model picker's list does that.
+        Column(Modifier.verticalScroll(rememberScrollState())) {
+            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 4.dp, bottom = 10.dp)) {
+                Text(name, style = MaterialTheme.typography.titleLarge, color = Palette.TextPrimary)
+                Text(
+                    if (other) stringResource(R.string.voices_sheet_other_detail) else stringResource(R.string.voices_sheet_detail, name),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = Palette.TextSecondary,
+                )
+            }
+            val automatic = VoiceLanguages.resolve(spoken, emptyMap(), listOf(spoken), ready).engine
             SheetChoice(
-                title = engineName(engine),
-                subtitle = engineDetail(engine),
-                selected = choice.engine == engine,
-                onClick = { save(choice.copy(engine = engine)) },
+                title = stringResource(R.string.voices_automatic),
+                subtitle = if (other) stringResource(R.string.voices_other_automatic_detail) else stringResource(R.string.voices_automatic_detail, engineName(automatic)),
+                selected = choice.engine == null,
+                onClick = { save(choice.copy(engine = null)) },
                 singleLine = false,
             )
-        }
-        val shown = VoiceLanguages.preferred(language, choice)
-        val preview = VoiceSamples.text(spoken, settings.userName)
-        Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            if (shown == VoiceEngine.System) {
-                Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-                    LinkAction(stringResource(R.string.tts_system_settings)) {
-                        runCatching { context.startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
-                    }
-                    LinkAction(stringResource(R.string.tts_preview)) { vm.speaker.preview(preview, spoken, choice) }
-                }
-            } else {
-                VoicePicker(
-                    voices = voiceList(shown),
-                    selected = VoiceLanguages.voiceFor(shown, choice.voice).orEmpty(),
-                    onSelect = { save(choice.copy(voice = it)) },
-                    onPreview = { vm.speaker.preview(preview, spoken, choice) }.takeIf { ready(shown) },
+            VoiceLanguages.engines(language).forEach { engine ->
+                SheetChoice(
+                    title = engineName(engine),
+                    subtitle = engineDetail(engine),
+                    selected = choice.engine == engine,
+                    onClick = { save(choice.copy(engine = engine)) },
+                    singleLine = false,
                 )
-                ModelStatus(if (shown == VoiceEngine.Kokoro) vm.kokoroModel else vm.supertonicModel, voiceModelTexts(engineName(shown)))
+            }
+            val shown = VoiceLanguages.preferred(language, choice)
+            val preview = VoiceSamples.text(spoken, settings.userName)
+            Column(Modifier.padding(start = 24.dp, end = 24.dp, top = 14.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                if (shown == VoiceEngine.System) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
+                        LinkAction(stringResource(R.string.tts_system_settings)) {
+                            runCatching { context.startActivity(Intent("com.android.settings.TTS_SETTINGS").addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
+                        }
+                        LinkAction(stringResource(R.string.tts_preview)) { vm.speaker.preview(preview, spoken, choice) }
+                    }
+                } else {
+                    VoicePicker(
+                        voices = voiceList(shown),
+                        selected = VoiceLanguages.voiceFor(shown, choice.voice).orEmpty(),
+                        onSelect = { save(choice.copy(voice = it)) },
+                        onPreview = { vm.speaker.preview(preview, spoken, choice) }.takeIf { ready(shown) },
+                    )
+                    ModelStatus(if (shown == VoiceEngine.Kokoro) vm.kokoroModel else vm.supertonicModel, voiceModelTexts(engineName(shown)))
+                }
             }
         }
     }
