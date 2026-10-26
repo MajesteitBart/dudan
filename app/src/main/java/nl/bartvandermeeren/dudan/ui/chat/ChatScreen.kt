@@ -341,6 +341,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     val working = remember(desktops.sessions) { desktops.sessions.filter { it.state != DesktopState.Stopped } }
     val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val messages = conversation.messages
+    val retryId = conversation.retryId
     val listState = rememberLazyListState()
     // Saving a file the agent returned keeps going when its row scrolls away, until the chat closes.
     val saves = rememberAttachmentSaves()
@@ -390,6 +391,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                         Role.Assistant -> AssistantMessageItem(
                             message = message,
                             isLast = index == messages.lastIndex,
+                            canRetry = message.id == retryId,
                             assistantName = settings.assistantName,
                             speaking = speakingId == message.id,
                             onSpeak = { vm.toggleSpeak(message.id, message.text) },

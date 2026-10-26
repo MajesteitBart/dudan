@@ -27,8 +27,8 @@ private val Context.scheduledStore by preferencesDataStore(name = "scheduled_res
  * Tells the user about scheduled task results that came in while dudan wasn't looking. Clark has no push to the phone,
  * so [ScheduledResultsWorker] asks every 15 minutes: it lists the chats, reads the latest rows of each task chat with
  * activity after its mark, and posts one notification per new result. The decisions are in [ScheduledCatchUp]; this
- * keeps the marks and posts. The chat the app shows while it's in front gets no notification: the drawer and the chat
- * are brought up to date instead.
+ * keeps the marks and posts. The chat on screen while the app is in front gets no notification: the drawer and the chat
+ * are brought up to date instead. A chat behind another screen, such as Scheduled tasks, still gets one.
  */
 class ScheduledResultsCheck(private val context: Context) {
     private val key = stringPreferencesKey("marks")
@@ -53,12 +53,14 @@ class ScheduledResultsCheck(private val context: Context) {
 
     /** One round of the check. [app] is the running app, when this process has one. */
     suspend fun check(api: HermesApi, server: String, app: AppContainer?) {
-        val sessions = api.listSessions(source = "api_server")
-        val now = System.currentTimeMillis() / 1000.0
+        val listing = api.sessionListing(source = "api_server")
+        val sessions = listing.sessions
+        // Without a clock or any activity the server has nothing to report yet.
+        val now = ScheduledCatchUp.serverNow(sessions, listing.serverSeconds) ?: return
         val stored = read()?.takeIf { it.server == server }
         if (stored == null) {
             // The first round on this server: everything so far counts as seen.
-            update(server) { it ?: ScheduledCatchUp.start(server, sessions, now) }
+            update(server) { it ?: ScheduledCatchUp.start(server, now) }
             return
         }
         val due = ScheduledCatchUp.due(sessions, stored)
@@ -72,8 +74,7 @@ class ScheduledResultsCheck(private val context: Context) {
             }
             // Read again: the user may have opened the chat meanwhile.
             val mark = read()?.takeIf { it.server == server }?.markFor(session.id) ?: return
-            val shown = AppVisibility.activityResumed && AppVisibility.openSessionId == session.id
-            if (!shown) ScheduledCatchUp.fresh(rows, mark).forEach { post(session, it) }
+            if (!AppVisibility.shows(session.id)) ScheduledCatchUp.fresh(rows, mark).forEach { post(session, it) }
             update(server) { it?.seen(session.id, ScheduledCatchUp.advance(mark, session.lastActive, rows, now)) }
         }
         if (due.isNotEmpty() && AppVisibility.activityResumed && app != null) {

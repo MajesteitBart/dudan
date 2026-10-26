@@ -306,12 +306,15 @@ class ChatEngine(
         val lastUserIndex = messages.indexOfLast { it.role == Role.User }
         if (lastUserIndex < 0) return
         val lastUser = messages[lastUserIndex]
-        flow.update { it.copy(messages = messages.subList(0, lastUserIndex)) }
+        val before = messages.subList(0, lastUserIndex)
         // Only continue after background results if nobody else did meanwhile.
-        if (lastUser.review != null && flow.value.awaitingReview) {
+        if (lastUser.review != null && flow.value.copy(messages = before).awaitingReview) {
+            flow.update { it.copy(messages = before) }
             reviewBackground(sessionId, lastUser.text, previous = lastUser.review)
             return
         }
+        // Scheduled task results that came in after the question stay; it is asked again after them.
+        flow.update { it.copy(messages = before + messages.subList(lastUserIndex + 1, messages.size).filter { m -> m.scheduled != null }) }
         val images = lastUser.images.mapNotNull { ref ->
             ref.source.takeIf { it.startsWith("data:") }?.let { PreparedImage(ByteArray(0), it) }
         }

@@ -185,9 +185,12 @@ class HermesApi(
 
     // ---- Sessions -------------------------------------------------------------------------------
 
-    suspend fun listSessions(source: String?, limit: Int = 100): List<SessionSummary> {
-        val root = getJson("api", "sessions", query = mapOf("limit" to limit.toString(), "source" to source))
-        return root.asObject()?.get("data").asArray().orEmpty().mapNotNull { it.asObject()?.let(SessionSummary::from) }
+    suspend fun listSessions(source: String?, limit: Int = 100): List<SessionSummary> = sessionListing(source, limit).sessions
+
+    /** The chats as [listSessions] gives them, and the server's clock when it listed them. */
+    suspend fun sessionListing(source: String?, limit: Int = 100): SessionListing {
+        val (root, serverSeconds) = exchange(request("api", "sessions", query = mapOf("limit" to limit.toString(), "source" to source)).get().build())
+        return SessionListing(root.asObject()?.get("data").asArray().orEmpty().mapNotNull { it.asObject()?.let(SessionSummary::from) }, serverSeconds)
     }
 
     suspend fun createSession(id: String, title: String? = null) {
@@ -392,14 +395,18 @@ class HermesApi(
         sendJson(request)
     }
 
-    private suspend fun sendJson(request: Request): JsonElement {
+    private suspend fun sendJson(request: Request): JsonElement = exchange(request).first
+
+    /** The answer's JSON, and the server's clock when it answered in seconds, from its Date header; null without one. */
+    private suspend fun exchange(request: Request): Pair<JsonElement, Double?> {
         val response = http.newCall(request).await()
         // Own the response from here on, so cancellation before the IO switch still closes it.
         try {
             return withContext(Dispatchers.IO) {
                 val text = response.body?.string().orEmpty()
                 if (!response.isSuccessful) throw errorFrom(response.code, text)
-                if (text.isBlank()) JsonNull else runCatching { HermesJson.parseToJsonElement(text) }.getOrDefault(JsonNull)
+                val json = if (text.isBlank()) JsonNull else runCatching { HermesJson.parseToJsonElement(text) }.getOrDefault(JsonNull)
+                json to response.headers.getDate("Date")?.let { it.time / 1000.0 }
             }
         } finally {
             response.close()

@@ -110,6 +110,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             _currentId.collect { AppVisibility.openSessionId = it }
         }
         viewModelScope.launch {
+            // Back on the chat from another screen, what it shows now counts as seen.
+            snapshotFlow { screen == Screen.Chat }.collect {
+                AppVisibility.chatOnScreen = it
+                markScheduledSeen()
+            }
+        }
+        viewModelScope.launch {
             // A task chat on screen counts as seen up to its newest result, which the catch-up check then doesn't report.
             conversation.map { it.sessionId to newestScheduledMs(it) }.distinctUntilChanged().collect { markScheduledSeen() }
         }
@@ -164,7 +171,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     private fun newestScheduledMs(c: Conversation): Long? = c.messages.mapNotNull { if (it.scheduled != null) it.finishedAtMs else null }.maxOrNull()
 
     private fun markScheduledSeen() {
-        if (!AppVisibility.activityResumed) return
+        if (!AppVisibility.activityResumed || screen != Screen.Chat) return
         val c = conversation.value
         val newest = newestScheduledMs(c) ?: return
         val server = settings.value?.serverUrl ?: return

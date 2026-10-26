@@ -22,13 +22,18 @@ import nl.bartvandermeeren.dudan.voice.SpeechText
 
 /**
  * Which dudan surfaces the user can currently see; replies they can see need no notification. [openSessionId] is the
- * chat the app shows, or last showed before it went to the background.
+ * chat the app shows, or last showed before it went to the background or to another screen. [chatOnScreen] is false
+ * while another screen, such as Settings or Scheduled tasks, covers it.
  */
 object AppVisibility {
     @Volatile var activityResumed = false
     @Volatile var overlayShown = false
     @Volatile var openSessionId: String? = null
+    @Volatile var chatOnScreen = false
     val anyVisible: Boolean get() = activityResumed || overlayShown
+
+    /** Whether the app is in front with [sessionId]'s chat on screen. */
+    fun shows(sessionId: String): Boolean = activityResumed && chatOnScreen && openSessionId == sessionId
 }
 
 /**

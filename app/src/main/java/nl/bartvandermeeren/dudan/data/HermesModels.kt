@@ -31,6 +31,12 @@ internal fun JsonObject.int(key: String): Int? =
 internal fun JsonObject.bool(key: String): Boolean? =
     (this[key] as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { n -> n != 0 } }
 
+/**
+ * A page of chats, and [serverSeconds], the server's clock when it listed them: its Date header, which counts whole
+ * seconds. Null when it sent none.
+ */
+data class SessionListing(val sessions: List<SessionSummary>, val serverSeconds: Double?)
+
 /** A chat in the drawer. [jobId] is set on a chat Clark made for a scheduled task's results; Hermes sends none. */
 data class SessionSummary(
     val id: String,

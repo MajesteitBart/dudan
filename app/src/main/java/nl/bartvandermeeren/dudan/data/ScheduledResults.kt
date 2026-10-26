@@ -57,11 +57,18 @@ object ScheduledCatchUp {
     const val PREVIEW_CHARS = 200
 
     /**
-     * The first check on [server], after an install, an upgrade or a change of server: what exists now counts as seen,
-     * so old results are never reported.
+     * The server's clock when it listed [sessions]: [dateSeconds], its Date header, or the newest activity it lists,
+     * whichever is later, since the header counts whole seconds. Null when it gives neither. Marks are compared with
+     * the server's times, so the phone's clock, which can run ahead or behind, never goes in.
      */
-    fun start(server: String, sessions: List<SessionSummary>, nowSeconds: Double): SeenMarks =
-        SeenMarks(server, nowSeconds, sessions.filter { it.jobId != null }.associate { it.id to maxOf(nowSeconds, it.lastActive ?: 0.0) })
+    fun serverNow(sessions: List<SessionSummary>, dateSeconds: Double?): Double? =
+        (sessions.mapNotNull { it.lastActive } + listOfNotNull(dateSeconds)).maxOrNull()
+
+    /**
+     * The first check on [server], after an install, an upgrade or a change of server: what exists at [serverNow]
+     * counts as seen, so old results are never reported. No chat was active later than that.
+     */
+    fun start(server: String, serverNow: Double): SeenMarks = SeenMarks(server, serverNow)
 
     /** Task chats active after their mark. */
     fun due(sessions: List<SessionSummary>, seen: SeenMarks): List<SessionSummary> =
@@ -74,7 +81,7 @@ object ScheduledCatchUp {
     /**
      * How far a chat counts as seen after its latest [rows] were read: up to the newest row, and up to [lastActive]
      * once a row is as new. Clark marks a chat active a moment before it writes the result, so a check that comes in
-     * between looks again next time, until [SETTLE_SECONDS] have passed.
+     * between looks again next time, until [SETTLE_SECONDS] have passed on the server's clock, [nowSeconds].
      */
     fun advance(mark: Double, lastActive: Double?, rows: List<HermesMessage>, nowSeconds: Double): Double {
         val newest = rows.mapNotNull { it.timestamp }.maxOrNull() ?: mark

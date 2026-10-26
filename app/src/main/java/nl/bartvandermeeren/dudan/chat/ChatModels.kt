@@ -96,6 +96,19 @@ data class Conversation(
      */
     val awaitingReview: Boolean
         get() = messages.takeLastWhile { it.role == Role.Background }.any { it.background?.interim == false }
+
+    /**
+     * The answer that offers Retry: the last question's answer, when it failed or was stopped and nothing but
+     * scheduled task results came in after it. Those answer no question, so they don't take Retry away.
+     */
+    val retryId: String?
+        get() {
+            val question = messages.indexOfLast { it.role == Role.User }
+            if (question < 0) return null
+            val answer = messages.subList(question + 1, messages.size).dropLastWhile { it.scheduled != null }.lastOrNull() ?: return null
+            val retryable = answer.role == Role.Assistant && (answer.state == MessageState.Failed || answer.state == MessageState.Cancelled)
+            return if (retryable) answer.id else null
+        }
 }
 
 data class SessionsState(

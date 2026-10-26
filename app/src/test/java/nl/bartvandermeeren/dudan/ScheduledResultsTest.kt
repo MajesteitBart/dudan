@@ -1,18 +1,25 @@
 package nl.bartvandermeeren.dudan
 
+import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonObject
+import nl.bartvandermeeren.dudan.chat.Conversation
 import nl.bartvandermeeren.dudan.chat.HistoryMapper
 import nl.bartvandermeeren.dudan.chat.MessageState
 import nl.bartvandermeeren.dudan.chat.Role
 import nl.bartvandermeeren.dudan.chat.ScheduledLabel
 import nl.bartvandermeeren.dudan.chat.StepKind
 import nl.bartvandermeeren.dudan.chat.UiMessage
+import nl.bartvandermeeren.dudan.data.AppVisibility
+import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.data.HermesJson
 import nl.bartvandermeeren.dudan.data.HermesMessage
 import nl.bartvandermeeren.dudan.data.ScheduledCatchUp
 import nl.bartvandermeeren.dudan.data.ScheduledRef
 import nl.bartvandermeeren.dudan.data.SeenMarks
 import nl.bartvandermeeren.dudan.data.SessionSummary
+import okhttp3.OkHttpClient
+import okhttp3.mockwebserver.MockResponse
+import okhttp3.mockwebserver.MockWebServer
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNull
@@ -83,6 +90,32 @@ class ScheduledHistoryTest {
         assertTrue(answer.attachments.isEmpty())
     }
 
+    @Test
+    fun aStoppedTurnsWorkStaysAboveResultsThatCameInAfterIt() {
+        val stopped = listOf(
+            row("""{"id":"1","role":"user","content":"Weer?","timestamp":100.0}"""),
+            row("""{"id":"2","role":"assistant","content":"","reasoning":"Look it up.","tool_calls":[{"id":"c1","function":{"name":"web_search","arguments":"{\"query\":\"weer\"}"}}],"timestamp":101.0}"""),
+            row("""{"id":"3","role":"tool","tool_call_id":"c1","content":"Tool web_search was aborted","timestamp":102.0}"""),
+        )
+        val before = HistoryMapper.map(stopped)
+        assertEquals(listOf("h_1", "h_work_2"), before.map { it.id })
+
+        // Clark writes a result once the stopped turn has ended, so it follows the turn's tool rows.
+        val withResult = stopped + ScheduledRows.result(4, "Three meetings today.", 200.0)
+        val ui = HistoryMapper.map(withResult)
+        assertEquals(listOf("h_1", "h_work_2", "h_4"), ui.map { it.id })
+        val work = ui[1]
+        assertEquals(listOf(StepKind.Tool), work.steps.map { it.kind })
+        assertEquals("Tool web_search was aborted", work.steps.single().result)
+        assertEquals("Look it up.", work.reasoning.trim())
+        assertTrue(ui[2].steps.isEmpty() && ui[2].reasoning.isEmpty())
+
+        // More results and the next question leave the work where it is, under the same id.
+        val later = withResult + ScheduledRows.result(5, "Two meetings today.", 300.0) +
+            row("""{"id":"6","role":"user","content":"En morgen?","timestamp":400.0}""")
+        assertEquals(listOf("h_1", "h_work_2", "h_4", "h_5", "h_6"), HistoryMapper.map(later).map { it.id })
+    }
+
     private fun user(id: String, text: String) = UiMessage(id, Role.User, text)
     private fun answer(id: String, text: String, state: MessageState = MessageState.Done) = UiMessage(id, Role.Assistant, text, state = state)
     private fun scheduled(id: Int, text: String) = HistoryMapper.map(listOf(ScheduledRows.result(id, text, 500.0))).single()
@@ -113,6 +146,21 @@ class ScheduledHistoryTest {
         assertFalse(merged.caughtUp)
         assertEquals(listOf("h_1", "h_2", "l_3", "l_4", "h_7"), merged.messages.map { it.id })
         assertEquals(merged.messages, HistoryMapper.reconcile(merged.messages, transcript).messages)
+        // The stopped answer still offers Retry.
+        assertEquals("l_4", Conversation("s", merged.messages).retryId)
+    }
+
+    @Test
+    fun aFailedOrStoppedAnswerKeepsRetryUntilSomethingButAResultFollows() {
+        val failed = listOf(user("h_1", "Vraag"), answer("l_2", "", MessageState.Failed))
+        assertEquals("l_2", Conversation("s", failed).retryId)
+        assertEquals("l_2", Conversation("s", failed + scheduled(3, "Rapport") + scheduled(4, "Nog een")).retryId)
+        // A finished answer, a new question or a background result takes it away.
+        assertNull(Conversation("s", listOf(user("h_1", "Vraag"), answer("l_2", "Antwoord"))).retryId)
+        assertNull(Conversation("s", failed + user("l_3", "Nieuw")).retryId)
+        assertNull(Conversation("s", failed + UiMessage("h_5", Role.Background, "Klaar")).retryId)
+        // Nothing was asked: a chat with only results has nothing to retry.
+        assertNull(Conversation("s", listOf(scheduled(3, "Rapport"))).retryId)
     }
 
     @Test
@@ -142,13 +190,66 @@ class ScheduledCatchUpTest {
     private fun reply(id: Int, timestamp: Double) = ScheduledRows.row("""{"id":"$id","role":"assistant","content":"Hi","timestamp":$timestamp}""")
 
     @Test
-    fun theFirstRoundCountsEverythingAsSeen() {
-        val sessions = listOf(session("task-brief", 900.0), session("task-late", 1_050.0), session("dudan_1", 990.0, jobId = null))
-        val seen = ScheduledCatchUp.start("http://clark", sessions, nowSeconds = 1_000.0)
-        assertEquals(1_000.0, seen.since, 0.0)
-        // A server clock a little ahead of the phone's still counts as seen.
-        assertEquals(mapOf("task-brief" to 1_000.0, "task-late" to 1_050.0), seen.marks)
+    fun theFirstRoundCountsEverythingAsSeenByTheServersClock() {
+        val sessions = listOf(session("task-brief", 900.0), session("task-late", 1_050.5), session("dudan_1", 990.0, jobId = null))
+        // The Date header counts whole seconds, so activity in the same second can be later.
+        val now = ScheduledCatchUp.serverNow(sessions, dateSeconds = 1_050.0)!!
+        assertEquals(1_050.5, now, 0.0)
+        val seen = ScheduledCatchUp.start("http://clark", now)
+        assertEquals(1_050.5, seen.since, 0.0)
+        assertTrue(seen.marks.isEmpty())
         assertTrue(ScheduledCatchUp.due(sessions, seen).isEmpty())
+        // A result that lands after the first round is reported, however far the phone's clock is ahead.
+        val later = listOf(session("task-brief", 1_051.0)) + sessions.drop(1)
+        assertEquals(listOf("task-brief"), ScheduledCatchUp.due(later, seen).map { it.id })
+        assertEquals(listOf("2"), ScheduledCatchUp.fresh(listOf(ScheduledRows.result(1, "Old", 900.0), ScheduledRows.result(2, "New", 1_051.0)), seen.markFor("task-brief")).map { it.id })
+
+        // The header alone, or the activity alone, is enough; with neither there is no round.
+        assertEquals(2_000.0, ScheduledCatchUp.serverNow(sessions, dateSeconds = 2_000.0)!!, 0.0)
+        assertEquals(1_050.5, ScheduledCatchUp.serverNow(sessions, dateSeconds = null)!!, 0.0)
+        assertEquals(500.0, ScheduledCatchUp.serverNow(emptyList(), dateSeconds = 500.0)!!, 0.0)
+        assertNull(ScheduledCatchUp.serverNow(listOf(session("x", null)), dateSeconds = null))
+    }
+
+    @Test
+    fun theListingCarriesTheServersClock() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(
+            MockResponse().setHeader("Date", "Mon, 26 Oct 2026 07:00:00 GMT")
+                .setBody("""{"object":"list","data":[{"id":"task-brief","last_active":1792997990.25,"job_id":"brief"}]}"""),
+        )
+        server.enqueue(MockResponse().setBody("""{"object":"list","data":[]}"""))
+        server.start()
+        val api = HermesApi(OkHttpClient()) { HermesApi.ServerConfig(server.url("/").toString(), "secret") }
+        val listing = api.sessionListing(source = "api_server")
+        assertEquals(1_792_998_000.0, listing.serverSeconds!!, 0.0)
+        assertEquals("brief", listing.sessions.single().jobId)
+        assertEquals("/api/sessions?limit=100&source=api_server", server.takeRequest().path)
+        // MockWebServer, like a server without the header, sends none.
+        assertNull(api.sessionListing(source = "api_server").serverSeconds)
+        server.shutdown()
+    }
+
+    @Test
+    fun onlyTheChatOnScreenCountsAsShown() {
+        val before = Triple(AppVisibility.activityResumed, AppVisibility.chatOnScreen, AppVisibility.openSessionId)
+        try {
+            AppVisibility.activityResumed = true
+            AppVisibility.openSessionId = "task-brief"
+            AppVisibility.chatOnScreen = true
+            assertTrue(AppVisibility.shows("task-brief"))
+            assertFalse(AppVisibility.shows("task-weekly"))
+            // The task list or Settings covers the chat.
+            AppVisibility.chatOnScreen = false
+            assertFalse(AppVisibility.shows("task-brief"))
+            AppVisibility.chatOnScreen = true
+            AppVisibility.activityResumed = false
+            assertFalse(AppVisibility.shows("task-brief"))
+        } finally {
+            AppVisibility.activityResumed = before.first
+            AppVisibility.chatOnScreen = before.second
+            AppVisibility.openSessionId = before.third
+        }
     }
 
     @Test

@@ -550,6 +550,39 @@ class ChatEngineTest {
     private val tailPolls get() = requests.count { it.contains("order=latest") }
 
     @Test
+    fun aRetryKeepsTheScheduledResultsThatCameInAfterTheQuestion() {
+        val runs = AtomicInteger()
+        script { request ->
+            when {
+                request.path!!.contains("/messages") -> transcriptPage(request)
+                request.path == "/v1/runs" -> MockResponse().setResponseCode(202).setBody("""{"run_id":"run_${runs.incrementAndGet()}"}""")
+                request.path == "/v1/runs/run_1/events" -> sse("""{"event":"run.failed","error":"Provider overloaded"}""")
+                request.path!!.endsWith("/events") -> sse("""{"event":"run.completed","output":"Het is kwart over acht."}""")
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        var id = ""
+        assertEquals(MessageState.Failed, sendAndSettle("Hoe laat is het?") { id = it }.state)
+        // A task's result comes in after the failed question, which never reached the transcript.
+        transcript += JsonObject(
+            row("assistant", "Drie afspraken vandaag.", displayKind = "scheduled_result") +
+                ("scheduled" to buildJsonObject { put("job_id", "brief"); put("title", "Morning brief") }),
+        )
+        val flow = runBlocking { withContext(dispatcher) { engine.sync(id); engine.conversation(id) } }
+        val merged = flow.await { c -> c.messages.lastOrNull()?.scheduled != null }
+        val failed = merged.messages.single { it.state == MessageState.Failed }
+        assertEquals(failed.id, merged.retryId)
+
+        runBlocking { withContext(dispatcher) { engine.retry(id) } }
+        val retried = flow.await { c -> c.messages.lastOrNull()?.let { it.state == MessageState.Done && it.scheduled == null } == true }
+        // The result stays, and the question is asked again after it.
+        assertEquals(listOf(Role.Assistant, Role.User, Role.Assistant), retried.messages.map { it.role })
+        assertEquals("Drie afspraken vandaag.", retried.messages[0].text)
+        assertEquals("Het is kwart over acht.", retried.messages[2].text)
+        assertEquals(2, runs.get())
+    }
+
+    @Test
     fun aResultThatLandsAfterTheRunEndedShowsUpWithoutAnotherTurn() {
         val runs = AtomicInteger()
         script { request ->

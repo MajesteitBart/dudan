@@ -174,12 +174,14 @@ private fun MessageImage(ref: ImageRef) {
  * An answer: the work panel, approval, text and status. [attachments] draws the files returned with it
  * below the text. The side-key overlay leaves it empty, since Save file needs an activity for the
  * document picker. A scheduled task's result gets a label above it; [chatTitle] is the open chat's
- * title, which the label doesn't repeat.
+ * title, which the label doesn't repeat. [canRetry] offers Retry on a failed or stopped answer; see
+ * [nl.bartvandermeeren.dudan.chat.Conversation.retryId].
  */
 @Composable
 fun AssistantMessageItem(
     message: UiMessage,
     isLast: Boolean,
+    canRetry: Boolean,
     assistantName: String,
     speaking: Boolean,
     onSpeak: () -> Unit,
@@ -221,11 +223,11 @@ fun AssistantMessageItem(
         }
         attachments()
         when (message.state) {
-            MessageState.Failed -> ErrorRow(message.error ?: stringResource(R.string.error_generic), onRetry = if (isLast) onRetry else null)
+            MessageState.Failed -> ErrorRow(message.error ?: stringResource(R.string.error_generic), onRetry = if (canRetry) onRetry else null)
             MessageState.Cancelled -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Icon(Icons.Outlined.Stop, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(18.dp))
                 Text(stringResource(R.string.status_stopped), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
-                if (isLast) {
+                if (canRetry) {
                     Spacer(Modifier.width(4.dp))
                     Text(
                         stringResource(R.string.action_retry),

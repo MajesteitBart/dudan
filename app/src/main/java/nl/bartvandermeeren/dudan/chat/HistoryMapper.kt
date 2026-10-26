@@ -14,7 +14,8 @@ import nl.bartvandermeeren.dudan.data.contentText
  * Turns a Hermes transcript into chat bubbles. Tool calls and the text a model writes beside them
  * collapse into the steps of the next answer, the way Gemini folds its work under one reply.
  * A scheduled task's result is an answer of its own: it can land in the middle of a turn, and that
- * turn's work stays with the turn's answer.
+ * turn's work stays with the turn's answer. Work that never got an answer, such as a stopped turn's,
+ * stays where it started, before any results that came in after it.
  */
 object HistoryMapper {
     fun map(messages: List<HermesMessage>): List<UiMessage> {
@@ -24,11 +25,23 @@ object HistoryMapper {
         // Files the agent returned wait for the next reply, like the steps.
         val files = mutableListOf<OutboundAttachment>()
         var turnStartedAt: Long? = null
+        // Where the waiting work goes in [out], and the row it started on, which names it, so rows added later
+        // don't move it or change its id.
+        var workAt: Int? = null
+        var workRow: String? = null
+
+        fun clearWork() {
+            steps.clear()
+            reasoning.setLength(0)
+            files.clear()
+            workAt = null
+            workRow = null
+        }
 
         fun flushWork(index: Int, finishedAt: Long?) {
             if (steps.isEmpty() && reasoning.isEmpty() && files.isEmpty()) return
-            out += UiMessage(
-                id = "h_work_$index",
+            val work = UiMessage(
+                id = "h_work_${workRow ?: index}",
                 role = Role.Assistant,
                 attachments = files.toList(),
                 steps = steps.toList(),
@@ -36,9 +49,8 @@ object HistoryMapper {
                 startedAtMs = turnStartedAt,
                 finishedAtMs = finishedAt,
             )
-            steps.clear()
-            reasoning.setLength(0)
-            files.clear()
+            out.add(workAt ?: out.size, work)
+            clearWork()
         }
 
         // Compression can leave two copies of one delivery; show it once.
@@ -113,9 +125,11 @@ object HistoryMapper {
                             startedAtMs = turnStartedAt,
                             finishedAtMs = timestampMs,
                         )
-                        steps.clear()
-                        reasoning.setLength(0)
-                        files.clear()
+                        clearWork()
+                    }
+                    if (workAt == null && (steps.isNotEmpty() || reasoning.isNotEmpty() || files.isNotEmpty())) {
+                        workAt = out.size
+                        workRow = message.id ?: index.toString()
                     }
                 }
                 "tool" -> {
