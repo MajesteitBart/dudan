@@ -26,13 +26,6 @@ class ListenEntryTest {
     }
 
     @Test
-    fun openingAgainWhileOpenListensAgainForTheWakeWordAndTheListenEntry() {
-        assertTrue(Opener.ListenEntry.listensAgain)
-        assertTrue(Opener.WakeWord.listensAgain)
-        assertFalse(Opener.Assist.listensAgain)
-    }
-
-    @Test
     fun theShowArgumentsNameTheOpener() {
         Opener.entries.forEach { assertEquals(it, Opener.from(it.name)) }
         // The side button and other apps asking for the assistant name none.

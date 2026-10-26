@@ -45,13 +45,34 @@ enum class Opener {
      */
     fun listens(listenOnInvoke: Boolean, hasMic: Boolean) = this != Assist || (listenOnInvoke && hasMic)
 
-    /** Whether opening it again while the overlay is open listens again in the same chat. */
-    val listensAgain get() = this != Assist
-
     companion object {
         /** The opener named in the session's show arguments; the side button names none. */
         fun from(name: String?) = entries.firstOrNull { it.name == name } ?: Assist
     }
+}
+
+/**
+ * The overlay's openings, so work started for one of them, such as loading the settings or listening
+ * again after a microphone hiccup, doesn't run after the overlay closed or in a later opening.
+ */
+internal class Openings {
+    /** The newest opening. */
+    var latest = 0
+        private set
+    private var open = false
+
+    /** The overlay opened, or was opened again while it was open; returns this opening. */
+    fun open(): Int {
+        open = true
+        return ++latest
+    }
+
+    fun close() {
+        open = false
+    }
+
+    /** Whether work started for [opening] may still run: the overlay is open and wasn't opened again since. */
+    fun isCurrent(opening: Int) = open && opening == latest
 }
 
 /** State and behavior of one assistant overlay, shared by every show/hide cycle of the session. */
@@ -100,18 +121,20 @@ class AssistState(
         }
     }
 
+    private val openings = Openings()
+
     /**
-     * The overlay opened. When the wake word or Clark in the app list opened it, it always listens,
-     * also with Listen right away off, and either one while it's already open listens again in the same chat.
+     * The overlay opened, or was opened again while it was open. Either way a new chat starts: what the
+     * overlay showed, heard or read aloud belongs to the last question. The wake word and Clark in the
+     * app list always listen, also with Listen right away off.
      */
     fun onShown(opener: Opener = Opener.Assist) {
-        if (opener.listensAgain && shown) {
-            startListening(wakeWord = opener == Opener.WakeWord)
-            return
-        }
+        val opening = openings.open()
         shown = true
         AppVisibility.overlayShown = true
         container.phoneControl.ensureRunning()
+        speech.cancel()
+        speaker.stop()
         sessionId = null
         text = ""
         attachScreenshot = false
@@ -119,6 +142,8 @@ class AssistState(
         seenTurnSeq = engine.completedTurns.value?.seq ?: 0L
         scope.launch {
             val current = container.settings.current()
+            // Hidden, or opened once more, while the settings loaded: that opening does the listening.
+            if (!openings.isCurrent(opening)) return@launch
             settings = current
             // Listening comes first: the user may already be talking. Without the microphone, listening
             // opens the app to ask for it, as when the overlay is already open.
@@ -131,6 +156,7 @@ class AssistState(
     }
 
     fun onHidden() {
+        openings.close()
         shown = false
         AppVisibility.overlayShown = false
         speech.cancel()
@@ -199,9 +225,10 @@ class AssistState(
                     }
                     AfterError.Retry -> {
                         retries++
+                        val opening = openings.latest
                         scope.launch {
                             delay(RETRY_DELAY_MS * retries)
-                            if (shown && !speech.isActive && text.isBlank()) listen()
+                            if (openings.isCurrent(opening) && !speech.isActive && text.isBlank()) listen()
                         }
                     }
                 }
