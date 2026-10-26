@@ -4,6 +4,7 @@ import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import kotlin.concurrent.thread
+import nl.bartvandermeeren.dudan.voice.LocalSpeechSession
 import nl.bartvandermeeren.dudan.voice.SentencePieces
 import nl.bartvandermeeren.dudan.voice.WakeMic
 import nl.bartvandermeeren.dudan.voice.WakePhrase
@@ -173,6 +174,36 @@ class WakeWordTest {
         } finally {
             WakeMic.release()
             closer.join()
+        }
+    }
+
+    @Test
+    fun aListenerThatFailsToStartLetsGoOfItsMicrophone() {
+        var closed = false
+        var interrupted = false
+        val microphone = object : LocalSpeechSession.AudioSource {
+            override fun read(window: ShortArray) = true
+
+            override fun interrupt() {
+                interrupted = true
+            }
+
+            override fun close() {
+                closed = true
+            }
+        }
+        // The spotter's native stream fails to be created after the microphone opened.
+        val failure = runCatching { WakeMic.listenOn(microphone) { error("no stream") } }.exceptionOrNull()
+        assertTrue(failure is IllegalStateException)
+        assertTrue(closed)
+        // Voice input neither waits for a listener that's gone nor stops its microphone.
+        val started = System.nanoTime()
+        try {
+            assertNull(WakeMic.acquire())
+            assertFalse(interrupted)
+            assertTrue((System.nanoTime() - started) / 1_000_000 < 300)
+        } finally {
+            WakeMic.release()
         }
     }
 

@@ -63,6 +63,20 @@ object WakeMic {
         lock.notifyAll()
     }
 
+    /**
+     * The listener listens on [source] for as long as [listen] runs. Afterwards, also when [listen]
+     * throws, the source is closed and voice input no longer waits for it or interrupts it.
+     */
+    internal inline fun <T> listenOn(source: LocalSpeechSession.AudioSource, listen: () -> T): T {
+        try {
+            listenerMicrophone(source::interrupt)
+            return listen()
+        } finally {
+            source.close()
+            listenerMicrophone(null)
+        }
+    }
+
     /** The listener heard the wake word and keeps recording into [next] until voice input takes it. */
     internal fun offer(next: Handoff) = synchronized(lock) {
         handoff?.expire()

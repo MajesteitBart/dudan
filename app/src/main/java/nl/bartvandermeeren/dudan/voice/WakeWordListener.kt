@@ -95,7 +95,17 @@ class WakeWordListener(
                     }
                     spotterPhrase = wanted
                 }
-                listen(spotter, wanted)
+                try {
+                    listen(spotter, wanted)
+                } catch (e: Exception) {
+                    // Such as a native stream that couldn't be created: load the spotter afresh after a pause,
+                    // rather than end the thread, and the app with it.
+                    Log.w(TAG, "keyword spotter failed", e)
+                    spotter.release()
+                    spotter = null
+                    spotterPhrase = null
+                    WakeMic.await(RETRY_MS)
+                }
             }
         } finally {
             spotter?.release()
@@ -141,37 +151,38 @@ class WakeWordListener(
             WakeMic.await(RETRY_MS)
             return
         }
-        WakeMic.listenerMicrophone(source::interrupt)
-        // Reads wait for audio, so the lock, screen and calls are also watched from the main thread.
-        val watch = object : Runnable {
-            override fun run() {
-                // Not the holds: voice input holds the microphone while it reads the handed-off audio.
-                if (!phoneAllows() || phrase() != wanted) source.interrupt() else main.postDelayed(this, WATCH_MS)
-            }
-        }
-        main.postDelayed(watch, WATCH_MS)
-        val stream = spotter.createStream()
-        try {
-            val samples = FloatArray(CHUNK)
-            val recent = ArrayDeque<ShortArray>(PRE_ROLL_CHUNKS + 1)
-            var chunks = 0
-            while (running && !WakeMic.held) {
-                if (++chunks % CHECK_EVERY == 0 && (!canListen() || phrase() != wanted)) return
-                val pcm = ShortArray(CHUNK)
-                if (!source.read(pcm)) return
-                recent.addLast(pcm)
-                if (recent.size > PRE_ROLL_CHUNKS) recent.removeFirst()
-                for (i in pcm.indices) samples[i] = pcm[i] / 32768f
-                if (heard(spotter, stream, samples)) {
-                    handOff(source, recent)
-                    return
+        // From here on everything is let go of again, also when the native stream can't be created.
+        WakeMic.listenOn(source) {
+            // Reads wait for audio, so the lock, screen and calls are also watched from the main thread.
+            val watch = object : Runnable {
+                override fun run() {
+                    // Not the holds: voice input holds the microphone while it reads the handed-off audio.
+                    if (!phoneAllows() || phrase() != wanted) source.interrupt() else main.postDelayed(this, WATCH_MS)
                 }
             }
-        } finally {
-            main.removeCallbacks(watch)
-            stream.release()
-            source.close()
-            WakeMic.listenerMicrophone(null)
+            var stream: OnlineStream? = null
+            try {
+                main.postDelayed(watch, WATCH_MS)
+                stream = spotter.createStream()
+                val samples = FloatArray(CHUNK)
+                val recent = ArrayDeque<ShortArray>(PRE_ROLL_CHUNKS + 1)
+                var chunks = 0
+                while (running && !WakeMic.held) {
+                    if (++chunks % CHECK_EVERY == 0 && (!canListen() || phrase() != wanted)) return
+                    val pcm = ShortArray(CHUNK)
+                    if (!source.read(pcm)) return
+                    recent.addLast(pcm)
+                    if (recent.size > PRE_ROLL_CHUNKS) recent.removeFirst()
+                    for (i in pcm.indices) samples[i] = pcm[i] / 32768f
+                    if (heard(spotter, stream, samples)) {
+                        handOff(source, recent)
+                        return
+                    }
+                }
+            } finally {
+                main.removeCallbacks(watch)
+                stream?.release()
+            }
         }
     }
 
