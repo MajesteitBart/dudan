@@ -157,6 +157,22 @@ class WakeWordTest {
     }
 
     @Test
+    fun thePhonesRecognizerLeavesTheAudioAfterTheWakeWord() {
+        val handoff = WakeMic.Handoff(silenced = { false })
+        WakeMic.offer(handoff)
+        handoff.push(ShortArray(1600))
+        WakeMic.pause()
+        try {
+            assertTrue(WakeMic.held)
+            // The listener stops recording for it; that recognizer only hears what's said once it listens.
+            assertFalse(handoff.wanted)
+        } finally {
+            WakeMic.release()
+        }
+        assertFalse(WakeMic.held)
+    }
+
+    @Test
     fun aRecordingWithoutAWakeWordWaitsForTheListenerToLetGo() {
         var interrupted = false
         WakeMic.listenerMicrophone { interrupted = true }

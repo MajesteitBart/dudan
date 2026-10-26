@@ -206,6 +206,7 @@
     <string name="wake_word_downloading">Model voor het activeringswoord downloaden… %1$d%%</string>
     <string name="wake_word_download">Model voor het activeringswoord downloaden (%1$d MB)</string>
     <string name="wake_word_crashed">Het model voor het activeringswoord crashte bij het starten op deze telefoon.</string>
+    <string name="wake_word_wait_for_tone">De Android-herkenning neemt je vraag aan tot Orukeet gekozen en geïnstalleerd is onder Spraakinvoer. Die luistert pas even na de zin, dus wacht op de toon en stel dan je vraag.</string>
     <string name="wake_word_needs_assistant">Maak dudan hierboven je standaardassistent. Dan opent het activeringswoord de assistent en blijft het werken na een herstart.</string>
     <string name="notification_channel_wake_word">Activeringswoord</string>
     <string name="wake_word_notification_title">Luistert naar \"%1$s\"</string>

@@ -624,6 +624,11 @@ private fun WakeWordSettings(vm: MainViewModel, settings: AppSettings) {
         context.appContainer.wakeWordModel,
         ModelTexts(R.string.wake_word_ready, R.string.wake_word_downloading, R.string.wake_word_download, R.string.wake_word_crashed),
     )
+    // Only Orukeet gets the audio right after the phrase.
+    val orukeet by vm.orukeetModel.state.collectAsStateWithLifecycle()
+    if (settings.sttEngine != SttEngine.Orukeet || orukeet != ModelPackage.State.Ready) {
+        Notice(stringResource(R.string.wake_word_wait_for_tone), Palette.SparkAmber)
+    }
     val lifecycle = LocalLifecycleOwner.current.lifecycle
     var isDefault by remember { mutableStateOf(true) }
     LaunchedEffect(lifecycle) {

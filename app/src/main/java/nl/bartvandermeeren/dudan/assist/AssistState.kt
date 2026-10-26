@@ -21,6 +21,7 @@ import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.AppVisibility
 import nl.bartvandermeeren.dudan.data.ModelProfile
 import nl.bartvandermeeren.dudan.ui.components.ImageCodec
+import nl.bartvandermeeren.dudan.voice.ListeningTone
 import nl.bartvandermeeren.dudan.voice.SpeechInput
 import nl.bartvandermeeren.dudan.voice.WakePhrase
 
@@ -77,11 +78,9 @@ class AssistState(
      */
     fun onShown(wakeWord: Boolean = false) {
         if (wakeWord && shown) {
-            heardWakeWord = true
-            startListening()
+            startListening(wakeWord = true)
             return
         }
-        heardWakeWord = wakeWord
         shown = true
         AppVisibility.overlayShown = true
         container.phoneControl.ensureRunning()
@@ -94,7 +93,7 @@ class AssistState(
             val current = container.settings.current()
             settings = current
             // Listening comes first: the user may already be talking.
-            if (current.isConfigured && (wakeWord || current.listenOnInvoke) && hasMic()) startListening()
+            if (current.isConfigured && (wakeWord || current.listenOnInvoke) && hasMic()) startListening(wakeWord)
             // Load the voice model now, so a spoken reply doesn't wait for it.
             if (current.speakReplies) speaker.warmUp()
             // The overlay can open without the app ever running, so load the skills for the $ list here too.
@@ -112,13 +111,22 @@ class AssistState(
 
     fun hasMic() = ContextCompat.checkSelfPermission(context, Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED
 
-    fun startListening() {
+    /** Listens for a question. [wakeWord] says the wake word asked for it, so nobody may be looking. */
+    fun startListening(wakeWord: Boolean = false) {
+        heardWakeWord = wakeWord
+        handsFree = wakeWord
         retries = 0
         listen()
     }
 
     /** The wake word opened this recording, so its last word may lead the transcript. */
     private var heardWakeWord = false
+
+    /**
+     * The wake word started this listening and nobody stopped it by hand. The phone's recognizer then
+     * plays a tone once it listens, since it doesn't get what was said right after the phrase.
+     */
+    private var handsFree = false
     private var retries = 0
 
     private fun listen() {
@@ -130,6 +138,9 @@ class AssistState(
         speaker.stop()
         speech.start(
             settings?.speechLanguage,
+            onListening = {
+                if (handsFree && speech.usesPhoneRecognizer) ListeningTone.play()
+            },
             onResult = { result ->
                 val wake = heardWakeWord
                 val heard = if (wake) WakePhrase.stripLeading(result, settings?.wakePhrase.orEmpty()) else result
@@ -145,27 +156,65 @@ class AssistState(
                 }
             },
             onError = { code ->
-                // Silence ends listening. Anything else (microphone busy, recognizer not ready) gets
-                // another try, so the overlay doesn't drop into typing on a hiccup.
-                if (!shown || SpeechInput.isSilence(code) || retries >= MAX_RETRIES || text.isNotBlank()) {
-                    heardWakeWord = false
-                    return@start
+                val next = if (shown && text.isBlank()) {
+                    afterError(code, retries, wakeWord = heardWakeWord && handsFree, phoneRecognizer = speech.usesPhoneRecognizer)
+                } else {
+                    AfterError.End
                 }
-                retries++
-                scope.launch {
-                    delay(RETRY_DELAY_MS * retries)
-                    if (shown && !speech.isActive && text.isBlank()) listen()
+                when (next) {
+                    AfterError.End -> heardWakeWord = false
+                    AfterError.ListenAgain -> {
+                        // Only once: the next silence ends listening.
+                        heardWakeWord = false
+                        listen()
+                    }
+                    AfterError.Retry -> {
+                        retries++
+                        scope.launch {
+                            delay(RETRY_DELAY_MS * retries)
+                            if (shown && !speech.isActive && text.isBlank()) listen()
+                        }
+                    }
                 }
             },
         )
     }
 
-    private companion object {
-        const val MAX_RETRIES = 2
-        const val RETRY_DELAY_MS = 300L
+    internal enum class AfterError {
+        /** Listening ends; the keyboard and the mic button are there. */
+        End,
+
+        /** Listens again after a short wait. */
+        Retry,
+
+        /** Listens again right away, for a question the phone's recognizer missed after the wake word. */
+        ListenAgain,
     }
 
-    fun stopListening() = speech.stop()
+    internal companion object {
+        const val MAX_RETRIES = 2
+        private const val RETRY_DELAY_MS = 300L
+
+        /**
+         * What follows when voice input in the overlay ended with [error] and nothing was typed. Anything
+         * but silence (microphone busy, recognizer not ready) gets [MAX_RETRIES] more tries, so the overlay
+         * doesn't drop into typing on a hiccup. Silence ends listening, except right after the [wakeWord]
+         * on the [phoneRecognizer]: that recognizer doesn't get the audio after the phrase and starts a
+         * moment later, so a question asked straight away can be over before it listens. It listens once
+         * more then, with its tone.
+         */
+        fun afterError(error: Int, retries: Int, wakeWord: Boolean, phoneRecognizer: Boolean): AfterError = when {
+            SpeechInput.isSilence(error) -> if (wakeWord && phoneRecognizer) AfterError.ListenAgain else AfterError.End
+            retries < MAX_RETRIES -> AfterError.Retry
+            else -> AfterError.End
+        }
+    }
+
+    fun stopListening() {
+        // Someone touched the phone: silence after this means there's nothing to ask.
+        handsFree = false
+        speech.stop()
+    }
 
     /**
      * Sends the question. [spoken] says it was asked out loud, so its reply is read aloud. Each send

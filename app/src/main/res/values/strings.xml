@@ -208,6 +208,7 @@
     <string name="wake_word_downloading">Downloading wake word model… %1$d%%</string>
     <string name="wake_word_download">Download wake word model (%1$d MB)</string>
     <string name="wake_word_crashed">The wake word model crashed while starting on this phone.</string>
+    <string name="wake_word_wait_for_tone">The Android recognizer takes your question until Orukeet is chosen and installed under Speech input. It starts listening a moment after the phrase, so wait for the tone, then ask.</string>
     <string name="wake_word_needs_assistant">Make dudan your default assistant, above. Then the wake word opens the assistant and keeps working after a restart.</string>
     <string name="notification_channel_wake_word">Wake word</string>
     <string name="wake_word_notification_title">Listening for \"%1$s\"</string>

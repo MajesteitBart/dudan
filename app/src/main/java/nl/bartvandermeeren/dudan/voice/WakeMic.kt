@@ -39,7 +39,10 @@ object WakeMic {
         null
     }
 
-    /** Pauses the listener without waiting, for the phone's recognizer, which records in its own process. */
+    /**
+     * Pauses the listener without waiting, for the phone's recognizer, which records in its own process.
+     * Audio waiting after a wake word is dropped: that recognizer can't take it.
+     */
     fun pause() = synchronized(lock) {
         holds++
         handoff?.expire()

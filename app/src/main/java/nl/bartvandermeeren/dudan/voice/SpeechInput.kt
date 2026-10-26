@@ -35,8 +35,17 @@ class SpeechInput(private val context: Context) {
     private var local: LocalSpeechSession? = null
     private var onResult: ((String) -> Unit)? = null
     private var onError: ((Int) -> Unit)? = null
+    private var onListening: (() -> Unit)? = null
 
     val isActive: Boolean get() = _phase.value != Phase.Idle
+
+    /**
+     * This voice input went to the phone's recognizer; stays set after it ended, until the next start.
+     * That recognizer records in its own process, so it doesn't get the audio after a wake word: it
+     * only hears what's said once it listens.
+     */
+    var usesPhoneRecognizer = false
+        private set
 
     private var language: String? = null
     private var pauseMs = Endpointer.DEFAULT_END_SILENCE_MS
@@ -45,13 +54,16 @@ class SpeechInput(private val context: Context) {
 
     /**
      * Starts listening in [language], the speech language setting; see [SpeechLanguage]. When Orukeet
-     * can't start (microphone busy, detector broken), the phone's recognizer takes over.
+     * can't start (microphone busy, detector broken), the phone's recognizer takes over. [onListening]
+     * runs once recording has started.
      */
-    fun start(language: String?, onResult: (String) -> Unit, onError: (Int) -> Unit = {}) {
+    fun start(language: String?, onResult: (String) -> Unit, onError: (Int) -> Unit = {}, onListening: () -> Unit = {}) {
         release()
         this.language = SpeechLanguage.normalize(language)
         this.onResult = onResult
         this.onError = onError
+        this.onListening = onListening
+        usesPhoneRecognizer = false
         val container = context.appContainer
         val settings = container.settingsSnapshot.value
         pauseMs = settings.speechPauseMs
@@ -63,9 +75,11 @@ class SpeechInput(private val context: Context) {
     }
 
     private fun startSystem() {
+        usesPhoneRecognizer = true
         candidates = SpeechRecognizers.candidates(context)
         attempt = 0
-        // The phone's recognizer records in its own process, so the wake word listener lets go of the microphone.
+        // The phone's recognizer records in its own process, so the wake word listener lets go of the
+        // microphone, and of the audio after a wake word: only Orukeet can take that.
         if (!pausedWakeWord) {
             pausedWakeWord = true
             WakeMic.pause()
@@ -87,7 +101,10 @@ class SpeechInput(private val context: Context) {
 
                 override fun onListening() {
                     // After a stop() that came while starting, the phase stays Processing.
-                    if (current && _phase.value == Phase.Starting) _phase.value = Phase.Listening
+                    if (current && _phase.value == Phase.Starting) {
+                        _phase.value = Phase.Listening
+                        onListening?.invoke()
+                    }
                 }
 
                 override fun onLevel(level: Float) {
@@ -221,6 +238,7 @@ class SpeechInput(private val context: Context) {
     }
 
     private fun release() {
+        onListening = null
         local?.cancel()
         local = null
         recognizer?.runCatching { cancel(); destroy() }
@@ -235,7 +253,10 @@ class SpeechInput(private val context: Context) {
 
     private val listener = object : RecognitionListener {
         override fun onReadyForSpeech(params: Bundle?) {
+            // After a stop() that came while starting, the phase stays Processing.
+            if (_phase.value != Phase.Starting) return
             _phase.value = Phase.Listening
+            onListening?.invoke()
         }
 
         override fun onBeginningOfSpeech() = Unit
