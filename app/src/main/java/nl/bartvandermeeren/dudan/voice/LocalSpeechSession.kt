@@ -41,7 +41,29 @@ class LocalSpeechSession(
         fun onPartial(text: String)
         fun onProcessing()
         fun onResult(text: String)
+
+        /** Recording broke or found nothing after [onListening]; a [SpeechRecognizer] error code. */
         fun onError(code: Int)
+
+        /** Recording never started; called instead of [onListening], and nothing follows. */
+        fun onStartFailed(failure: StartFailure)
+    }
+
+    /** Why a recording couldn't start, and whether the phone's recognizer may do better. */
+    enum class StartFailure(
+        /** The [SpeechRecognizer] error code that stands for it. */
+        val code: Int,
+        /** The phone's recognizer records in its own process, so it can still try. */
+        val phoneRecognizerCanTry: Boolean,
+    ) {
+        /** A call holds the audio: any recording, also the phone recognizer's, would only hear the call. */
+        Call(SpeechRecognizer.ERROR_AUDIO, phoneRecognizerCanTry = false),
+
+        /** The microphone didn't open, such as while another app records. */
+        Microphone(SpeechRecognizer.ERROR_AUDIO, phoneRecognizerCanTry = true),
+
+        /** Silero VAD failed to load. */
+        Detector(SpeechRecognizer.ERROR_CLIENT, phoneRecognizerCanTry = true),
     }
 
     /** Where the audio comes from: the microphone, or a test recording in debug builds. */
@@ -116,7 +138,7 @@ class LocalSpeechSession(
             .build()
         if (audio.requestAudioFocus(focus) != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
             // A phone call holds the audio; recording now would only hear the call.
-            post { onError(SpeechRecognizer.ERROR_AUDIO) }
+            post { onStartFailed(StartFailure.Call) }
             return
         }
         // The wake word was heard on the listener's microphone; what follows it comes from there too.
@@ -126,14 +148,14 @@ class LocalSpeechSession(
         try {
             source = TestMicrophone.open(context) ?: afterWakeWord ?: openMicrophone(headset?.input)
             if (source == null) {
-                post { onError(SpeechRecognizer.ERROR_AUDIO) }
+                post { onStartFailed(StartFailure.Microphone) }
                 return
             }
             vad = try {
                 engine.newVad()
             } catch (e: Throwable) {
                 Log.w(TAG, "voice activity detector failed to load", e)
-                post { onError(SpeechRecognizer.ERROR_CLIENT) }
+                post { onStartFailed(StartFailure.Detector) }
                 return
             }
             record(source, vad)

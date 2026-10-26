@@ -45,7 +45,7 @@ class SpeechInput(private val context: Context) {
 
     /**
      * Starts listening in [language], the speech language setting; see [SpeechLanguage]. When Orukeet
-     * can't start (microphone busy, model broken), the phone's recognizer takes over.
+     * can't start (microphone busy, detector broken), the phone's recognizer takes over.
      */
     fun start(language: String?, onResult: (String) -> Unit, onError: (Int) -> Unit = {}) {
         release()
@@ -84,12 +84,9 @@ class SpeechInput(private val context: Context) {
             engine,
             object : LocalSpeechSession.Listener {
                 private val current get() = local === session
-                private var listened = false
 
                 override fun onListening() {
-                    if (!current) return
-                    listened = true
-                    _phase.value = Phase.Listening
+                    if (current) _phase.value = Phase.Listening
                 }
 
                 override fun onLevel(level: Float) {
@@ -118,18 +115,20 @@ class SpeechInput(private val context: Context) {
                 override fun onError(code: Int) {
                     if (!current) return
                     Log.w("DudanSpeech", "Orukeet input error $code")
-                    if (!listened && code != SpeechRecognizer.ERROR_AUDIO) {
-                        // Never got to listen (the detector failed to load): the phone's recognizer still can.
-                        local?.cancel()
-                        local = null
-                        startSystem()
+                    fail(code)
+                }
+
+                override fun onStartFailed(failure: LocalSpeechSession.StartFailure) {
+                    if (!current) return
+                    Log.w("DudanSpeech", "Orukeet could not start: $failure")
+                    if (!failure.phoneRecognizerCanTry) {
+                        fail(failure.code)
                         return
                     }
-                    val callback = this@SpeechInput.onError
-                    onResult = null
-                    this@SpeechInput.onError = null
-                    release()
-                    callback?.invoke(code)
+                    // The microphone or the detector: the phone's recognizer records in its own process, so it still can.
+                    local?.cancel()
+                    local = null
+                    startSystem()
                 }
             },
             endSilenceMs = pauseMs,
@@ -139,15 +138,20 @@ class SpeechInput(private val context: Context) {
         session.start()
     }
 
+    /** Ends this voice input with [code]. */
+    private fun fail(code: Int) {
+        val callback = onError
+        onResult = null
+        onError = null
+        release()
+        callback?.invoke(code)
+    }
+
     /** Starts the current candidate recognizer; falls back to the on-device one when none is installed. */
     private fun launch() {
         val created = SpeechRecognizers.create(context, candidates.getOrNull(attempt))
         if (created == null) {
-            val callback = onError
-            onResult = null
-            onError = null
-            release()
-            callback?.invoke(ERROR_UNAVAILABLE)
+            fail(ERROR_UNAVAILABLE)
             return
         }
         recognizer = created
