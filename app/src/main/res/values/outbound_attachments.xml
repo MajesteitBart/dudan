@@ -1,0 +1,12 @@
+<resources>
+    <string name="attachment_save">Save file</string>
+    <string name="attachment_saved">File saved</string>
+    <string name="attachment_unavailable">Couldn\'t download the file. Try again.</string>
+    <string name="attachment_gone">This file is no longer available.</string>
+    <string name="attachment_save_failed">Couldn\'t save the file. Try again.</string>
+    <!-- Reply notification for an answer with only files; %2$s lists their names. -->
+    <plurals name="attachment_notification">
+        <item quantity="one">Sent %1$d file: %2$s</item>
+        <item quantity="other">Sent %1$d files: %2$s</item>
+    </plurals>
+</resources>

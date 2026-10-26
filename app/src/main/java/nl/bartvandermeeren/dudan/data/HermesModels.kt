@@ -75,6 +75,7 @@ data class HermesMessage(
     val timestamp: Double?,
     val displayKind: String?,
     val reasoning: String?,
+    val attachments: List<OutboundAttachment> = emptyList(),
 ) {
     companion object {
         fun from(o: JsonObject): HermesMessage = HermesMessage(
@@ -87,6 +88,7 @@ data class HermesMessage(
             timestamp = o.dbl("timestamp"),
             displayKind = o.str("display_kind"),
             reasoning = o.str("reasoning_content") ?: o.str("reasoning"),
+            attachments = OutboundAttachment.parse(o["attachments"]),
         )
 
         private fun JsonElement?.parseToolCalls(): List<ToolCallRef> {
@@ -179,8 +181,8 @@ sealed interface AgentEvent {
     data class ApprovalResolved(val requestId: String?) : AgentEvent
     data class SubagentStarted(val preview: String?) : AgentEvent
     data class SubagentFinished(val summary: String?, val status: String?) : AgentEvent
-    data class FinalText(val content: String) : AgentEvent
-    data class Finished(val outcome: RunOutcome, val output: String?, val error: String?) : AgentEvent
+    data class FinalText(val content: String, val attachments: List<OutboundAttachment> = emptyList()) : AgentEvent
+    data class Finished(val outcome: RunOutcome, val output: String?, val error: String?, val attachments: List<OutboundAttachment> = emptyList()) : AgentEvent
     data class Failed(val message: String) : AgentEvent
     data object StreamClosed : AgentEvent
 }
@@ -209,8 +211,8 @@ object AgentEventParser {
             "approval.responded" -> AgentEvent.ApprovalResolved(o.str("request_id"))
             "subagent.start" -> AgentEvent.SubagentStarted(o.str("preview") ?: o.str("goal"))
             "subagent.complete" -> AgentEvent.SubagentFinished(o.str("summary") ?: o.str("preview"), o.str("status"))
-            "assistant.completed" -> AgentEvent.FinalText(o.str("content").orEmpty())
-            "run.completed" -> AgentEvent.Finished(RunOutcome.Completed, o.str("output"), null)
+            "assistant.completed" -> AgentEvent.FinalText(o.str("content").orEmpty(), OutboundAttachment.parse(o["attachments"]))
+            "run.completed" -> AgentEvent.Finished(RunOutcome.Completed, o.str("output"), null, OutboundAttachment.parse(o["attachments"]))
             "run.failed" -> AgentEvent.Finished(RunOutcome.Failed, o.str("output"), o.str("error"))
             "run.cancelled" -> AgentEvent.Finished(RunOutcome.Cancelled, o.str("output"), o.str("error"))
             "run.interrupted" -> AgentEvent.Finished(RunOutcome.Interrupted, o.str("output"), o.str("error"))
@@ -295,6 +297,7 @@ data class RunStatus(
     val output: String?,
     val error: String?,
     val approval: ApprovalRequest?,
+    val attachments: List<OutboundAttachment> = emptyList(),
 ) {
     val isTerminal: Boolean get() = status in setOf("completed", "failed", "cancelled", "interrupted")
     val outcome: RunOutcome

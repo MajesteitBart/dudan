@@ -6,6 +6,7 @@ import kotlin.coroutines.resumeWithException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.channels.Channel
 import kotlinx.coroutines.channels.awaitClose
+import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.buffer
 import kotlinx.coroutines.flow.callbackFlow
@@ -47,6 +48,56 @@ class HermesApi(
     suspend fun verify(): String? = capabilities().model
 
     suspend fun capabilities(): ServerCapabilities = ServerCapabilities.from(getJson("v1", "capabilities").asObject())
+
+    // Attachment downloads use one fixed route on the configured server and never follow a redirect. The
+    // call limit leaves a 100 MiB file 10 minutes, about 170 KB/s.
+    private val attachmentHttp by lazy { http.newBuilder().cache(null).followRedirects(false).followSslRedirects(false).callTimeout(10, java.util.concurrent.TimeUnit.MINUTES).build() }
+
+    /**
+     * Downloads [file] into [destination], a private temporary file, through
+     * `GET /api/sessions/{session}/attachments/{input}/{index}` with the bearer header. It stops past the
+     * announced size and checks the exact size and SHA-256 at the end. On any failure, also cancellation,
+     * [destination] is deleted, so nothing unverified is ever shown or exported.
+     */
+    suspend fun downloadAttachment(file: OutboundAttachment, destination: java.io.File) {
+        try {
+            require(file.size in 0..OutboundAttachment.MAX_BYTES) { "Attachment too large" }
+            val request = request("api", "sessions", file.sessionId, "attachments", file.inputId, file.index.toString())
+                .header("Accept", "*/*").get().build()
+            val response = attachmentHttp.newCall(request).await()
+            try {
+                withContext(Dispatchers.IO) {
+                    if (!response.isSuccessful) throw HermesException(response.code, "Attachment unavailable")
+                    val body = response.body ?: throw IOException("Missing attachment")
+                    val length = body.contentLength()
+                    if (length >= 0 && length != file.size) throw IOException("Attachment size mismatch")
+                    val digest = java.security.MessageDigest.getInstance("SHA-256")
+                    var total = 0L
+                    body.byteStream().use { source ->
+                        destination.outputStream().use { target ->
+                            val buffer = ByteArray(64 * 1024)
+                            while (true) {
+                                ensureActive()
+                                val count = source.read(buffer)
+                                if (count < 0) break
+                                total += count
+                                if (total > file.size) throw IOException("Attachment size mismatch")
+                                digest.update(buffer, 0, count)
+                                target.write(buffer, 0, count)
+                            }
+                        }
+                    }
+                    val hash = digest.digest().joinToString("") { "%02x".format(it) }
+                    if (total != file.size || hash != file.sha256) throw IOException("Attachment checksum mismatch")
+                }
+            } finally {
+                response.close()
+            }
+        } catch (error: Throwable) {
+            destination.delete()
+            throw error
+        }
+    }
 
     // Desktop requests use fixed routes on the configured server. Disable automatic POST retries and redirects.
     private val desktopHttp by lazy { http.newBuilder().cache(null).retryOnConnectionFailure(false).followRedirects(false).followSslRedirects(false).callTimeout(15, java.util.concurrent.TimeUnit.SECONDS).build() }
@@ -249,6 +300,7 @@ class HermesApi(
             output = o.str("output"),
             error = o.str("error"),
             approval = o["approval"].asObject()?.let(AgentEventParser::parseApproval),
+            attachments = OutboundAttachment.parse(o["attachments"]),
         )
     }
 

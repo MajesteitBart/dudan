@@ -99,8 +99,9 @@ fun FileBadge(file: FileRef, modifier: Modifier = Modifier) {
     }
 }
 
+/** A file's kind as an icon on a small tile. */
 @Composable
-private fun FileKind(mime: String, name: String) {
+internal fun FileKind(mime: String, name: String) {
     Box(Modifier.size(40.dp).pane(RoundedCornerShape(12.dp), Palette.Surface, outline = Palette.Hairline), contentAlignment = Alignment.Center) {
         Icon(fileIcon(mime, name), contentDescription = null, tint = Palette.Icon, modifier = Modifier.size(22.dp))
     }

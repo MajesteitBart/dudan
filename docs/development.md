@@ -70,6 +70,7 @@ adb shell am start -n nl.bartvandermeeren.aight.debug/nl.bartvandermeeren.dudan.
 ## Code map
 
 - Agent desktop: `data/DesktopProtocol.kt` defines versioned capability/session parsing and aspect-fit coordinates; the fixed authenticated routes are in `HermesApi`. `ui/chat/AgentScreen.kt` renders cards in the real conversation and the expanded viewer. `DesktopController` owns frame polling and the control lease for the visible viewer. See [the protocol and acceptance guide](agent-screen.md).
+- Files from the agent: `data/OutboundAttachment.kt` parses and checks the version-1 metadata, `HermesApi.downloadAttachment` fetches the bytes from the fixed route and verifies them, `ui/chat/OutboundAttachments.kt` draws the previews and Save file, and `ui/components/ImageLimits.kt` sets the pixel limit for decoding a preview. See [Files returned by Clark](outbound-attachments.md).
 
 - `data/`: Hermes HTTP client, SSE reader, payload parsing, settings with the API key encrypted by an Android Keystore key. `UploadClient` talks to the upload service; `AttachmentNotes` writes and reads Hermes' file notes; `SkillCatalog` loads Hermes' skill list once per server for the `$` list, the Skills screen and the engine
 - `openui/`: OpenUI Lang parser and evaluator (`OpenUiParser`, `OpenUiRuntime`), the instructions the agent gets (`OpenUiPrompt`) and the markdown export for copy and speech (`OpenUiText`). `ui/openui/` renders the components

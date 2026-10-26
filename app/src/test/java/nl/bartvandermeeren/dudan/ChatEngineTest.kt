@@ -6,6 +6,7 @@ import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.atomic.AtomicLong
+import java.util.concurrent.atomic.AtomicReference
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.asCoroutineDispatcher
@@ -360,6 +361,36 @@ class ChatEngineTest {
         // The reply notifier keys off this to stay quiet about a turn that opened something.
         assertEquals(listOf("mcp__phone__open_app"), turn.tools)
         assertTrue(PhoneControl.openedSomething(turn.tools))
+    }
+
+    @Test
+    fun anAnswerWithOnlyFilesCompletesTheTurn() {
+        // The reply notification keys off this; an answer with only files names them instead of text.
+        val file = { session: String ->
+            """{"version":1,"session_id":"$session","input_id":"input-a","index":0,"name":"screen.png","mime_type":"image/png","size":12,"sha256":"${"a".repeat(64)}"}"""
+        }
+        val sessionId = AtomicReference("")
+        script { request ->
+            when {
+                request.path == "/v1/runs" -> {
+                    sessionId.set(json(request)["session_id"]!!.jsonPrimitive.content)
+                    MockResponse().setResponseCode(202).setBody("""{"run_id":"run_files"}""")
+                }
+                request.path!!.endsWith("/events") -> sse(
+                    """{"event":"assistant.completed","content":"","attachments":[${file(sessionId.get())}]}""",
+                    """{"event":"run.completed","output":"","attachments":[${file(sessionId.get())},${file("other-chat").replace("index\":0", "index\":1")}]}""",
+                )
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        val reply = sendAndSettle("Stuur een screenshot")
+        assertEquals(MessageState.Done, reply.state)
+        val turn = runBlocking {
+            withTimeout(5_000) { withContext(dispatcher) { engine.completedTurns }.first { it != null }!! }
+        }
+        assertEquals("", turn.text)
+        // A file listed under another chat doesn't show here, so it isn't announced either.
+        assertEquals(listOf("screen.png"), turn.files)
     }
 
     @Test

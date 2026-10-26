@@ -38,6 +38,8 @@ Attach photos, PDFs, spreadsheets, audio, video or other files, with up to eight
 
 Uploads resume after a dropped connection. Files other than photos need the small [upload service](tools/hermes-upload/README.md) alongside Hermes.
 
+With a compatible Clark server, the agent can send files back too. Images show in the chat, and Save file stores any file, an APK included, where you choose. See [Files returned by Clark](docs/outbound-attachments.md).
+
 ## Keep up with the work
 
 With a compatible Clark server, an [Agent screen](docs/agent-screen.md) card shows the task's dedicated desktop. Open it to watch, take control, and explicitly return control to the agent. Existing Hermes servers keep working with this feature hidden.

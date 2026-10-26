@@ -1,0 +1,12 @@
+<resources>
+    <string name="attachment_save">Bestand opslaan</string>
+    <string name="attachment_saved">Bestand opgeslagen</string>
+    <string name="attachment_unavailable">Kan het bestand niet downloaden. Probeer het opnieuw.</string>
+    <string name="attachment_gone">Dit bestand is niet meer beschikbaar.</string>
+    <string name="attachment_save_failed">Kan het bestand niet opslaan. Probeer het opnieuw.</string>
+    <!-- Reply notification for an answer with only files; %2$s lists their names. -->
+    <plurals name="attachment_notification">
+        <item quantity="one">%1$d bestand gestuurd: %2$s</item>
+        <item quantity="other">%1$d bestanden gestuurd: %2$s</item>
+    </plurals>
+</resources>

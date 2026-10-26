@@ -342,6 +342,8 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val messages = conversation.messages
     val listState = rememberLazyListState()
+    // Saving a file the agent returned keeps going when its row scrolls away, until the chat closes.
+    val saves = rememberAttachmentSaves()
     var follow by remember { mutableStateOf(true) }
     var previousCount by remember(conversation.sessionId) { mutableIntStateOf(0) }
 
@@ -393,6 +395,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                             onSpeak = { vm.toggleSpeak(message.id, message.text) },
                             onRetry = vm::retry,
                             onApproval = vm::resolveApproval,
+                            attachments = { OutboundAttachments(vm.api, conversation.sessionId, message.attachments, saves) },
                         )
                     }
                 }

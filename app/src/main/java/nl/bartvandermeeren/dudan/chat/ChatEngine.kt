@@ -105,13 +105,18 @@ class ChatEngine(
     private val _completedTurns = MutableStateFlow<CompletedTurn?>(null)
     val completedTurns: StateFlow<CompletedTurn?> = _completedTurns.asStateFlow()
 
-    /** [tools] names the tools the turn called, as Hermes reports them (MCP tools as mcp__server__tool). */
+    /**
+     * [tools] names the tools the turn called, as Hermes reports them (MCP tools as mcp__server__tool).
+     * [files] names the files the agent returned with the answer; an answer can have only files, and
+     * then [text] is blank.
+     */
     data class CompletedTurn(
         val sessionId: String,
         val messageId: String,
         val text: String,
         val seq: Long,
         val tools: List<String> = emptyList(),
+        val files: List<String> = emptyList(),
     )
 
     /**
@@ -496,9 +501,11 @@ class ChatEngine(
             }
             if (turns[sessionId] === turn) turns.remove(sessionId)
             val message = conversations[sessionId]?.value?.messages?.firstOrNull { it.id == turn.messageId }
-            if (message != null && message.state == MessageState.Done && message.text.isNotBlank()) {
+            // Only files listed under this chat show in it, so only those count.
+            val files = message?.attachments.orEmpty().filter { it.sessionId == sessionId }.map { it.name }
+            if (message != null && message.state == MessageState.Done && (message.text.isNotBlank() || files.isNotEmpty())) {
                 val tools = message.steps.filter { it.kind == StepKind.Tool }.map { it.title }
-                _completedTurns.value = CompletedTurn(sessionId, turn.messageId, message.text, idCounter.incrementAndGet(), tools)
+                _completedTurns.value = CompletedTurn(sessionId, turn.messageId, message.text, idCounter.incrementAndGet(), tools, files)
             }
             refreshSessions()
             // A turn that sent work to the background, or ran while earlier work was out, may have
@@ -688,7 +695,7 @@ class ChatEngine(
             if (status.approval != null) updateMessage(turn.sessionId, turn.messageId) { it.copy(approval = status.approval) }
             if (status.isTerminal) {
                 updateMessage(turn.sessionId, turn.messageId) {
-                    TurnReducer.finish(it, status.outcome, status.output, status.error, System.currentTimeMillis())
+                    TurnReducer.finish(it.copy(attachments = status.attachments.ifEmpty { it.attachments }), status.outcome, status.output, status.error, System.currentTimeMillis())
                 }
                 return
             }
@@ -701,11 +708,11 @@ class ChatEngine(
         val history = runCatching { HistoryMapper.map(api.sessionMessages(turn.sessionId).messages) }.getOrNull()
         val question = history?.indexOfLast { it.role == Role.User && it.text.trim() == turn.text.trim() } ?: -1
         val answer = if (question >= 0) {
-            history!!.drop(question + 1).firstOrNull { it.role == Role.Assistant && it.text.isNotBlank() }
+            history!!.drop(question + 1).firstOrNull { it.role == Role.Assistant && (it.text.isNotBlank() || it.attachments.isNotEmpty()) }
         } else null
         if (answer != null) {
             updateMessage(turn.sessionId, turn.messageId) {
-                TurnReducer.finish(it.copy(steps = answer.steps.ifEmpty { it.steps }), RunOutcome.Completed, answer.text, null, System.currentTimeMillis())
+                TurnReducer.finish(it.copy(steps = answer.steps.ifEmpty { it.steps }, attachments = answer.attachments), RunOutcome.Completed, answer.text, null, System.currentTimeMillis())
             }
         } else {
             fail(turn, "Lost track of this run. Reopen the chat to see whether Hermes finished it.")
