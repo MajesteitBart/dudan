@@ -143,25 +143,18 @@ class LocalSpeechSession(
         }
         // The wake word was heard on the listener's microphone; what follows it comes from there too.
         val headset = if (afterWakeWord == null) HeadsetMicrophone.connect(audio) { live } else null
-        var source: AudioSource? = null
-        var vad: Vad? = null
         try {
-            source = TestMicrophone.open(context) ?: afterWakeWord ?: openMicrophone(headset?.input)
-            if (source == null) {
-                post { onStartFailed(StartFailure.Microphone) }
-                return
-            }
-            vad = try {
-                engine.newVad()
-            } catch (e: Throwable) {
-                Log.w(TAG, "voice activity detector failed to load", e)
-                post { onStartFailed(StartFailure.Detector) }
-                return
-            }
-            record(source, vad)
+            recordWithInputs(
+                openSource = { TestMicrophone.open(context) ?: afterWakeWord ?: openMicrophone(headset?.input) },
+                newDetector = engine::newVad,
+                releaseDetector = Vad::release,
+                startFailed = { failure, cause ->
+                    if (cause != null) Log.w(TAG, "recording could not start: $failure", cause)
+                    post { onStartFailed(failure) }
+                },
+                record = ::record,
+            )
         } finally {
-            source?.close()
-            vad?.release()
             headset?.disconnect()
             audio.abandonAudioFocusRequest(focus)
         }
@@ -330,6 +323,35 @@ class LocalSpeechSession(
         private fun levelOf(rms: Double): Float {
             val db = 20 * log10(rms.coerceAtLeast(1e-6))
             return ((db + 55) / 40).toFloat().coerceIn(0f, 1f)
+        }
+
+        /**
+         * Opens the audio source, then the voice detector, and hands both to [record]; closes them
+         * afterwards. When one of them won't open, [startFailed] says which (with the detector's
+         * exception), and nothing is recorded.
+         */
+        internal fun <D> recordWithInputs(
+            openSource: () -> AudioSource?,
+            newDetector: () -> D,
+            releaseDetector: (D) -> Unit,
+            startFailed: (StartFailure, Throwable?) -> Unit,
+            record: (AudioSource, D) -> Unit,
+        ) {
+            val source = openSource() ?: return startFailed(StartFailure.Microphone, null)
+            try {
+                val detector = try {
+                    newDetector()
+                } catch (e: Throwable) {
+                    return startFailed(StartFailure.Detector, e)
+                }
+                try {
+                    record(source, detector)
+                } finally {
+                    releaseDetector(detector)
+                }
+            } finally {
+                source.close()
+            }
         }
 
         /** The microphone, tuned for recognition, as an [AudioSource]; null when it can't be opened. */
