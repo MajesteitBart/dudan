@@ -97,10 +97,10 @@ class OrukeetEngine(private val model: ModelPackage, private val assets: AssetMa
      */
     private fun inLanguage(engine: OfflineRecognizer, primer: LanguagePrimer, samples: FloatArray, plain: String, language: String?): String {
         val wanted = SpeechLanguage.normalize(language) ?: return plain
-        val heard = SpeechText.guessLanguage(plain) ?: return plain
+        val heard = LanguageGuess.guess(plain) ?: return plain
         if (SpeechLanguage.sameLanguage(heard, wanted)) return plain
         val again = primed(engine, primer, samples)
-        val guess = SpeechText.guessLanguage(again) ?: return plain
+        val guess = LanguageGuess.guess(again) ?: return plain
         return if (SpeechLanguage.sameLanguage(guess, wanted)) again else plain
     }
 
