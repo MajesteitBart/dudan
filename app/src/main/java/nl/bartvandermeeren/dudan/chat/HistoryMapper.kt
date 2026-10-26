@@ -6,6 +6,7 @@ import kotlinx.serialization.json.contentOrNull
 import nl.bartvandermeeren.dudan.data.AttachmentNotes
 import nl.bartvandermeeren.dudan.data.HermesJson
 import nl.bartvandermeeren.dudan.data.HermesMessage
+import nl.bartvandermeeren.dudan.data.OutboundAttachment
 import nl.bartvandermeeren.dudan.data.contentImages
 import nl.bartvandermeeren.dudan.data.contentText
 
@@ -18,13 +19,16 @@ object HistoryMapper {
         val out = mutableListOf<UiMessage>()
         val steps = mutableListOf<Step>()
         val reasoning = StringBuilder()
+        // Files the agent returned wait for the next reply, like the steps.
+        val files = mutableListOf<OutboundAttachment>()
         var turnStartedAt: Long? = null
 
         fun flushWork(index: Int, finishedAt: Long?) {
-            if (steps.isEmpty() && reasoning.isEmpty()) return
+            if (steps.isEmpty() && reasoning.isEmpty() && files.isEmpty()) return
             out += UiMessage(
                 id = "h_work_$index",
                 role = Role.Assistant,
+                attachments = files.toList(),
                 steps = steps.toList(),
                 reasoning = reasoning.toString(),
                 startedAtMs = turnStartedAt,
@@ -32,10 +36,14 @@ object HistoryMapper {
             )
             steps.clear()
             reasoning.setLength(0)
+            files.clear()
         }
 
         // Compression can leave two copies of one delivery; show it once.
         val delivered = mutableSetOf<String>()
+        // Clark can list an answer's files on more than one of its rows, the one that called attach_file
+        // among them; each file shows once.
+        val shownFiles = mutableSetOf<Triple<String, String, Int>>()
 
         messages.forEachIndexed { index, message ->
             if (message.displayKind == "hidden") return@forEachIndexed
@@ -70,16 +78,18 @@ object HistoryMapper {
                 "assistant" -> {
                     message.reasoning?.takeIf { it.isNotBlank() }?.let { reasoning.append(it.trim()).append("\n\n") }
                     val text = message.content.contentText()
+                    message.attachments.filterTo(files) { shownFiles.add(Triple(it.sessionId, it.inputId, it.index)) }
                     if (message.toolCalls.isNotEmpty()) {
                         if (text.isNotBlank()) steps += Step(StepKind.Commentary, text.trim())
                         message.toolCalls.forEach { call ->
                             steps += Step(StepKind.Tool, call.name, detail = summarizeArguments(call.arguments), callId = call.id)
                         }
-                    } else if (text.isNotBlank()) {
+                    } else if (text.isNotBlank() || files.isNotEmpty()) {
                         out += UiMessage(
                             id = message.id?.let { "h_$it" } ?: "h_$index",
                             role = Role.Assistant,
                             text = text,
+                            attachments = files.toList(),
                             steps = steps.toList(),
                             reasoning = reasoning.toString().trim(),
                             startedAtMs = turnStartedAt,
@@ -87,6 +97,7 @@ object HistoryMapper {
                         )
                         steps.clear()
                         reasoning.setLength(0)
+                        files.clear()
                     }
                 }
                 "tool" -> {
@@ -139,8 +150,8 @@ object HistoryMapper {
     private fun holdsTurn(transcript: List<UiMessage>, savedQuestion: Int, answer: UiMessage?): Boolean {
         // A stopped turn stays as the user left it; Hermes may have saved half a reply.
         if (answer?.state == MessageState.Cancelled) return false
-        val savedReply = transcript.drop(savedQuestion + 1).any { it.role == Role.Assistant && it.text.isNotBlank() }
-        return savedReply || answer == null || (answer.state == MessageState.Done && answer.text.isBlank())
+        val savedReply = transcript.drop(savedQuestion + 1).any { it.role == Role.Assistant && (it.text.isNotBlank() || it.attachments.isNotEmpty()) }
+        return savedReply || answer == null || (answer.state == MessageState.Done && answer.text.isBlank() && answer.attachments.isEmpty())
     }
 
     /**

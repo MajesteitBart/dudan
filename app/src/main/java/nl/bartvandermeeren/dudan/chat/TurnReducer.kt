@@ -70,9 +70,14 @@ object TurnReducer {
             }
         }
 
-        is AgentEvent.FinalText -> if (event.content.isNotBlank()) message.copy(text = event.content) else message
+        // Files come with the answer; a repeat or a later event without them keeps the ones already shown.
+        is AgentEvent.FinalText -> message.copy(
+            text = event.content.takeIf { it.isNotBlank() } ?: message.text,
+            attachments = event.attachments.ifEmpty { message.attachments },
+        )
 
-        is AgentEvent.Finished -> finish(message, event.outcome, event.output, event.error, nowMs)
+        is AgentEvent.Finished ->
+            finish(message.copy(attachments = event.attachments.ifEmpty { message.attachments }), event.outcome, event.output, event.error, nowMs)
 
         is AgentEvent.Failed -> message.copy(
             state = MessageState.Failed,

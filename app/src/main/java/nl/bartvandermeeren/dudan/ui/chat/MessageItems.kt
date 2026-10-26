@@ -162,6 +162,11 @@ private fun MessageImage(ref: ImageRef) {
     }
 }
 
+/**
+ * An answer: the work panel, approval, text and status. [attachments] draws the files returned with it
+ * below the text. The side-key overlay leaves it empty, since Save file needs an activity for the
+ * document picker.
+ */
 @Composable
 fun AssistantMessageItem(
     message: UiMessage,
@@ -173,6 +178,7 @@ fun AssistantMessageItem(
     onApproval: (String) -> Unit,
     modifier: Modifier = Modifier,
     showDisclaimer: Boolean = true,
+    attachments: @Composable () -> Unit = {},
 ) {
     Column(
         modifier
@@ -202,6 +208,7 @@ fun AssistantMessageItem(
                 SelectionContainer { Markdown(message.text) }
             }
         }
+        attachments()
         when (message.state) {
             MessageState.Failed -> ErrorRow(message.error ?: stringResource(R.string.error_generic), onRetry = if (isLast) onRetry else null)
             MessageState.Cancelled -> Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {

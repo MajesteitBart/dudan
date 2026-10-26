@@ -688,7 +688,7 @@ class ChatEngine(
             if (status.approval != null) updateMessage(turn.sessionId, turn.messageId) { it.copy(approval = status.approval) }
             if (status.isTerminal) {
                 updateMessage(turn.sessionId, turn.messageId) {
-                    TurnReducer.finish(it, status.outcome, status.output, status.error, System.currentTimeMillis())
+                    TurnReducer.finish(it.copy(attachments = status.attachments.ifEmpty { it.attachments }), status.outcome, status.output, status.error, System.currentTimeMillis())
                 }
                 return
             }
@@ -701,11 +701,11 @@ class ChatEngine(
         val history = runCatching { HistoryMapper.map(api.sessionMessages(turn.sessionId).messages) }.getOrNull()
         val question = history?.indexOfLast { it.role == Role.User && it.text.trim() == turn.text.trim() } ?: -1
         val answer = if (question >= 0) {
-            history!!.drop(question + 1).firstOrNull { it.role == Role.Assistant && it.text.isNotBlank() }
+            history!!.drop(question + 1).firstOrNull { it.role == Role.Assistant && (it.text.isNotBlank() || it.attachments.isNotEmpty()) }
         } else null
         if (answer != null) {
             updateMessage(turn.sessionId, turn.messageId) {
-                TurnReducer.finish(it.copy(steps = answer.steps.ifEmpty { it.steps }), RunOutcome.Completed, answer.text, null, System.currentTimeMillis())
+                TurnReducer.finish(it.copy(steps = answer.steps.ifEmpty { it.steps }, attachments = answer.attachments), RunOutcome.Completed, answer.text, null, System.currentTimeMillis())
             }
         } else {
             fail(turn, "Lost track of this run. Reopen the chat to see whether Hermes finished it.")

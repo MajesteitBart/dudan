@@ -3,6 +3,7 @@ package nl.bartvandermeeren.dudan.chat
 import nl.bartvandermeeren.dudan.data.ApprovalRequest
 import nl.bartvandermeeren.dudan.data.FileRef
 import nl.bartvandermeeren.dudan.data.ModelChoice
+import nl.bartvandermeeren.dudan.data.OutboundAttachment
 import nl.bartvandermeeren.dudan.data.SessionSummary
 
 /** [Background] is a result a subagent delivered after the agent's turn ended; see [BackgroundResult]. */
@@ -33,6 +34,8 @@ data class UiMessage(
     val images: List<ImageRef> = emptyList(),
     /** Files the user attached; they are on the Hermes host, see data/AttachmentNotes. */
     val files: List<FileRef> = emptyList(),
+    /** Files the agent returned with this answer; see data/OutboundAttachment. */
+    val attachments: List<OutboundAttachment> = emptyList(),
     val steps: List<Step> = emptyList(),
     val reasoning: String = "",
     val state: MessageState = MessageState.Done,
