@@ -235,14 +235,16 @@ class ChatEngine(
         val flow = conversations[sessionId] ?: return
         val current = flow.value
         if (!current.awaitingReview || current.isBusy || current.reviewing) return
-        val result = current.messages.last().background?.key ?: return
-        val request = previous ?: ReviewRequest(reviewKey(current.messages.takeLastWhile { it.role == Role.Background }.last { it.background?.interim == false }))
+        // Scheduled task results that came in after the background results don't count as moving on.
+        val results = Conversation.latestResults(current.messages)
+        val result = results.last().background?.key ?: return
+        val request = previous ?: ReviewRequest(reviewKey(results.last { it.background?.interim == false }))
         flow.update { it.copy(reviewing = true, reviewError = null) }
         scope.launch {
             try {
                 val rows = api.sessionMessages(sessionId).messages
                 val transcript = HistoryMapper.map(rows)
-                if (transcript.takeLastWhile { it.role == Role.Background }.none { it.background?.key == result }) {
+                if (Conversation.latestResults(transcript).none { it.background?.key == result }) {
                     // Someone continued already or the chat moved on; show that instead. The chat ended
                     // with results from Hermes, so nothing unsent is lost.
                     flow.update { if (it.isBusy) it else it.copy(messages = transcript) }
@@ -306,15 +308,14 @@ class ChatEngine(
         val lastUserIndex = messages.indexOfLast { it.role == Role.User }
         if (lastUserIndex < 0) return
         val lastUser = messages[lastUserIndex]
-        val before = messages.subList(0, lastUserIndex)
+        // Scheduled task results that came in after the question stay; it is asked again after them.
+        val results = messages.subList(lastUserIndex + 1, messages.size).filter { it.scheduled != null }
+        flow.update { it.copy(messages = messages.subList(0, lastUserIndex) + results) }
         // Only continue after background results if nobody else did meanwhile.
-        if (lastUser.review != null && flow.value.copy(messages = before).awaitingReview) {
-            flow.update { it.copy(messages = before) }
+        if (lastUser.review != null && flow.value.awaitingReview) {
             reviewBackground(sessionId, lastUser.text, previous = lastUser.review)
             return
         }
-        // Scheduled task results that came in after the question stay; it is asked again after them.
-        flow.update { it.copy(messages = before + messages.subList(lastUserIndex + 1, messages.size).filter { m -> m.scheduled != null }) }
         val images = lastUser.images.mapNotNull { ref ->
             ref.source.takeIf { it.startsWith("data:") }?.let { PreparedImage(ByteArray(0), it) }
         }

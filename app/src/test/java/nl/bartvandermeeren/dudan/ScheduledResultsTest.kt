@@ -164,6 +164,38 @@ class ScheduledHistoryTest {
     }
 
     @Test
+    fun aResultAfterABackgroundResultLeavesItWaitingForReview() {
+        val started = listOf(Deliveries.row(1, "user", "Zoek vluchten"), Deliveries.row(2, "assistant", "Gestart."), Deliveries.delivery(3, Deliveries.single("deleg_1")))
+        val one = HistoryMapper.map(started + ScheduledRows.result(4, "Rapport", 500.0))
+        assertEquals(listOf(Role.User, Role.Assistant, Role.Background, Role.Assistant), one.map { it.role })
+        assertTrue(Conversation("s", one).awaitingReview)
+        // Review result and finish stays on the background result, however many results follow it.
+        assertEquals("h_3", Conversation("s", one).reviewId)
+        val two = HistoryMapper.map(started + ScheduledRows.result(4, "Rapport", 500.0) + ScheduledRows.result(5, "Nog een", 600.0))
+        assertTrue(Conversation("s", two).awaitingReview)
+        assertEquals("h_3", Conversation("s", two).reviewId)
+
+        // An ordinary turn still settles it, also with another result after that turn.
+        val answered = two + user("l_6", "Wat nu?") + answer("l_7", "Niets meer te doen.")
+        assertFalse(Conversation("s", answered).awaitingReview)
+        assertNull(Conversation("s", answered).reviewId)
+        assertFalse(Conversation("s", answered + scheduled(8, "Rapport")).awaitingReview)
+    }
+
+    @Test
+    fun aResultAmongABatchsResultsLeavesTheBatchWaitingForItsEnd() {
+        val notice = listOf(
+            Deliveries.row(1, "user", "Check alles"), Deliveries.row(2, "assistant", "Gestart."),
+            Deliveries.delivery(3, Deliveries.taskFailed("deleg_b")), ScheduledRows.result(4, "Rapport", 500.0),
+        )
+        // An early failure notice alone still waits for the rest of its batch.
+        assertFalse(Conversation("s", HistoryMapper.map(notice)).awaitingReview)
+        val done = Conversation("s", HistoryMapper.map(notice + Deliveries.delivery(5, Deliveries.batch("deleg_b")) + ScheduledRows.result(6, "Nog een", 600.0)))
+        assertTrue(done.awaitingReview)
+        assertEquals("h_5", done.reviewId)
+    }
+
+    @Test
     fun aStreamedReplyNeverLendsItsIdToAResultWithTheSameText() {
         val shown = listOf(user("l_1", "Vraag"), answer("l_2", "OK"))
         val transcript = listOf(user("h_1", "Vraag"), answer("h_2", "OK"), scheduled(3, "OK"))

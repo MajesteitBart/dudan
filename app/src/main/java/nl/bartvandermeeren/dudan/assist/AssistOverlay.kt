@@ -230,6 +230,7 @@ private fun ResponsePanel(
     val listState = rememberLazyListState()
     val last = conversation.messages.lastOrNull()
     val retryId = conversation.retryId
+    val reviewId = conversation.reviewId
     LaunchedEffect(conversation.messages.size, last?.text?.length, last?.steps?.size) {
         listState.scrollToItem(conversation.messages.size)
     }
@@ -260,7 +261,7 @@ private fun ResponsePanel(
                                 assistantName = settings.assistantName,
                                 reviewing = conversation.reviewing,
                                 reviewError = conversation.reviewError,
-                                onReview = state::reviewBackground.takeIf { index == conversation.messages.lastIndex && conversation.awaitingReview },
+                                onReview = state::reviewBackground.takeIf { message.id == reviewId },
                             )
                             Role.Assistant -> AssistantMessageItem(
                                 message = message,
