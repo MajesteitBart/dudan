@@ -43,6 +43,9 @@
     <string name="job_discard">Weggooien</string>
     <string name="job_keep_editing">Verder bewerken</string>
     <string name="job_schedule_kept">Nu: %1$s. Dat blijft zo, tenzij je iets anders kiest.</string>
+    <string name="job_deliver_app">Deze app</string>
+    <string name="job_results">Resultaten</string>
+    <string name="job_shadow">Schaduwmodus op Clark: de resultaten zijn tegengehouden</string>
     <string name="schedule_once">Eenmalig</string>
     <string name="schedule_repeat">Herhalen</string>
     <string name="schedule_daily">Dagelijks</string>
@@ -91,6 +94,7 @@
     <string name="recent">Recent</string>
     <string name="no_chats">Nog geen gesprekken</string>
     <string name="untitled_chat">Nieuw gesprek</string>
+    <string name="session_scheduled_task">Geplande taak</string>
     <string name="settings">Instellingen</string>
     <string name="pin">Vastzetten</string>
     <string name="unpin">Losmaken</string>
@@ -162,6 +166,8 @@
     <string name="background_waiting">%1$s heeft dit nog niet bekeken en gaat pas verder als je dat vraagt.</string>
     <string name="background_review">Resultaat bekijken en afronden</string>
     <string name="background_review_prompt">Bekijk de resultaten van het achtergrondwerk hierboven en rond de taak af. Vraag het me eerst als iets nog mijn bevestiging nodig heeft.</string>
+    <string name="scheduled_result">Geplande taak · %1$s</string>
+    <string name="scheduled_result_titled">Geplande taak · %1$s · %2$s</string>
 
     <!-- Models -->
     <string name="model_picker_title">Model</string>
@@ -202,6 +208,7 @@
     <string name="open_full_chat">Volledig gesprek openen</string>
     <string name="notification_channel_replies">Antwoorden</string>
     <string name="notification_channel_background">Achtergrondwerk</string>
+    <string name="notification_channel_scheduled">Geplande taken</string>
     <string name="assist_not_configured">dudan is nog niet verbonden met Hermes. Tik om het in te stellen.</string>
 
     <!-- Settings -->

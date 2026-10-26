@@ -8,7 +8,9 @@
 // instructions and system_message each turn received.
 // Scheduled tasks can be listed, created, changed, deleted, paused, resumed and run, in stock Hermes'
 // shape; MOCK_CLARK_JOBS=1 answers like Clark's dudan channel and MOCK_CLARK_JOBS=old like a Clark
-// from before job management (see jobs.mjs).
+// from before job management (see jobs.mjs). With MOCK_CLARK_JOBS=1, Run now on a task that delivers
+// to this app writes a scheduled_result row with a file into the task's own chat, which the session
+// list marks with job_id, and GET /api/sessions/{id}/attachments/result-<row>/0 serves the file.
 //
 // Usage: node tools/mock-hermes/server.mjs [port] [upload-port]
 //   port         the Hermes API (default 8642)
@@ -33,7 +35,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileReply, openUiReply } from "./openui-demo.mjs";
 import { DESKTOP, DESKTOP_SESSION, desktopFeature, handleDesktop, seedDesktopConversation } from "./desktop.mjs";
-import { handleJobs, jobEndpoints, seedJobs } from "./jobs.mjs";
+import { CLARK, handleJobs, jobEndpoints, seedJobs, setResultSink } from "./jobs.mjs";
 
 const PORT = Number(process.argv[2] ?? 8642);
 const UPLOAD_PORT = Number(process.argv[3] ?? 8645);
@@ -124,6 +126,34 @@ function seed() {
   if (DESKTOP) sessions.set(DESKTOP_SESSION, seedDesktopConversation(LANG, rowId, t));
 }
 seed();
+
+// A scheduled task's result, the way Clark writes it into a dudan chat: a passive assistant row with
+// display_kind scheduled_result, its files under the input id result-<row id>. The chat is made when
+// the first result comes in, and again after it was deleted.
+const resultFiles = new Map(); // "session/input/index" -> { bytes, mime }
+setResultSink(({ session: id, job, title, text, file, at }) => {
+  const t = at ?? now();
+  let s = sessions.get(id);
+  if (!s) {
+    s = { meta: { id, source: "api_server", title, started_at: t, last_active: t, pinned: false, message_count: 0, job_id: job }, messages: [] };
+    sessions.set(id, s);
+  }
+  const rid = rowId();
+  const attachments = [];
+  if (file) {
+    const bytes = Buffer.from(file.text, "utf8");
+    const input = `result-${rid}`;
+    resultFiles.set(`${id}/${input}/0`, { bytes, mime: file.mime });
+    attachments.push({
+      version: 1, session_id: id, input_id: input, index: 0, name: file.name, mime_type: file.mime,
+      size: bytes.length, sha256: createHash("sha256").update(bytes).digest("hex"),
+    });
+  }
+  s.messages.push({ id: rid, role: "assistant", content: text, display_kind: "scheduled_result", scheduled: { job_id: job, title }, attachments, timestamp: t });
+  s.meta.last_active = Math.max(s.meta.last_active, t);
+  s.meta.message_count = s.messages.length;
+  console.log(`  scheduled result for ${id} (${job})`);
+});
 seedJobs(LANG);
 
 // Questions containing "english" get a short English answer, for testing the English voice.
@@ -484,7 +514,12 @@ const server = http.createServer(async (req, res) => {
   if (await handleJobs(req, res, parts, url, send, readBody)) return;
 
   if (path === "/api/sessions" && req.method === "GET") {
-    const list = [...sessions.values()].map((s) => ({ ...s.meta, preview: textOf(s.messages.find((m) => m.role === "user")?.content ?? "").slice(0, 60) }));
+    // Clark marks a task's own chat with its job id; stock Hermes sends no job_id.
+    const list = [...sessions.values()].map((s) => ({
+      ...s.meta,
+      ...(CLARK ? { job_id: s.meta.job_id ?? null } : {}),
+      preview: textOf(s.messages.find((m) => m.role === "user")?.content ?? "").slice(0, 60),
+    }));
     list.sort((a, b) => b.last_active - a.last_active);
     return send(res, 200, { object: "list", data: list, limit: 100, offset: 0, has_more: false });
   }
@@ -509,6 +544,12 @@ const server = http.createServer(async (req, res) => {
     if (parts.length === 3 && req.method === "DELETE") {
       sessions.delete(s.meta.id);
       return send(res, 200, { object: "hermes.session.deleted", id: s.meta.id, deleted: true });
+    }
+    if (parts[3] === "attachments" && req.method === "GET") {
+      const file = resultFiles.get(`${s.meta.id}/${parts[4]}/${parts[5]}`);
+      if (!file) return send(res, 404, { error: { message: "Attachment not found", code: "attachment_not_found" } });
+      res.writeHead(200, { "Content-Type": file.mime, "Content-Length": file.bytes.length });
+      return res.end(file.bytes);
     }
     if (parts[3] === "messages") {
       // Hermes' default page is the latest 500 rows. order=latest pages back from the newest row,

@@ -235,14 +235,16 @@ class ChatEngine(
         val flow = conversations[sessionId] ?: return
         val current = flow.value
         if (!current.awaitingReview || current.isBusy || current.reviewing) return
-        val result = current.messages.last().background?.key ?: return
-        val request = previous ?: ReviewRequest(reviewKey(current.messages.takeLastWhile { it.role == Role.Background }.last { it.background?.interim == false }))
+        // Scheduled task results that came in after the background results don't count as moving on.
+        val results = Conversation.latestResults(current.messages)
+        val result = results.last().background?.key ?: return
+        val request = previous ?: ReviewRequest(reviewKey(results.last { it.background?.interim == false }))
         flow.update { it.copy(reviewing = true, reviewError = null) }
         scope.launch {
             try {
                 val rows = api.sessionMessages(sessionId).messages
                 val transcript = HistoryMapper.map(rows)
-                if (transcript.takeLastWhile { it.role == Role.Background }.none { it.background?.key == result }) {
+                if (Conversation.latestResults(transcript).none { it.background?.key == result }) {
                     // Someone continued already or the chat moved on; show that instead. The chat ended
                     // with results from Hermes, so nothing unsent is lost.
                     flow.update { if (it.isBusy) it else it.copy(messages = transcript) }
@@ -306,7 +308,9 @@ class ChatEngine(
         val lastUserIndex = messages.indexOfLast { it.role == Role.User }
         if (lastUserIndex < 0) return
         val lastUser = messages[lastUserIndex]
-        flow.update { it.copy(messages = messages.subList(0, lastUserIndex)) }
+        // Scheduled task results that came in after the question stay; it is asked again after them.
+        val results = messages.subList(lastUserIndex + 1, messages.size).filter { it.scheduled != null }
+        flow.update { it.copy(messages = messages.subList(0, lastUserIndex) + results) }
         // Only continue after background results if nobody else did meanwhile.
         if (lastUser.review != null && flow.value.awaitingReview) {
             reviewBackground(sessionId, lastUser.text, previous = lastUser.review)
@@ -703,12 +707,17 @@ class ChatEngine(
         fail(turn, cause.userMessage())
     }
 
-    /** Takes this turn's answer from the transcript: the first reply after this turn's own question. */
+    /**
+     * Takes this turn's answer from the transcript: the first reply after this turn's own question. A scheduled task's
+     * result that landed meanwhile answers nothing.
+     */
     private suspend fun reloadAfterRecovery(turn: Turn) {
         val history = runCatching { HistoryMapper.map(api.sessionMessages(turn.sessionId).messages) }.getOrNull()
         val question = history?.indexOfLast { it.role == Role.User && it.text.trim() == turn.text.trim() } ?: -1
         val answer = if (question >= 0) {
-            history!!.drop(question + 1).firstOrNull { it.role == Role.Assistant && (it.text.isNotBlank() || it.attachments.isNotEmpty()) }
+            history!!.drop(question + 1).firstOrNull {
+                it.role == Role.Assistant && it.scheduled == null && (it.text.isNotBlank() || it.attachments.isNotEmpty())
+            }
         } else null
         if (answer != null) {
             updateMessage(turn.sessionId, turn.messageId) {

@@ -477,6 +477,12 @@ class ChatEngineTest {
 
     private fun delivery(content: String) = row("user", content, displayKind = "async_delegation_complete")
 
+    /** A scheduled task's result the way Clark writes it into the chat. */
+    private fun scheduledResult(text: String) = JsonObject(
+        row("assistant", text, displayKind = "scheduled_result") +
+            ("scheduled" to buildJsonObject { put("job_id", "brief"); put("title", "Morning brief") }),
+    )
+
     /** Answers /messages like Hermes: the latest 500 rows by default, or the last `limit` rows for `order=latest`. */
     private fun transcriptPage(request: RecordedRequest): MockResponse {
         val url = request.requestUrl!!
@@ -548,6 +554,36 @@ class ChatEngineTest {
     private fun <T> StateFlow<T>.await(condition: (T) -> Boolean): T = runBlocking { withTimeout(10_000) { first(condition) } }
 
     private val tailPolls get() = requests.count { it.contains("order=latest") }
+
+    @Test
+    fun aRetryKeepsTheScheduledResultsThatCameInAfterTheQuestion() {
+        val runs = AtomicInteger()
+        script { request ->
+            when {
+                request.path!!.contains("/messages") -> transcriptPage(request)
+                request.path == "/v1/runs" -> MockResponse().setResponseCode(202).setBody("""{"run_id":"run_${runs.incrementAndGet()}"}""")
+                request.path == "/v1/runs/run_1/events" -> sse("""{"event":"run.failed","error":"Provider overloaded"}""")
+                request.path!!.endsWith("/events") -> sse("""{"event":"run.completed","output":"Het is kwart over acht."}""")
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        var id = ""
+        assertEquals(MessageState.Failed, sendAndSettle("Hoe laat is het?") { id = it }.state)
+        // A task's result comes in after the failed question, which never reached the transcript.
+        transcript += scheduledResult("Drie afspraken vandaag.")
+        val flow = runBlocking { withContext(dispatcher) { engine.sync(id); engine.conversation(id) } }
+        val merged = flow.await { c -> c.messages.lastOrNull()?.scheduled != null }
+        val failed = merged.messages.single { it.state == MessageState.Failed }
+        assertEquals(failed.id, merged.retryId)
+
+        runBlocking { withContext(dispatcher) { engine.retry(id) } }
+        val retried = flow.await { c -> c.messages.lastOrNull()?.let { it.state == MessageState.Done && it.scheduled == null } == true }
+        // The result stays, and the question is asked again after it.
+        assertEquals(listOf(Role.Assistant, Role.User, Role.Assistant), retried.messages.map { it.role })
+        assertEquals("Drie afspraken vandaag.", retried.messages[0].text)
+        assertEquals("Het is kwart over acht.", retried.messages[2].text)
+        assertEquals(2, runs.get())
+    }
 
     @Test
     fun aResultThatLandsAfterTheRunEndedShowsUpWithoutAnotherTurn() {
@@ -815,6 +851,48 @@ class ChatEngineTest {
         assertEquals(listOf("dudan-review-deleg_7", "dudan-review-deleg_7", "dudan-review-deleg_7#2"), hermes.keys)
         assertEquals(1, done.messages.count { it.role == Role.User && it.reviewsBackground })
         assertEquals("dudan-review-deleg_7#2", done.messages.last { it.role == Role.User }.review?.key)
+    }
+
+    @Test
+    fun scheduledResultsAfterABackgroundResultLeaveItToReviewAndRetry() {
+        transcript += row("user", "Zoek vluchten")
+        transcript += row("assistant", "Gestart.")
+        transcript += delivery(Deliveries.single("deleg_s"))
+        transcript += scheduledResult("Drie afspraken vandaag.")
+        val hermes = Admissions()
+        script { request ->
+            when {
+                request.path!!.contains("/messages") -> transcriptPage(request)
+                request.path == "/v1/runs" -> hermes.admit(request)
+                request.path == "/v1/runs/run_1/events" -> {
+                    hermes.status["run_1"] = "failed"
+                    sse("""{"event":"run.failed","error":"provider error"}""")
+                }
+                request.path == "/v1/runs/run_2/events" -> sse("""{"event":"run.completed","output":"Klaar."}""")
+                else -> MockResponse().setResponseCode(404)
+            }
+        }
+        val flow = open("s_scheduled")
+        assertTrue(flow.value.awaitingReview)
+        val result = flow.value.messages.single { it.role == Role.Background }
+        assertEquals(result.id, flow.value.reviewId)
+
+        runBlocking { withContext(dispatcher) { engine.reviewBackground("s_scheduled", "Rond af") } }
+        flow.await { it.messages.lastOrNull()?.state == MessageState.Failed }
+        // Another result comes in after the failed review; Retry still reviews the background result.
+        transcript += scheduledResult("Twee afspraken morgen.")
+        runBlocking { withContext(dispatcher) { engine.sync("s_scheduled") } }
+        flow.await { c -> c.messages.lastOrNull()?.text == "Twee afspraken morgen." }
+        runBlocking { withContext(dispatcher) { engine.retry("s_scheduled") } }
+        val done = flow.await { c -> c.messages.lastOrNull()?.let { it.role == Role.Assistant && it.state == MessageState.Done && it.scheduled == null } == true }
+        assertEquals("Klaar.", done.messages.last().text)
+        assertEquals(listOf("dudan-review-deleg_s", "dudan-review-deleg_s", "dudan-review-deleg_s#2"), hermes.keys)
+        // Both results stay, and the review is asked after them.
+        assertEquals(
+            listOf("Zoek vluchten", "Gestart.", null, "Drie afspraken vandaag.", "Twee afspraken morgen.", "Rond af", "Klaar."),
+            done.messages.map { if (it.role == Role.Background) null else it.text },
+        )
+        assertFalse(done.awaitingReview)
     }
 
     @Test

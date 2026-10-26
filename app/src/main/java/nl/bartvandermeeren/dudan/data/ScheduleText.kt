@@ -46,6 +46,10 @@ class ScheduleText(locale: Locale) {
     /** "Mon 26 Oct 09:30", as the list shows the next run. */
     fun dateTime(at: LocalDateTime, today: LocalDate): String = "${date(at.toLocalDate(), today)} ${time(at.toLocalTime())}"
 
+    /** A moment that has passed, such as when a result came in: "07:30" on [today], else "Mon 26 Oct 07:30". */
+    fun moment(at: LocalDateTime, today: LocalDate): String =
+        if (at.toLocalDate() == today) time(at.toLocalTime()) else dateTime(at, today)
+
     /** Run times for a preview: each day's date once, then only the times on the same day. */
     fun runs(times: List<LocalDateTime>, today: LocalDate): String {
         var previous: LocalDate? = null

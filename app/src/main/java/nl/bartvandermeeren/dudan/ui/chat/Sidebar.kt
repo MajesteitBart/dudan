@@ -258,7 +258,12 @@ private fun SessionItem(
                 overflow = TextOverflow.Ellipsis,
                 modifier = Modifier.weight(1f),
             )
+            // A chat Clark keeps for a scheduled task's results.
+            if (session.jobId != null) {
+                Icon(Icons.Outlined.Schedule, contentDescription = stringResource(R.string.session_scheduled_task), tint = Palette.TextSecondary, modifier = Modifier.size(20.dp))
+            }
             if (session.pinned) {
+                if (session.jobId != null) Spacer(Modifier.width(4.dp))
                 Icon(Icons.Outlined.PushPin, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(20.dp))
             }
         }

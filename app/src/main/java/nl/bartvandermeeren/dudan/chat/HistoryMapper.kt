@@ -13,6 +13,9 @@ import nl.bartvandermeeren.dudan.data.contentText
 /**
  * Turns a Hermes transcript into chat bubbles. Tool calls and the text a model writes beside them
  * collapse into the steps of the next answer, the way Gemini folds its work under one reply.
+ * A scheduled task's result is an answer of its own: it can land in the middle of a turn, and that
+ * turn's work stays with the turn's answer. Work that never got an answer, such as a stopped turn's,
+ * stays where it started, before any results that came in after it.
  */
 object HistoryMapper {
     fun map(messages: List<HermesMessage>): List<UiMessage> {
@@ -22,11 +25,23 @@ object HistoryMapper {
         // Files the agent returned wait for the next reply, like the steps.
         val files = mutableListOf<OutboundAttachment>()
         var turnStartedAt: Long? = null
+        // Where the waiting work goes in [out], and the row it started on, which names it, so rows added later
+        // don't move it or change its id.
+        var workAt: Int? = null
+        var workRow: String? = null
+
+        fun clearWork() {
+            steps.clear()
+            reasoning.setLength(0)
+            files.clear()
+            workAt = null
+            workRow = null
+        }
 
         fun flushWork(index: Int, finishedAt: Long?) {
             if (steps.isEmpty() && reasoning.isEmpty() && files.isEmpty()) return
-            out += UiMessage(
-                id = "h_work_$index",
+            val work = UiMessage(
+                id = "h_work_${workRow ?: index}",
                 role = Role.Assistant,
                 attachments = files.toList(),
                 steps = steps.toList(),
@@ -34,9 +49,8 @@ object HistoryMapper {
                 startedAtMs = turnStartedAt,
                 finishedAtMs = finishedAt,
             )
-            steps.clear()
-            reasoning.setLength(0)
-            files.clear()
+            out.add(workAt ?: out.size, work)
+            clearWork()
         }
 
         // Compression can leave two copies of one delivery; show it once.
@@ -62,6 +76,22 @@ object HistoryMapper {
                     )
                 }
                 turnStartedAt = timestampMs
+                return@forEachIndexed
+            }
+            // Leaves the turn around it as it is: its steps, reasoning, files and start.
+            if (message.isScheduledResult) {
+                val text = message.content.contentText()
+                val attachments = message.attachments.filter { shownFiles.add(Triple(it.sessionId, it.inputId, it.index)) }
+                if (text.isNotBlank() || attachments.isNotEmpty()) {
+                    out += UiMessage(
+                        id = message.id?.let { "h_$it" } ?: "h_$index",
+                        role = Role.Assistant,
+                        text = text,
+                        attachments = attachments,
+                        finishedAtMs = timestampMs,
+                        scheduled = ScheduledLabel(message.scheduled?.title ?: message.scheduled?.jobId, timestampMs),
+                    )
+                }
                 return@forEachIndexed
             }
             when (message.role) {
@@ -95,9 +125,11 @@ object HistoryMapper {
                             startedAtMs = turnStartedAt,
                             finishedAtMs = timestampMs,
                         )
-                        steps.clear()
-                        reasoning.setLength(0)
-                        files.clear()
+                        clearWork()
+                    }
+                    if (workAt == null && (steps.isNotEmpty() || reasoning.isNotEmpty() || files.isNotEmpty())) {
+                        workAt = out.size
+                        workRow = message.id ?: index.toString()
                     }
                 }
                 "tool" -> {
@@ -119,9 +151,10 @@ object HistoryMapper {
      * last turn this app ran. That turn is the first question with the same text after the last item
      * the chat already took from the transcript, so turns other clients added later don't hide it.
      * Until the transcript holds it, because the turn never reached Hermes, was stopped, or its reply
-     * isn't saved yet, the chat keeps its own turn and only gains the background results it doesn't
-     * show, placed before or after that turn as in the transcript. Results are matched by delivery,
-     * since compression can copy a row under a new id.
+     * isn't saved yet, the chat keeps its own turn and only gains the background results and scheduled
+     * task results it doesn't show, placed before or after that turn as in the transcript. Background
+     * results are matched by delivery, since compression can copy a row under a new id; scheduled
+     * results by id. A scheduled result is never the turn's answer.
      */
     fun reconcile(shown: List<UiMessage>, transcript: List<UiMessage>): Reconciled {
         val questionIndex = shown.indexOfLast { it.role == Role.User }
@@ -132,12 +165,15 @@ object HistoryMapper {
         val savedQuestion = (from until transcript.size).firstOrNull {
             transcript[it].role == Role.User && transcript[it].text.trim() == question.text.trim()
         }
-        val answer = shown.drop(questionIndex + 1).lastOrNull { it.role == Role.Assistant }
+        val answer = shown.drop(questionIndex + 1).lastOrNull { it.role == Role.Assistant && it.scheduled == null }
         if (savedQuestion != null && holdsTurn(transcript, savedQuestion, answer)) {
             return Reconciled(keepReplyIds(shown, transcript), caughtUp = true)
         }
         val known = shown.mapNotNullTo(mutableSetOf()) { it.background?.key }
-        fun results(indices: IntRange) = indices.map { transcript[it] }.filter { it.role == Role.Background && it.background?.key !in known }
+        val shownIds = shown.mapTo(HashSet()) { it.id }
+        fun results(indices: IntRange) = indices.map { transcript[it] }.filter {
+            (it.role == Role.Background && it.background?.key !in known) || (it.scheduled != null && it.id !in shownIds)
+        }
         val before = if (savedQuestion != null) results(from until savedQuestion) else emptyList()
         val after = results((savedQuestion?.plus(1) ?: from) until transcript.size)
         return Reconciled(shown.subList(0, questionIndex) + before + shown.subList(questionIndex, shown.size) + after, caughtUp = false)
@@ -150,7 +186,9 @@ object HistoryMapper {
     private fun holdsTurn(transcript: List<UiMessage>, savedQuestion: Int, answer: UiMessage?): Boolean {
         // A stopped turn stays as the user left it; Hermes may have saved half a reply.
         if (answer?.state == MessageState.Cancelled) return false
-        val savedReply = transcript.drop(savedQuestion + 1).any { it.role == Role.Assistant && (it.text.isNotBlank() || it.attachments.isNotEmpty()) }
+        val savedReply = transcript.drop(savedQuestion + 1).any {
+            it.role == Role.Assistant && it.scheduled == null && (it.text.isNotBlank() || it.attachments.isNotEmpty())
+        }
         return savedReply || answer == null || (answer.state == MessageState.Done && answer.text.isBlank() && answer.attachments.isEmpty())
     }
 
@@ -158,7 +196,8 @@ object HistoryMapper {
      * Replies this app streamed keep their ids on the saved copies, so a reply being read aloud keeps
      * its stop button and a file being saved keeps its row. Each question is matched to its saved copy
      * in order (by id when it has one, else the next question with the same text), and a reply only
-     * within its own question's turn: by its text, or by its files when it has no text.
+     * within its own question's turn: by its text, or by its files when it has no text. A scheduled
+     * task's result is never that reply.
      */
     private fun keepReplyIds(shown: List<UiMessage>, transcript: List<UiMessage>): List<UiMessage> {
         val ids = mutableMapOf<Int, String>()
@@ -178,7 +217,7 @@ object HistoryMapper {
             val files = message.attachments.mapTo(HashSet()) { Triple(it.sessionId, it.inputId, it.index) }
             val reply = (turn + 1 until end).lastOrNull { i ->
                 val saved = transcript[i]
-                saved.role == Role.Assistant && if (message.text.isNotBlank()) saved.text.trim() == message.text.trim()
+                saved.role == Role.Assistant && saved.scheduled == null && if (message.text.isNotBlank()) saved.text.trim() == message.text.trim()
                 else saved.attachments.any { Triple(it.sessionId, it.inputId, it.index) in files }
             }
             if (reply != null) ids[reply] = message.id

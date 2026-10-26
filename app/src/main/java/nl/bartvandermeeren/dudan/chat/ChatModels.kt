@@ -27,6 +27,12 @@ data class Step(
 /** An image in a message; [source] is a data: URL or a content:// URI. */
 data class ImageRef(val source: String)
 
+/**
+ * Marks an answer as a scheduled task's result, which arrives without a question. [title] names the task (its name,
+ * else its id), [atMs] when Clark delivered it.
+ */
+data class ScheduledLabel(val title: String?, val atMs: Long?)
+
 data class UiMessage(
     val id: String,
     val role: Role,
@@ -53,6 +59,8 @@ data class UiMessage(
     val review: ReviewRequest? = null,
     /** Where a question sent from this app was asked; a retry sends it the same way. */
     val origin: TurnOrigin? = null,
+    /** Set on a scheduled task's result. It is no turn's answer: see HistoryMapper. */
+    val scheduled: ScheduledLabel? = null,
 ) {
     val isStreaming: Boolean get() = state == MessageState.Streaming
     val reviewsBackground: Boolean get() = review != null
@@ -86,8 +94,36 @@ data class Conversation(
      * user continues from here: arriving results never start a turn by themselves. An early failure
      * notice alone doesn't count, because the rest of its batch is still running.
      */
-    val awaitingReview: Boolean
-        get() = messages.takeLastWhile { it.role == Role.Background }.any { it.background?.interim == false }
+    val awaitingReview: Boolean get() = reviewId != null
+
+    /** The result that offers "Review result and finish": the latest of [latestResults], while [awaitingReview]. */
+    val reviewId: String?
+        get() {
+            val results = latestResults(messages)
+            return if (results.any { it.background?.interim == false }) results.last().id else null
+        }
+
+    /**
+     * The answer that offers Retry: the last question's answer, when it failed or was stopped and nothing but
+     * scheduled task results came in after it. Those answer no question, so they don't take Retry away.
+     */
+    val retryId: String?
+        get() {
+            val question = messages.indexOfLast { it.role == Role.User }
+            if (question < 0) return null
+            val answer = messages.subList(question + 1, messages.size).dropLastWhile { it.scheduled != null }.lastOrNull() ?: return null
+            val retryable = answer.role == Role.Assistant && (answer.state == MessageState.Failed || answer.state == MessageState.Cancelled)
+            return if (retryable) answer.id else null
+        }
+
+    companion object {
+        /**
+         * The background results that came in after the agent's last turn, oldest first. Scheduled task results
+         * among or after them answer no question and start no turn, so they leave them waiting for review.
+         */
+        fun latestResults(messages: List<UiMessage>): List<UiMessage> =
+            messages.filter { it.scheduled == null }.takeLastWhile { it.role == Role.Background }
+    }
 }
 
 data class SessionsState(

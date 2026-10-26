@@ -186,7 +186,7 @@ fun ChatPane(
                         modifier = Modifier.align(Alignment.Center).size(28.dp),
                     )
                     conversation.loadError != null && messages.isEmpty() -> LoadError(conversation.loadError!!, onRetry = vm::reloadCurrent)
-                    else -> androidx.compose.runtime.key(settings.serverUrl, settings.apiKey) { MessageList(vm, settings, speakingId, skills) }
+                    else -> androidx.compose.runtime.key(settings.serverUrl, settings.apiKey) { MessageList(vm, settings, speakingId, skills, session?.displayTitle) }
                 }
             }
         }
@@ -334,13 +334,15 @@ private fun LoadError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?, skills: List<SkillInfo>) {
+private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?, skills: List<SkillInfo>, chatTitle: String?) {
     val conversation by vm.conversation.collectAsStateWithLifecycle()
     val desktops = rememberConversationDesktops(vm.api, conversation.sessionId)
     // A desktop shows while it works; a stopped one leaves the conversation.
     val working = remember(desktops.sessions) { desktops.sessions.filter { it.state != DesktopState.Stopped } }
     val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val messages = conversation.messages
+    val retryId = conversation.retryId
+    val reviewId = conversation.reviewId
     val listState = rememberLazyListState()
     // Saving a file the agent returned keeps going when its row scrolls away, until the chat closes.
     val saves = rememberAttachmentSaves()
@@ -385,16 +387,18 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                             assistantName = settings.assistantName,
                             reviewing = conversation.reviewing,
                             reviewError = conversation.reviewError,
-                            onReview = vm::reviewBackground.takeIf { index == messages.lastIndex && conversation.awaitingReview },
+                            onReview = vm::reviewBackground.takeIf { message.id == reviewId },
                         )
                         Role.Assistant -> AssistantMessageItem(
                             message = message,
                             isLast = index == messages.lastIndex,
+                            canRetry = message.id == retryId,
                             assistantName = settings.assistantName,
                             speaking = speakingId == message.id,
                             onSpeak = { vm.toggleSpeak(message.id, message.text) },
                             onRetry = vm::retry,
                             onApproval = vm::resolveApproval,
+                            chatTitle = chatTitle,
                             attachments = { OutboundAttachments(vm.api, conversation.sessionId, message.attachments, saves) },
                         )
                     }

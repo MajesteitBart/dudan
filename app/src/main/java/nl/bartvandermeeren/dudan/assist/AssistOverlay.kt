@@ -229,6 +229,8 @@ private fun ResponsePanel(
     val skillSlugs = remember(skills) { skills.mapTo(HashSet()) { SkillTags.slug(it.name) } }
     val listState = rememberLazyListState()
     val last = conversation.messages.lastOrNull()
+    val retryId = conversation.retryId
+    val reviewId = conversation.reviewId
     LaunchedEffect(conversation.messages.size, last?.text?.length, last?.steps?.size) {
         listState.scrollToItem(conversation.messages.size)
     }
@@ -259,11 +261,12 @@ private fun ResponsePanel(
                                 assistantName = settings.assistantName,
                                 reviewing = conversation.reviewing,
                                 reviewError = conversation.reviewError,
-                                onReview = state::reviewBackground.takeIf { index == conversation.messages.lastIndex && conversation.awaitingReview },
+                                onReview = state::reviewBackground.takeIf { message.id == reviewId },
                             )
                             Role.Assistant -> AssistantMessageItem(
                                 message = message,
                                 isLast = index == conversation.messages.lastIndex,
+                                canRetry = message.id == retryId,
                                 assistantName = settings.assistantName,
                                 speaking = speakingId == message.id,
                                 onSpeak = {
