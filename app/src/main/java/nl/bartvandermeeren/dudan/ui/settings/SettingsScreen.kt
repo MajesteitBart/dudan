@@ -99,6 +99,7 @@ import kotlin.math.roundToInt
 import nl.bartvandermeeren.dudan.BuildConfig
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.appContainer
+import nl.bartvandermeeren.dudan.assist.ListenActivity
 import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.HermesApi
@@ -263,6 +264,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                         scope.launch { vm.settingsRepository.setListenOnInvoke(it) }
                     }
                     WakeWordSettings(vm, settings)
+                    ListenEntrySetting()
                     Toggle(stringResource(R.string.speak_replies), stringResource(R.string.speak_replies_detail), settings.speakReplies) {
                         scope.launch { vm.settingsRepository.setSpeakReplies(it) }
                     }
@@ -637,6 +639,18 @@ private fun WakeWordSettings(vm: MainViewModel, settings: AppSettings) {
         }
     }
     if (!isDefault) Notice(stringResource(R.string.wake_word_needs_assistant), Palette.SparkAmber)
+}
+
+/** Clark in the app list, for Bixby to open by name. Android keeps the switch as the entry's state. */
+@Composable
+private fun ListenEntrySetting() {
+    val context = LocalContext.current
+    var on by remember { mutableStateOf(ListenActivity.isInAppList(context)) }
+    val name = stringResource(R.string.listen_entry_label)
+    Toggle(stringResource(R.string.listen_entry, name), stringResource(R.string.listen_entry_detail, name), on) {
+        ListenActivity.setInAppList(context, it)
+        on = it
+    }
 }
 
 /** A setting's label with the chosen value's name beside it. */

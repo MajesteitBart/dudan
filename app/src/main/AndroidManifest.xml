@@ -127,6 +127,24 @@
                 android:resource="@xml/recognition_service" />
         </service>
 
+        <!-- Clark in the app list, off until Settings > Assistant turns it on. Bixby opens apps by name,
+             so "Hi Bixby, open Clark" opens the overlay, listening. Its own empty task keeps dudan's
+             window from coming forward when it finishes. -->
+        <activity
+            android:name=".assist.ListenActivity"
+            android:enabled="false"
+            android:excludeFromRecents="true"
+            android:exported="true"
+            android:label="@string/listen_entry_label"
+            android:noHistory="true"
+            android:taskAffinity=""
+            android:theme="@android:style/Theme.NoDisplay">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+        </activity>
+
         <service
             android:name=".assist.WakeWordService"
             android:exported="false"
