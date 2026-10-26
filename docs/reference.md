@@ -75,7 +75,7 @@ A schedule the editor doesn't change keeps running the way the server runs it:
 What each server offers:
 
 - Stock Hermes has all the job endpoints without listing them in `/v1/capabilities`, so dudan offers New task, Edit and Delete. Hermes doesn't take a time zone and runs crons on its own configured clock.
-- Clark lists `job_create`, `job_update`, `job_delete` and `job` next to `jobs`. It also sends `delivery_targets`, and the editor then asks where results go: one of those destinations, or nowhere, which keeps them in the job log. Clark names a task by its ID, so an existing task keeps its name. A task Clark won't let the app change, such as one written by hand on the server, shows Clark's reason instead of Edit.
+- Clark lists `job_create`, `job_update`, `job_delete` and `job` next to `jobs`. It also sends `delivery_targets`, and the editor then asks where results go: one of those destinations, or nowhere, which keeps them in the job log. A new task starts on the first destination. Clark names a task by its ID, so an existing task keeps its name. A task Clark won't let the app change, such as one written by hand on the server, shows Clark's reason instead of Edit.
 - A Clark from before job management lists `jobs` without `job_create`; dudan then only runs, pauses and resumes.
 
 When dudan can't load the capabilities, it shows the controls and lets the server's answers speak for themselves.

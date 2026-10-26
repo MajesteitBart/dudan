@@ -295,7 +295,10 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
     val text = remember(locale) { ScheduleText(locale) }
     val opened = remember { LocalDateTime.now(zone) }
     val original = remember(job?.id) { job?.let { JobSchedule.parse(it, zone) } }
-    val initialDeliver = remember(job?.id) { job?.deliver?.takeIf { it.isNotBlank() } ?: DELIVER_NOWHERE }
+    // A new task sends its results to the first place the server offers; one that reaches nobody is rarely meant.
+    val initialDeliver = remember(job?.id) {
+        if (job == null) targets.firstOrNull()?.id ?: DELIVER_NOWHERE else job.deliver?.takeIf { it.isNotBlank() } ?: DELIVER_NOWHERE
+    }
 
     var name by rememberSaveable { mutableStateOf(job?.name.orEmpty()) }
     var prompt by rememberSaveable { mutableStateOf(job?.prompt.orEmpty()) }
