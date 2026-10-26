@@ -203,6 +203,7 @@
     <string name="wake_phrase">Wake phrase</string>
     <string name="wake_phrase_detail">Two or three words work best. The listener knows English sounds, so spell a name the way it sounds in English.</string>
     <string name="wake_phrase_too_short">Use at least four letters, such as \"Ok Clark\".</string>
+    <string name="wake_phrase_too_long">Use at most five words. Two or three work best, such as \"Ok Clark\".</string>
     <string name="wake_word_ready">Wake word model installed</string>
     <string name="wake_word_downloading">Downloading wake word model… %1$d%%</string>
     <string name="wake_word_download">Download wake word model (%1$d MB)</string>

@@ -201,6 +201,7 @@
     <string name="wake_phrase">Activeringszin</string>
     <string name="wake_phrase_detail">Twee of drie woorden werken het best. De luisteraar kent Engelse klanken, dus spel een naam zoals die in het Engels klinkt.</string>
     <string name="wake_phrase_too_short">Gebruik minstens vier letters, zoals \"Ok Clark\".</string>
+    <string name="wake_phrase_too_long">Gebruik hooguit vijf woorden. Twee of drie werken het best, zoals \"Ok Clark\".</string>
     <string name="wake_word_ready">Model voor het activeringswoord geïnstalleerd</string>
     <string name="wake_word_downloading">Model voor het activeringswoord downloaden… %1$d%%</string>
     <string name="wake_word_download">Model voor het activeringswoord downloaden (%1$d MB)</string>

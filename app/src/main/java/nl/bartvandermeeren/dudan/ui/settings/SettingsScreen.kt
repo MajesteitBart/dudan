@@ -615,10 +615,10 @@ private fun WakeWordSettings(vm: MainViewModel, settings: AppSettings) {
         stringResource(R.string.wake_phrase),
         placeholder = WakePhrase.DEFAULT,
     )
-    if (WakePhrase.isUsable(phrase)) {
-        Text(stringResource(R.string.wake_phrase_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-    } else {
-        Notice(stringResource(R.string.wake_phrase_too_short), Palette.SparkAmber)
+    when (WakePhrase.problem(phrase)) {
+        null -> Text(stringResource(R.string.wake_phrase_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+        WakePhrase.Problem.TooShort -> Notice(stringResource(R.string.wake_phrase_too_short), Palette.SparkAmber)
+        WakePhrase.Problem.TooLong -> Notice(stringResource(R.string.wake_phrase_too_long), Palette.SparkAmber)
     }
     ModelStatus(
         context.appContainer.wakeWordModel,

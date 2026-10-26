@@ -75,6 +75,32 @@ class WakeWordTest {
     }
 
     @Test
+    fun aPhraseHasAtMostFiveWords() {
+        assertNull(WakePhrase.problem("Ok Clark"))
+        assertEquals(WakePhrase.Problem.TooShort, WakePhrase.problem("Ok"))
+        // Punctuation and spaces don't make words.
+        assertNull(WakePhrase.problem(" Hey, ok... hey - ok  hey! "))
+        assertEquals(WakePhrase.Problem.TooLong, WakePhrase.problem("Hey ok hey ok hey ok"))
+        assertFalse(WakePhrase.isUsable("Hey hey hey hey hey hey"))
+        // Twenty words with two spellings each would be a million lines; it's turned down instead.
+        assertNull(WakePhrase.keywords(List(20) { "hey" }.joinToString(" "), pieces))
+    }
+
+    @Test
+    fun repeatedAlternateSpellingsStayWithinTheBudget() {
+        val heyOkHey = WakePhrase.keywords("Hey ok hey", pieces)!!.trimEnd().lines()
+        assertEquals(WakePhrase.MAX_VARIANTS, heyOkHey.size)
+        assertEquals(heyOkHey.distinct(), heyOkHey)
+        assertTrue(heyOkHey.contains("▁ H A Y ▁OKAY ▁ H A Y @HAY_OKAY_HAY"))
+        // Five words with two spellings each: the later words keep their written spelling.
+        val okOk = WakePhrase.keywords("Ok ok ok ok ok", pieces)!!.trimEnd().lines()
+        assertEquals(WakePhrase.MAX_VARIANTS, okOk.size)
+        assertEquals(okOk.distinct(), okOk)
+        assertEquals("▁O K ▁O K ▁O K ▁O K ▁O K @OK_OK_OK_OK_OK", okOk.first())
+        assertTrue(okOk.all { it.endsWith("_OK_OK") })
+    }
+
+    @Test
     fun theWakePhraseIsDroppedFromTheFrontOfTheQuestion() {
         assertEquals("What time is it?", WakePhrase.stripLeading("Clark, what time is it?", "Ok Clark"))
         assertEquals("What time is it?", WakePhrase.stripLeading("Okay Clark, what time is it?", "Ok Clark"))

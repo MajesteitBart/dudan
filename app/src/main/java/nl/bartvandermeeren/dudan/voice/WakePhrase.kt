@@ -27,10 +27,38 @@ object WakePhrase {
             .replace(Regex("[^A-Z']+"), " ")
             .trim()
 
-    /** Too short a phrase fires on everyday speech; four letters ("Ok Bo") is the least that works. */
-    fun isUsable(phrase: String): Boolean = normalize(phrase).count { it.isLetter() } >= MIN_LETTERS
+    /** Why a phrase can't be the wake phrase. */
+    enum class Problem {
+        /** Fewer than four letters: it would fire on everyday speech. */
+        TooShort,
 
+        /** More than [MAX_WORDS] words. */
+        TooLong,
+    }
+
+    /** What keeps [phrase] from working as the wake phrase, or null when it works. */
+    fun problem(phrase: String): Problem? {
+        val normalized = normalize(phrase)
+        return when {
+            normalized.count { it.isLetter() } < MIN_LETTERS -> Problem.TooShort
+            normalized.split(' ').size > MAX_WORDS -> Problem.TooLong
+            else -> null
+        }
+    }
+
+    fun isUsable(phrase: String): Boolean = problem(phrase) == null
+
+    /** Four letters ("Ok Bo") is the least that doesn't fire on everyday speech. */
     private const val MIN_LETTERS = 4
+
+    /** The most words a phrase may have. Two or three work best; more only take longer to say. */
+    const val MAX_WORDS = 5
+
+    /**
+     * The most spellings of a phrase the spotter listens for. "Ok hey ok" already has eight; words after
+     * that keep the spelling they were written in, so a phrase never spells out into thousands of lines.
+     */
+    internal const val MAX_VARIANTS = 8
 
     /**
      * The spotter's keywords file for [phrase]: a line of tokens per spelling, or null when the phrase is
@@ -45,9 +73,11 @@ object WakePhrase {
         return lines.distinct().joinToString("\n", postfix = "\n")
     }
 
+    /** The spellings of [words], the written one first; at most [MAX_VARIANTS] of them. */
     private fun variants(words: List<String>): List<List<String>> =
         words.fold(listOf(emptyList())) { acc, word ->
-            acc.flatMap { prefix -> (spellings[word] ?: listOf(word)).map { prefix + it } }
+            val options = spellings[word]?.takeIf { acc.size * it.size <= MAX_VARIANTS } ?: listOf(word)
+            acc.flatMap { prefix -> options.map { prefix + it } }
         }
 
     /**
