@@ -23,6 +23,68 @@
     <string name="job_run_now">Nu uitvoeren</string>
     <string name="job_pause">Pauzeren</string>
     <string name="job_resume">Hervatten</string>
+    <string name="no_jobs_add">Nog geen geplande taken. Voeg er een toe met Nieuwe taak.</string>
+    <string name="job_new">Nieuwe taak</string>
+    <string name="job_edit">Bewerken</string>
+    <string name="job_edit_title">Taak bewerken</string>
+    <string name="job_read_only">Wijzig deze taak op de server.</string>
+    <string name="job_name">Naam</string>
+    <string name="job_name_hint">Ochtendbriefing</string>
+    <string name="job_name_fixed">Deze server herkent een taak aan zijn ID, dus de naam blijft zoals hij is.</string>
+    <string name="job_prompt">Opdracht</string>
+    <string name="job_prompt_hint">Wat moet de agent doen? Bijvoorbeeld: vat mijn inbox en de agenda van vandaag samen.</string>
+    <string name="job_when">Wanneer</string>
+    <string name="job_deliver">Resultaten sturen naar</string>
+    <string name="job_deliver_none">Nergens (alleen in het taaklogboek)</string>
+    <string name="job_delete_title">“%1$s” verwijderen?</string>
+    <string name="job_delete_body">Dit kun je niet ongedaan maken.</string>
+    <string name="job_discard_title">Wijzigingen weggooien?</string>
+    <string name="job_discard_body">Je wijzigingen aan deze taak worden niet bewaard.</string>
+    <string name="job_discard">Weggooien</string>
+    <string name="job_keep_editing">Verder bewerken</string>
+    <string name="job_schedule_kept">Nu: %1$s. Dat blijft zo, tenzij je iets anders kiest.</string>
+    <string name="schedule_once">Eenmalig</string>
+    <string name="schedule_repeat">Herhalen</string>
+    <string name="schedule_daily">Dagelijks</string>
+    <string name="schedule_weekly">Wekelijks</string>
+    <string name="schedule_monthly">Maandelijks</string>
+    <string name="schedule_custom">Aangepast</string>
+    <string name="schedule_date">Datum</string>
+    <string name="schedule_time">Tijd</string>
+    <string name="schedule_in_an_hour">Over 1 uur</string>
+    <string name="schedule_tonight">Vanavond 20:00</string>
+    <string name="schedule_tomorrow">Morgen 09:00</string>
+    <string name="schedule_every">Elke</string>
+    <string name="schedule_minutes_short">%1$d min</string>
+    <string name="schedule_hours_short">%1$d uur</string>
+    <string name="schedule_window">Alleen op bepaalde uren</string>
+    <string name="schedule_window_detail">Bijvoorbeeld niet \'s nachts</string>
+    <string name="schedule_from">Van</string>
+    <string name="schedule_until">tot</string>
+    <string name="schedule_days_toggle">Alleen op bepaalde dagen</string>
+    <string name="schedule_days_detail">Bijvoorbeeld alleen op werkdagen</string>
+    <string name="schedule_days">Dagen</string>
+    <string name="schedule_weekdays">Werkdagen</string>
+    <string name="schedule_weekend">Weekend</string>
+    <string name="schedule_every_day">Elke dag</string>
+    <string name="schedule_day_of_month">Dag van de maand</string>
+    <string name="schedule_short_months">Maanden zonder dag %1$d worden overgeslagen.</string>
+    <string name="schedule_cron">Cron-expressie</string>
+    <string name="schedule_cron_hint">Minuut, uur, dag, maand, weekdag. Zo is 30 7 * * 1-5 om 07:30 op werkdagen; zondag is 0.</string>
+    <string name="schedule_next">Volgende: %1$s</string>
+    <string name="schedule_past">Dit moment is al voorbij. Kies een later tijdstip.</string>
+    <string name="schedule_no_days">Kies minstens één dag.</string>
+    <string name="schedule_bad_window">Het eerste uur moet voor het laatste liggen.</string>
+    <string name="cron_error_fields">Gebruik vijf velden: minuut, uur, dag van de maand, maand en dag van de week.</string>
+    <string name="cron_error_field">“%2$s” klopt niet als %1$s.</string>
+    <string name="cron_error_never">Dit wordt nooit uitgevoerd.</string>
+    <string-array name="cron_fields">
+        <item>minuut</item>
+        <item>uur</item>
+        <item>dag van de maand</item>
+        <item>maand</item>
+        <item>dag van de week</item>
+    </string-array>
     <string name="recent">Recent</string>
     <string name="no_chats">Nog geen gesprekken</string>
     <string name="untitled_chat">Nieuw gesprek</string>

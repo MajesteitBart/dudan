@@ -25,6 +25,68 @@
     <string name="job_run_now">Run now</string>
     <string name="job_pause">Pause</string>
     <string name="job_resume">Resume</string>
+    <string name="no_jobs_add">No scheduled tasks yet. Add one with New task.</string>
+    <string name="job_new">New task</string>
+    <string name="job_edit">Edit</string>
+    <string name="job_edit_title">Edit task</string>
+    <string name="job_read_only">Change this task on the server.</string>
+    <string name="job_name">Name</string>
+    <string name="job_name_hint">Morning briefing</string>
+    <string name="job_name_fixed">This server names a task by its ID, so the name stays as it is.</string>
+    <string name="job_prompt">Instruction</string>
+    <string name="job_prompt_hint">What should the agent do? For example: summarise my inbox and today\'s agenda.</string>
+    <string name="job_when">When</string>
+    <string name="job_deliver">Send results to</string>
+    <string name="job_deliver_none">Nowhere (job log only)</string>
+    <string name="job_delete_title">Delete “%1$s”?</string>
+    <string name="job_delete_body">This can\'t be undone.</string>
+    <string name="job_discard_title">Discard changes?</string>
+    <string name="job_discard_body">Your changes to this task won\'t be saved.</string>
+    <string name="job_discard">Discard</string>
+    <string name="job_keep_editing">Keep editing</string>
+    <string name="job_schedule_kept">Now: %1$s. This stays as it is unless you pick something else.</string>
+    <string name="schedule_once">Once</string>
+    <string name="schedule_repeat">Repeat</string>
+    <string name="schedule_daily">Daily</string>
+    <string name="schedule_weekly">Weekly</string>
+    <string name="schedule_monthly">Monthly</string>
+    <string name="schedule_custom">Custom</string>
+    <string name="schedule_date">Date</string>
+    <string name="schedule_time">Time</string>
+    <string name="schedule_in_an_hour">In 1 hour</string>
+    <string name="schedule_tonight">Tonight 20:00</string>
+    <string name="schedule_tomorrow">Tomorrow 09:00</string>
+    <string name="schedule_every">Every</string>
+    <string name="schedule_minutes_short">%1$d min</string>
+    <string name="schedule_hours_short">%1$d h</string>
+    <string name="schedule_window">Only during certain hours</string>
+    <string name="schedule_window_detail">For example not at night</string>
+    <string name="schedule_from">From</string>
+    <string name="schedule_until">until</string>
+    <string name="schedule_days_toggle">Only on certain days</string>
+    <string name="schedule_days_detail">For example only on weekdays</string>
+    <string name="schedule_days">Days</string>
+    <string name="schedule_weekdays">Weekdays</string>
+    <string name="schedule_weekend">Weekend</string>
+    <string name="schedule_every_day">Every day</string>
+    <string name="schedule_day_of_month">Day of the month</string>
+    <string name="schedule_short_months">Months without day %1$d are skipped.</string>
+    <string name="schedule_cron">Cron expression</string>
+    <string name="schedule_cron_hint">Minute, hour, day, month, weekday. For example 30 7 * * 1-5 is 07:30 on weekdays; Sunday is 0.</string>
+    <string name="schedule_next">Next: %1$s</string>
+    <string name="schedule_past">This time has passed. Pick a later one.</string>
+    <string name="schedule_no_days">Pick at least one day.</string>
+    <string name="schedule_bad_window">The first hour has to come before the last.</string>
+    <string name="cron_error_fields">Use five fields: minute, hour, day of the month, month and day of the week.</string>
+    <string name="cron_error_field">“%2$s” isn\'t a valid %1$s.</string>
+    <string name="cron_error_never">This never runs.</string>
+    <string-array name="cron_fields">
+        <item>minute</item>
+        <item>hour</item>
+        <item>day of the month</item>
+        <item>month</item>
+        <item>day of the week</item>
+    </string-array>
     <string name="recent">Recent</string>
     <string name="no_chats">No chats yet</string>
     <string name="untitled_chat">New chat</string>

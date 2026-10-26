@@ -17,7 +17,6 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
@@ -27,9 +26,6 @@ import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.outlined.OpenInNew
 import androidx.compose.material.icons.automirrored.rounded.ArrowBack
-import androidx.compose.material.icons.outlined.Pause
-import androidx.compose.material.icons.outlined.PlayArrow
-import androidx.compose.material.icons.rounded.Bolt
 import androidx.compose.material.icons.rounded.Search
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.HorizontalDivider
@@ -41,15 +37,16 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
+import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextOverflow
@@ -57,10 +54,8 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.launch
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.userMessage
-import nl.bartvandermeeren.dudan.data.JobInfo
 import nl.bartvandermeeren.dudan.data.SkillDetail
 import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.ui.MainViewModel
@@ -76,7 +71,7 @@ import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 
 @Composable
-private fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable (() -> Unit)? = null, content: @Composable () -> Unit) {
+internal fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable (() -> Unit)? = null, content: @Composable () -> Unit) {
     BackHandler(onBack = onBack)
     Box(Modifier.fillMaxSize(), contentAlignment = Alignment.TopCenter) {
         Column(Modifier.widthIn(max = 880.dp).fillMaxSize().statusBarsPadding().navigationBarsPadding()) {
@@ -105,7 +100,7 @@ private fun ScreenFrame(title: String?, onBack: () -> Unit, header: @Composable 
 }
 
 /** A glass card on the sky, inset from the screen edges. */
-private fun Modifier.listCard(shape: Shape = RoundedCornerShape(22.dp)) = fillMaxWidth()
+internal fun Modifier.listCard(shape: Shape = RoundedCornerShape(22.dp)) = fillMaxWidth()
     .padding(horizontal = 16.dp)
     .glass(shape)
 
@@ -340,88 +335,24 @@ private fun SkillDetailScreen(vm: MainViewModel, skill: SkillInfo, readable: Boo
     }
 }
 
+/** An outlined pill with a line icon; [color] tints both, such as Palette.Danger for Delete. */
 @Composable
-fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
-    val scope = rememberCoroutineScope()
-    var jobs by remember { mutableStateOf<List<JobInfo>?>(null) }
-    var error by remember { mutableStateOf<String?>(null) }
-    var busyJob by remember { mutableStateOf<String?>(null) }
-    suspend fun load() {
-        try {
-            jobs = vm.api.jobs()
-            error = null
-        } catch (e: Exception) {
-            error = e.userMessage()
-        }
-    }
-    LaunchedEffect(Unit) { load() }
-    fun act(job: JobInfo, action: String) {
-        busyJob = job.id
-        scope.launch {
-            runCatching { vm.api.jobAction(job.id, action) }.onFailure { error = it.userMessage() }
-            load()
-            busyJob = null
-        }
-    }
-    ScreenFrame(stringResource(R.string.scheduled_tasks), onBack) {
-        LoadingOrError(jobs == null && error == null, if (jobs == null) error else null) {
-            LazyColumn(
-                Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(top = 4.dp, bottom = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(10.dp),
-            ) {
-                if (jobs.orEmpty().isEmpty()) {
-                    item { Text(stringResource(R.string.no_jobs), color = Palette.TextTertiary, modifier = Modifier.padding(24.dp)) }
-                }
-                error?.let { item { Text(it, color = Palette.Danger, modifier = Modifier.padding(horizontal = 24.dp)) } }
-                items(jobs.orEmpty(), key = { it.id }) { job ->
-                    Box(Modifier.listCard(RoundedCornerShape(24.dp))) {
-                        Column(Modifier.padding(18.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                            Text(job.name, style = MaterialTheme.typography.titleMedium, color = Palette.TextPrimary, maxLines = 2, overflow = TextOverflow.Ellipsis)
-                            val meta = listOfNotNull(
-                                job.schedule,
-                                job.nextRunAt?.let { stringResource(R.string.job_next, it.take(16).replace('T', ' ')) },
-                                if (job.paused || !job.enabled) stringResource(R.string.job_paused) else null,
-                            ).joinToString(" · ")
-                            if (meta.isNotBlank()) Text(meta, style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
-                            job.prompt?.let { Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis) }
-                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-                                if (busyJob == job.id) {
-                                    CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.TextSecondary, modifier = Modifier.size(18.dp))
-                                } else {
-                                    PillButton(Icons.Rounded.Bolt, stringResource(R.string.job_run_now)) { act(job, "run") }
-                                    if (job.paused || !job.enabled) {
-                                        PillButton(Icons.Outlined.PlayArrow, stringResource(R.string.job_resume)) { act(job, "resume") }
-                                    } else {
-                                        PillButton(Icons.Outlined.Pause, stringResource(R.string.job_pause)) { act(job, "pause") }
-                                    }
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-private fun PillButton(icon: androidx.compose.ui.graphics.vector.ImageVector, label: String, onClick: () -> Unit) {
+internal fun PillButton(icon: ImageVector, label: String, color: Color = Palette.TextPrimary, onClick: () -> Unit) {
     Row(
         Modifier
-            .outlined(CircleShape)
+            .outlined(CircleShape, outline = if (color == Palette.TextPrimary) Palette.Outline else color.copy(alpha = 0.5f))
             .clickable(onClick = onClick)
             .padding(horizontal = 14.dp, vertical = 8.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(6.dp),
     ) {
-        Icon(icon, null, tint = Palette.Icon, modifier = Modifier.size(18.dp))
-        Text(label, style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp), color = Palette.TextPrimary)
+        Icon(icon, null, tint = if (color == Palette.TextPrimary) Palette.Icon else color, modifier = Modifier.size(18.dp))
+        Text(label, style = MaterialTheme.typography.labelLarge.copy(fontSize = 14.sp), color = color)
     }
 }
 
 @Composable
-private fun LoadingOrError(loading: Boolean, error: String?, content: @Composable () -> Unit) {
+internal fun LoadingOrError(loading: Boolean, error: String?, content: @Composable () -> Unit) {
     when {
         error != null -> Text(error, color = Palette.TextSecondary, modifier = Modifier.padding(24.dp))
         loading -> Box(Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
