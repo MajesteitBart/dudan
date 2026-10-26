@@ -10,11 +10,21 @@
 // job_create, job_update and job_delete in /v1/capabilities. MOCK_CLARK_JOBS=old is a Clark from before that: it
 // lists jobs and job_action only and has no single-job routes, so the app shows no add, edit or delete.
 //
+// In Clark mode the first target is `@dudan`, this app: a task's results go to its own chat, `task-<id>`, which the
+// session list marks with `job_id`. A new task without `deliver` goes there too. Run now on such a task writes a
+// `scheduled_result` row with a small text file into that chat after MOCK_RESULT_MS (default 3000), through the sink
+// the server sets with setResultSink. A morning brief that already delivered once is seeded with its chat.
+// MOCK_SHADOW=1 holds results back, as Clark's shadow mode does, and the task reports `last_shadow`.
+//
 // Times are on MOCK_TZ's clock (default Europe/Amsterdam), like Hermes' configured zone and Clark's config.timezone.
 import { randomBytes } from "node:crypto";
 
 const MODE = { "1": "clark", old: "old-clark" }[process.env.MOCK_CLARK_JOBS] ?? "hermes";
-const CLARK = MODE !== "hermes";
+export const CLARK = MODE !== "hermes";
+/** Clark's reserved target for results that go to a chat in dudan. */
+const APP_TARGET = "@dudan";
+const RESULT_MS = Number(process.env.MOCK_RESULT_MS ?? 3000);
+const SHADOW = process.env.MOCK_SHADOW === "1";
 const ZONE = process.env.MOCK_TZ ?? "Europe/Amsterdam";
 /** Clark's config.destinations: where a job's results can go. */
 const DESTINATIONS = {
@@ -30,13 +40,30 @@ const TEXT = {
     heartbeat: "Kijk of er iets is dat mijn aandacht nodig heeft, en meld het alleen als dat zo is.",
     dentist: "Tandarts bellen",
     dentistPrompt: "Herinner me eraan de tandarts te bellen voor een controle.",
+    brief: "Ochtendbriefing",
+    briefPrompt: "Vat mijn agenda en inbox van vandaag samen.",
+    result: "Er staan vandaag **drie afspraken** in je agenda; de eerste is om 10:00 met Sanne. In je inbox wachten twee mails op antwoord.\n\nDe details staan in het bestand.",
+    file: (title, time) => `${title}, ${time}\n\n10:00 Sanne\n13:30 Teamoverleg\n16:00 Tandarts\n`,
   },
   en: {
     heartbeat: "Check whether anything needs my attention, and only tell me if something does.",
     dentist: "Call the dentist",
     dentistPrompt: "Remind me to call the dentist for a check-up.",
+    brief: "Morning brief",
+    briefPrompt: "Summarize my agenda and inbox for today.",
+    result: "Your calendar has **three meetings** today; the first is at 10:00 with Sanne. Two emails in your inbox are waiting for a reply.\n\nThe details are in the file.",
+    file: (title, time) => `${title}, ${time}\n\n10:00 Sanne\n13:30 Team meeting\n16:00 Dentist\n`,
   },
 };
+
+/** The seeds' language, which results are written in too. */
+let text = TEXT.nl;
+
+/** Writes a task's result into a dudan chat; server.mjs sets it. */
+let resultSink = () => {};
+export function setResultSink(sink) {
+  resultSink = sink;
+}
 
 const jobs = new Map(); // id -> stored job, in creation order
 
@@ -289,10 +316,37 @@ function clarkCheck(job, newSchedule) {
   if (newSchedule && clarkNext(job) === null) throw new Refusal(400, "invalid_job", `${job.schedule} has no time left to run; pick one in the future.`);
 }
 
-function clarkDeliver(value) {
-  if (value === undefined || value === null || value === "none") return null;
-  if (!(value in DESTINATIONS)) throw new Refusal(400, "unknown_destination", `Clark has no destination called ${value}; pick one of ${Object.keys(DESTINATIONS).join(", ")} or none.`);
-  return value;
+/**
+ * Where a job's results go, as Clark's deliveryFrom decides it: nowhere, a config destination, or, for `@dudan`, a
+ * dudan chat. `@dudan` keeps a dudan destination the job already has, else gives it its own chat named after its id.
+ */
+function clarkDelivery(value, id, title, current) {
+  if (value === null || value === "none") return { deliver: null, destination: null };
+  if (value === APP_TARGET) {
+    if (current?.deliver === APP_TARGET) return { deliver: current.deliver, destination: current.destination };
+    return { deliver: APP_TARGET, destination: { session: `task-${id}`, job: id, title } };
+  }
+  if (!(value in DESTINATIONS)) {
+    throw new Refusal(400, "unknown_destination", `Clark has no destination called ${value}; pick one of ${[APP_TARGET, ...Object.keys(DESTINATIONS)].join(", ")} or none.`);
+  }
+  return { deliver: value, destination: null };
+}
+
+/** The result of a run that delivers to dudan, a moment after Run now, unless shadow mode holds it back. */
+function deliverRun(job, at) {
+  if (job.deliver !== APP_TARGET) return;
+  job.last_shadow = SHADOW;
+  if (SHADOW) return;
+  const p = localParts(at, job.timezone);
+  const time = `${pad(p.hour)}:${pad(p.minute)}`;
+  const { session, title } = job.destination;
+  setTimeout(() => resultSink({
+    session,
+    job: job.id,
+    title: title ?? null,
+    text: text.result,
+    file: { name: `${job.id}.txt`, mime: "text/plain", text: text.file(title ?? job.id, time) },
+  }), RESULT_MS);
 }
 
 function clarkView(job, full = false) {
@@ -314,10 +368,12 @@ function clarkView(job, full = false) {
     ...(job.editable ? {} : { edit_note: HAND_WRITTEN }),
     name_editable: false,
     deliver: job.deliver,
+    session_id: job.destination?.session ?? null,
+    last_shadow: job.last_shadow ?? false,
     timezone: job.timezone,
   };
-  // A Clark from before job management sent none of the editing fields.
-  if (MODE === "old-clark") for (const key of ["editable", "edit_note", "name_editable", "deliver", "timezone"]) delete view[key];
+  // A Clark from before job management sent none of the editing or result fields.
+  if (MODE === "old-clark") for (const key of ["editable", "edit_note", "name_editable", "deliver", "session_id", "last_shadow", "timezone"]) delete view[key];
   return view;
 }
 
@@ -326,9 +382,11 @@ function clarkCreate(body) {
   if (!validZone(timezone)) throw new Refusal(400, "invalid_job", `${timezone} is not a time zone Clark knows.`);
   let id = slug(body?.name);
   for (let n = 2; jobs.has(id); n++) id = `${slug(body?.name).slice(0, 60)}-${n}`;
+  const title = String(body?.name ?? "").trim() || null;
   const job = {
     id, editable: true, enabled: true, paused: false, timezone, prompt: String(body?.prompt ?? "").trim(),
-    schedule: clarkSchedule(body?.schedule, timezone), deliver: clarkDeliver(body?.deliver), last_run_at: null, last_status: null,
+    schedule: clarkSchedule(body?.schedule, timezone), ...clarkDelivery(body?.deliver ?? APP_TARGET, id, title, null),
+    last_run_at: null, last_status: null, last_shadow: false,
   };
   clarkCheck(job, true);
   jobs.set(id, job);
@@ -344,7 +402,7 @@ function clarkUpdate(job, body) {
   if ("timezone" in body && "schedule" in body) next.timezone = body.timezone || ZONE;
   if ("schedule" in body) next.schedule = clarkSchedule(body.schedule, next.timezone);
   if ("prompt" in body) next.prompt = String(body.prompt ?? "").trim();
-  if ("deliver" in body) next.deliver = clarkDeliver(body.deliver);
+  if ("deliver" in body) Object.assign(next, clarkDelivery(body.deliver, job.id, job.destination?.title ?? job.id, job));
   clarkCheck(next, "schedule" in body);
   Object.assign(job, next);
 }
@@ -353,13 +411,29 @@ function clarkUpdate(job, body) {
 
 /** A heartbeat every half hour by day, and a paused one-off tomorrow at 09:00. */
 export function seedJobs(lang) {
-  const text = TEXT[lang] ?? TEXT.nl;
+  text = TEXT[lang] ?? TEXT.nl;
   const tomorrow = localParts(Date.now() + 86_400_000, ZONE);
   const date = `${tomorrow.year}-${pad(tomorrow.month)}-${pad(tomorrow.day)}`;
   if (CLARK) {
-    jobs.set("heartbeat", { id: "heartbeat", editable: false, enabled: true, paused: false, timezone: ZONE, prompt: text.heartbeat, schedule: "*/30 7-22 * * *", deliver: "telegram", last_run_at: null, last_status: null });
+    jobs.set("heartbeat", { id: "heartbeat", editable: false, enabled: true, paused: false, timezone: ZONE, prompt: text.heartbeat, schedule: "*/30 7-22 * * *", deliver: "telegram", destination: null, last_run_at: null, last_status: null });
     const id = slug(text.dentist);
-    jobs.set(id, { id, editable: true, enabled: true, paused: true, timezone: ZONE, prompt: text.dentistPrompt, schedule: `at ${date}T09:00`, deliver: null, last_run_at: null, last_status: null });
+    jobs.set(id, { id, editable: true, enabled: true, paused: true, timezone: ZONE, prompt: text.dentistPrompt, schedule: `at ${date}T09:00`, deliver: null, destination: null, last_run_at: null, last_status: null });
+    if (MODE === "clark") {
+      // A weekday brief that delivered to its own chat two hours ago.
+      const brief = slug(text.brief);
+      const ran = Date.now() - 2 * 3_600_000;
+      const p = localParts(ran, ZONE);
+      const time = `${pad(p.hour)}:${pad(p.minute)}`;
+      jobs.set(brief, {
+        id: brief, editable: true, enabled: true, paused: false, timezone: ZONE, prompt: text.briefPrompt, schedule: "30 7 * * 1-5",
+        deliver: APP_TARGET, destination: { session: `task-${brief}`, job: brief, title: text.brief },
+        last_run_at: localIso(ran, ZONE), last_status: "succeeded", last_shadow: false,
+      });
+      resultSink({
+        session: `task-${brief}`, job: brief, title: text.brief, at: ran / 1000, text: text.result,
+        file: { name: `${brief}.txt`, mime: "text/plain", text: text.file(text.brief, time) },
+      });
+    }
     return;
   }
   const created = localIso(Date.now(), ZONE);
@@ -401,7 +475,7 @@ export async function handleJobs(req, res, parts, url, send, readBody) {
       if (req.method === "GET") {
         const all = url.searchParams.get("include_disabled") === "true" || url.searchParams.get("include_disabled") === "1";
         const list = [...jobs.values()].filter((job) => all || job.enabled).map((job) => view(job, false));
-        const targets = Object.entries(DESTINATIONS).map(([name, d]) => ({ id: name, label: d.description || name }));
+        const targets = [{ id: APP_TARGET, label: "This app" }, ...Object.entries(DESTINATIONS).map(([name, d]) => ({ id: name, label: d.description || name }))];
         return reply(200, { jobs: list, ...(MODE === "clark" ? { delivery_targets: targets } : {}) });
       }
       if (req.method === "POST" && MODE !== "old-clark") {
@@ -451,6 +525,7 @@ export async function handleJobs(req, res, parts, url, send, readBody) {
       case "run":
         Object.assign(job, { last_run_at: now, last_status: "ok" });
         if (!CLARK) job.repeat.completed++;
+        if (MODE === "clark") deliverRun(job, Date.now());
         return reply(200, CLARK ? { ok: true, occurrence: `${id}@${now}`, job: view(job, false) } : { job: view(job, true) });
       default:
         return fail(404, "not_found", "No such endpoint.");

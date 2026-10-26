@@ -31,6 +31,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.outlined.CalendarToday
+import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.outlined.Edit
 import androidx.compose.material.icons.outlined.Pause
@@ -83,6 +84,7 @@ import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
@@ -95,6 +97,7 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.userMessage
+import nl.bartvandermeeren.dudan.data.DELIVER_APP
 import nl.bartvandermeeren.dudan.data.DELIVER_NOWHERE
 import nl.bartvandermeeren.dudan.data.DeliveryTarget
 import nl.bartvandermeeren.dudan.data.HermesApi
@@ -105,6 +108,7 @@ import nl.bartvandermeeren.dudan.data.JobInfo
 import nl.bartvandermeeren.dudan.data.JobList
 import nl.bartvandermeeren.dudan.data.JobSchedule
 import nl.bartvandermeeren.dudan.data.ScheduleText
+import nl.bartvandermeeren.dudan.data.newTaskDelivery
 import nl.bartvandermeeren.dudan.ui.MainViewModel
 import nl.bartvandermeeren.dudan.ui.components.CtaButton
 import nl.bartvandermeeren.dudan.ui.components.GlassDialog
@@ -125,10 +129,12 @@ private val DraftSaver = listSaver<ScheduleDraft, Any>(save = { it.encode() }, r
 /**
  * Scheduled tasks: run, pause and resume each one and, where the server allows it, add, change and delete them.
  * The editor is state inside this screen, the way SkillsScreen opens a skill, so Back returns to the list where it was.
+ * A task whose results go to a chat in dudan opens that chat with Results, once the chat exists.
  */
 @Composable
 fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
     val scope = rememberCoroutineScope()
+    val sessions by vm.sessions.collectAsStateWithLifecycle()
     var list by remember { mutableStateOf<JobList?>(null) }
     var error by remember { mutableStateOf<String?>(null) }
     var busyJob by remember { mutableStateOf<String?>(null) }
@@ -158,6 +164,8 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
         }
         load()
     }
+    // Clark makes a task's chat when the first result comes in; the drawer's list says which exist.
+    LaunchedEffect(Unit) { vm.refreshSessions() }
     fun act(job: JobInfo, action: String) {
         busyJob = job.id
         scope.launch {
@@ -208,6 +216,7 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
                     }
                     error?.let { item { Text(it, color = Palette.Danger, modifier = Modifier.padding(horizontal = 24.dp)) } }
                     items(jobs, key = { it.id }) { job ->
+                        val chat = job.sessionId?.takeIf { id -> sessions.items.any { it.id == id } }
                         JobCard(
                             job = job,
                             schedule = text.summary(job, zone, today),
@@ -215,6 +224,7 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
                             readOnlyNote = if (manages == true && !job.editable) job.editNote ?: stringResource(R.string.job_read_only) else null,
                             busy = busyJob == job.id,
                             onEdit = if (manages == true && job.editable) ({ editing = job.id }) else null,
+                            onResults = chat?.let { id -> { vm.openSession(id) } },
                             onAction = { act(job, it) },
                         )
                     }
@@ -242,6 +252,7 @@ private fun JobCard(
     readOnlyNote: String?,
     busy: Boolean,
     onEdit: (() -> Unit)?,
+    onResults: (() -> Unit)?,
     onAction: (String) -> Unit,
 ) {
     val paused = job.paused || !job.enabled
@@ -263,6 +274,7 @@ private fun JobCard(
             Text(it, style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary, maxLines = 3, overflow = TextOverflow.Ellipsis)
         }
         readOnlyNote?.let { Text(it, style = MaterialTheme.typography.bodySmall, color = Palette.TextTertiary) }
+        if (job.lastShadow) Text(stringResource(R.string.job_shadow), style = MaterialTheme.typography.bodySmall, color = Palette.TextTertiary)
         FlowRow(
             Modifier.padding(top = 4.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp),
@@ -272,6 +284,7 @@ private fun JobCard(
                 CircularProgressIndicator(strokeWidth = 2.dp, color = Palette.TextSecondary, modifier = Modifier.padding(8.dp).size(18.dp))
             } else {
                 PillButton(Icons.Rounded.Bolt, stringResource(R.string.job_run_now)) { onAction("run") }
+                if (onResults != null) PillButton(Icons.Outlined.ChatBubbleOutline, stringResource(R.string.job_results), onClick = onResults)
                 if (paused) {
                     PillButton(Icons.Outlined.PlayArrow, stringResource(R.string.job_resume)) { onAction("resume") }
                 } else {
@@ -295,9 +308,8 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
     val text = remember(locale) { ScheduleText(locale) }
     val opened = remember { LocalDateTime.now(zone) }
     val original = remember(job?.id) { job?.let { JobSchedule.parse(it, zone) } }
-    // A new task sends its results to the first place the server offers; one that reaches nobody is rarely meant.
     val initialDeliver = remember(job?.id) {
-        if (job == null) targets.firstOrNull()?.id ?: DELIVER_NOWHERE else job.deliver?.takeIf { it.isNotBlank() } ?: DELIVER_NOWHERE
+        if (job == null) newTaskDelivery(targets) else job.deliver?.takeIf { it.isNotBlank() } ?: DELIVER_NOWHERE
     }
 
     var name by rememberSaveable { mutableStateOf(job?.name.orEmpty()) }
@@ -802,12 +814,17 @@ private fun problemText(problem: ScheduleProblem): String = when (problem) {
     }
 }
 
-/** The server's places for results, the one the task already uses even when it's no longer listed, and nowhere. */
+/**
+ * The server's places for results, the one the task already uses even when it's no longer listed, and nowhere. Clark's
+ * `@dudan` reads as this app, in the app's language.
+ */
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 private fun DeliveryChoices(targets: List<DeliveryTarget>, initial: String, selected: String, onSelect: (String) -> Unit) {
-    val options = targets.map { it.id to it.label } +
-        listOfNotNull((initial to initial).takeIf { initial != DELIVER_NOWHERE && targets.none { it.id == initial } }) +
+    val app = stringResource(R.string.job_deliver_app)
+    fun label(id: String, server: String) = if (id == DELIVER_APP) app else server
+    val options = targets.map { it.id to label(it.id, it.label) } +
+        listOfNotNull((initial to label(initial, initial)).takeIf { initial != DELIVER_NOWHERE && targets.none { it.id == initial } }) +
         (DELIVER_NOWHERE to stringResource(R.string.job_deliver_none))
     FlowRow(Modifier.selectableGroup(), horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
         options.forEach { (id, label) -> Choice(label, selected = selected == id) { onSelect(id) } }

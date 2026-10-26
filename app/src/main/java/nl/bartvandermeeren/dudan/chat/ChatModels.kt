@@ -27,6 +27,12 @@ data class Step(
 /** An image in a message; [source] is a data: URL or a content:// URI. */
 data class ImageRef(val source: String)
 
+/**
+ * Marks an answer as a scheduled task's result, which arrives without a question. [title] names the task (its name,
+ * else its id), [atMs] when Clark delivered it.
+ */
+data class ScheduledLabel(val title: String?, val atMs: Long?)
+
 data class UiMessage(
     val id: String,
     val role: Role,
@@ -53,6 +59,8 @@ data class UiMessage(
     val review: ReviewRequest? = null,
     /** Where a question sent from this app was asked; a retry sends it the same way. */
     val origin: TurnOrigin? = null,
+    /** Set on a scheduled task's result. It is no turn's answer: see HistoryMapper. */
+    val scheduled: ScheduledLabel? = null,
 ) {
     val isStreaming: Boolean get() = state == MessageState.Streaming
     val reviewsBackground: Boolean get() = review != null

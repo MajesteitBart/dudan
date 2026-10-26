@@ -23,7 +23,7 @@
 - Rich replies: when a table, chart, steps, choices or a short form help, the agent adds an [OpenUI](https://www.openui.com) block to its answer, and dudan draws it as native UI in the chat. Buttons, follow-up suggestions and form submits send your next message. See [Rich replies](#rich-replies).
 - Skills: type `$` in a message and the prompt bar lists Hermes' skills with their descriptions, narrowing as you type. A picked skill goes in as a tag such as `$github-pr-workflow`, in the accent color, and stays colored in the sent message. Tags that match no skill, such as `$5`, stay plain text. The attach menu's Skill entry starts a tag, and the side-key overlay has the same list. The message goes to Hermes as typed. The tagged skills go along in that turn's instructions, after the rich reply rules and the turn's context, and ask the agent to load each skill with `skill_view` before it answers.
 - The Skills screen lists Hermes' skills by category. Tap one for its description and Use in chat, which starts a chat with its tag. A Hermes with the [skills patch](../tools/hermes-patches/README.md) also sends the skill's SKILL.md, its path and its extra files. See [Skills](setup.md#skills).
-- Search, pin, rename and delete chats. Run, pause or resume scheduled tasks, and add, change or delete them where the server allows it. See [Scheduled tasks](#scheduled-tasks).
+- Search, pin, rename and delete chats. Run, pause or resume scheduled tasks, and add, change or delete them where the server allows it. With Clark, a task's results come to a chat of their own. See [Scheduled tasks](#scheduled-tasks).
 - Phone control: Hermes can open apps and links, set timers and alarms, and control media on the phone, whichever channel you ask it from. See [Phone control](setup.md#phone-control).
 - English and Dutch UI.
 
@@ -52,7 +52,7 @@ Copy, share, the reply notification and read-aloud turn each block into the mark
 
 ## Scheduled tasks
 
-The clock in the drawer's bottom row opens Scheduled tasks. Each task shows its name, when it runs in a short sentence ("Weekdays at 07:30", "Elke 30 minuten, 07:00–22:59"), its next run on the phone's clock and the first lines of its instruction, with Run now and Pause or Resume. A schedule dudan can't put into words shows as the server wrote it, and a task that runs on another time zone's clock names that zone.
+The clock in the drawer's bottom row opens Scheduled tasks. Each task shows its name, when it runs in a short sentence ("Weekdays at 07:30", "Elke 30 minuten, 07:00–22:59"), its next run on the phone's clock and the first lines of its instruction, with Run now and Pause or Resume. A schedule dudan can't put into words shows as the server wrote it, and a task that runs on another time zone's clock names that zone. A task whose results come to dudan also has Results, once its chat exists, which opens that chat. When Clark held back a task's last results because it runs in shadow mode, the task says so on one line.
 
 New task, at the bottom of the screen, opens the editor; so does tapping a task or its Edit button. The editor has a name, the instruction for the agent, and When:
 
@@ -75,10 +75,16 @@ A schedule the editor doesn't change keeps running the way the server runs it:
 What each server offers:
 
 - Stock Hermes has all the job endpoints without listing them in `/v1/capabilities`, so dudan offers New task, Edit and Delete. Hermes doesn't take a time zone and runs crons on its own configured clock.
-- Clark lists `job_create`, `job_update`, `job_delete` and `job` next to `jobs`. It also sends `delivery_targets`, and the editor then asks where results go: one of those destinations, or nowhere, which keeps them in the job log. A new task starts on the first destination. Clark names a task by its ID, so an existing task keeps its name. A task Clark won't let the app change, such as one written by hand on the server, shows Clark's reason instead of Edit.
+- Clark lists `job_create`, `job_update`, `job_delete` and `job` next to `jobs`. It also sends `delivery_targets`, and the editor then asks where results go: This app, Clark's other destinations, or nowhere, which keeps them in the job log. A new task delivers to its own chat in dudan when Clark offers This app (the target `@dudan`), and otherwise starts on the first destination. Clark names a task by its ID, so an existing task keeps its name. A task Clark won't let the app change, such as one written by hand on the server, shows Clark's reason instead of Edit.
 - A Clark from before job management lists `jobs` without `job_create`; dudan then only runs, pauses and resumes.
 
 When dudan can't load the capabilities, it shows the controls and lets the server's answers speak for themselves.
+
+### Results in dudan
+
+A task that delivers to This app gets a chat of its own, named after the task, which Clark makes when the first result comes in and again after you delete it. The drawer marks such a chat with a clock, and a new result moves it to the top. Each result shows as an answer under a label such as "Scheduled task · 07:30", with the date when it came in on another day, and its files show and save like an answer's. A task scheduled from a chat, with Clark's `schedule` tool and `here`, sends its results back to that chat instead; there the label also names the task. A result that comes in while you're in the middle of a turn in that chat stays a separate answer and doesn't take the turn's steps or files. You can reply in a task's chat like in any other, and the agent reads the results above your message.
+
+Clark has no way to reach the phone, so a result comes without a notification: it shows in its chat, at the top of the drawer, the next time you open dudan or return to it.
 
 ## Known limits
 

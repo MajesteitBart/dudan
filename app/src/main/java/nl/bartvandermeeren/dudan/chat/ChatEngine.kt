@@ -703,12 +703,17 @@ class ChatEngine(
         fail(turn, cause.userMessage())
     }
 
-    /** Takes this turn's answer from the transcript: the first reply after this turn's own question. */
+    /**
+     * Takes this turn's answer from the transcript: the first reply after this turn's own question. A scheduled task's
+     * result that landed meanwhile answers nothing.
+     */
     private suspend fun reloadAfterRecovery(turn: Turn) {
         val history = runCatching { HistoryMapper.map(api.sessionMessages(turn.sessionId).messages) }.getOrNull()
         val question = history?.indexOfLast { it.role == Role.User && it.text.trim() == turn.text.trim() } ?: -1
         val answer = if (question >= 0) {
-            history!!.drop(question + 1).firstOrNull { it.role == Role.Assistant && (it.text.isNotBlank() || it.attachments.isNotEmpty()) }
+            history!!.drop(question + 1).firstOrNull {
+                it.role == Role.Assistant && it.scheduled == null && (it.text.isNotBlank() || it.attachments.isNotEmpty())
+            }
         } else null
         if (answer != null) {
             updateMessage(turn.sessionId, turn.messageId) {

@@ -186,7 +186,7 @@ fun ChatPane(
                         modifier = Modifier.align(Alignment.Center).size(28.dp),
                     )
                     conversation.loadError != null && messages.isEmpty() -> LoadError(conversation.loadError!!, onRetry = vm::reloadCurrent)
-                    else -> androidx.compose.runtime.key(settings.serverUrl, settings.apiKey) { MessageList(vm, settings, speakingId, skills) }
+                    else -> androidx.compose.runtime.key(settings.serverUrl, settings.apiKey) { MessageList(vm, settings, speakingId, skills, session?.displayTitle) }
                 }
             }
         }
@@ -334,7 +334,7 @@ private fun LoadError(message: String, onRetry: () -> Unit) {
 }
 
 @Composable
-private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?, skills: List<SkillInfo>) {
+private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: String?, skills: List<SkillInfo>, chatTitle: String?) {
     val conversation by vm.conversation.collectAsStateWithLifecycle()
     val desktops = rememberConversationDesktops(vm.api, conversation.sessionId)
     // A desktop shows while it works; a stopped one leaves the conversation.
@@ -395,6 +395,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                             onSpeak = { vm.toggleSpeak(message.id, message.text) },
                             onRetry = vm::retry,
                             onApproval = vm::resolveApproval,
+                            chatTitle = chatTitle,
                             attachments = { OutboundAttachments(vm.api, conversation.sessionId, message.attachments, saves) },
                         )
                     }

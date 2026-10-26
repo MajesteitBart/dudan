@@ -32,6 +32,7 @@ import androidx.compose.material.icons.outlined.ChatBubbleOutline
 import androidx.compose.material.icons.outlined.ContentCopy
 import androidx.compose.material.icons.outlined.ErrorOutline
 import androidx.compose.material.icons.outlined.Psychology
+import androidx.compose.material.icons.outlined.Schedule
 import androidx.compose.material.icons.outlined.Share
 import androidx.compose.material.icons.outlined.Shield
 import androidx.compose.material.icons.outlined.Stop
@@ -58,21 +59,28 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import java.time.Instant
+import java.time.LocalDate
+import java.time.LocalDateTime
+import java.time.ZoneId
 import kotlinx.coroutines.delay
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.BackgroundStatus
 import nl.bartvandermeeren.dudan.chat.ImageRef
 import nl.bartvandermeeren.dudan.chat.MessageState
+import nl.bartvandermeeren.dudan.chat.ScheduledLabel
 import nl.bartvandermeeren.dudan.chat.Step
 import nl.bartvandermeeren.dudan.chat.StepKind
 import nl.bartvandermeeren.dudan.chat.UiMessage
 import nl.bartvandermeeren.dudan.data.ApprovalRequest
+import nl.bartvandermeeren.dudan.data.ScheduleText
 import nl.bartvandermeeren.dudan.openui.OpenUiText
 import nl.bartvandermeeren.dudan.ui.components.FileBadge
 import nl.bartvandermeeren.dudan.ui.components.Markdown
@@ -165,7 +173,8 @@ private fun MessageImage(ref: ImageRef) {
 /**
  * An answer: the work panel, approval, text and status. [attachments] draws the files returned with it
  * below the text. The side-key overlay leaves it empty, since Save file needs an activity for the
- * document picker.
+ * document picker. A scheduled task's result gets a label above it; [chatTitle] is the open chat's
+ * title, which the label doesn't repeat.
  */
 @Composable
 fun AssistantMessageItem(
@@ -178,6 +187,7 @@ fun AssistantMessageItem(
     onApproval: (String) -> Unit,
     modifier: Modifier = Modifier,
     showDisclaimer: Boolean = true,
+    chatTitle: String? = null,
     attachments: @Composable () -> Unit = {},
 ) {
     Column(
@@ -186,6 +196,7 @@ fun AssistantMessageItem(
             .padding(horizontal = 18.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
+        message.scheduled?.let { ScheduledLabelRow(it, chatTitle) }
         val hasWork = message.steps.isNotEmpty() || message.reasoning.isNotBlank()
         if (message.isStreaming && message.text.isEmpty() && !hasWork) {
             WorkingRow(
@@ -237,6 +248,32 @@ fun AssistantMessageItem(
                 )
             }
         }
+    }
+}
+
+/**
+ * "Scheduled task · 07:30" on the phone's clock, with the date when it isn't today. The task's name goes in
+ * when the chat has another title, such as the chat a task was scheduled from.
+ */
+@Composable
+private fun ScheduledLabelRow(label: ScheduledLabel, chatTitle: String?) {
+    val locale = LocalConfiguration.current.locales[0]
+    val text = remember(locale) { ScheduleText(locale) }
+    val at = remember(label.atMs, text) {
+        label.atMs?.let { ms ->
+            val zone = ZoneId.systemDefault()
+            text.moment(LocalDateTime.ofInstant(Instant.ofEpochMilli(ms), zone), LocalDate.now(zone))
+        }
+    }
+    val title = label.title?.trim()?.takeIf { it.isNotEmpty() && !it.equals(chatTitle?.trim(), ignoreCase = true) }
+    val line = when {
+        title != null && at != null -> stringResource(R.string.scheduled_result_titled, title, at)
+        title != null || at != null -> stringResource(R.string.scheduled_result, title ?: at.orEmpty())
+        else -> stringResource(R.string.session_scheduled_task)
+    }
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+        Icon(Icons.Outlined.Schedule, contentDescription = null, tint = Palette.TextSecondary, modifier = Modifier.size(16.dp))
+        Text(line, style = MaterialTheme.typography.labelLarge, color = Palette.TextSecondary, maxLines = 1, overflow = TextOverflow.Ellipsis)
     }
 }
 

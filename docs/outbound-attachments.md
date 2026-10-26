@@ -16,6 +16,7 @@ The `attachments` array comes with:
 - `run.completed` on the run event stream;
 - `assistant.completed` and `run.completed` on the session chat stream, which turns with photos use;
 - the answer's assistant rows in `GET /api/sessions/{session_id}/messages`. Clark can list the files on any assistant row of the answer, also on the one that called `attach_file`; dudan shows each file once, with the reply that follows.
+- a scheduled task's result in the same transcript, a row with `display_kind: scheduled_result`. Its files have input ids like `result-41` and show with that result only, never with a turn's answer.
 
 A missing array means no files. An entry looks like this (synthetic metadata):
 

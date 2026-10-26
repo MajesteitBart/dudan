@@ -45,6 +45,10 @@
     <string name="job_discard">Discard</string>
     <string name="job_keep_editing">Keep editing</string>
     <string name="job_schedule_kept">Now: %1$s. This stays as it is unless you pick something else.</string>
+    <!-- Clark's @dudan delivery target: the task's results go to a chat in this app. -->
+    <string name="job_deliver_app">This app</string>
+    <string name="job_results">Results</string>
+    <string name="job_shadow">Shadow mode on Clark: results were held back</string>
     <string name="schedule_once">Once</string>
     <string name="schedule_repeat">Repeat</string>
     <string name="schedule_daily">Daily</string>
@@ -93,6 +97,7 @@
     <string name="recent">Recent</string>
     <string name="no_chats">No chats yet</string>
     <string name="untitled_chat">New chat</string>
+    <string name="session_scheduled_task">Scheduled task</string>
     <string name="settings">Settings</string>
     <string name="pin">Pin</string>
     <string name="unpin">Unpin</string>
@@ -164,6 +169,10 @@
     <string name="background_waiting">%1$s hasn\'t reviewed this yet and won\'t continue until you ask.</string>
     <string name="background_review">Review result and finish</string>
     <string name="background_review_prompt">Review the background results above and finish the task. If anything still needs my confirmation, ask me first.</string>
+    <!-- Above a scheduled task's result; %1$s is when it came in. -->
+    <string name="scheduled_result">Scheduled task · %1$s</string>
+    <!-- %1$s is the task's name, %2$s when its result came in. -->
+    <string name="scheduled_result_titled">Scheduled task · %1$s · %2$s</string>
 
     <!-- Models -->
     <string name="model_picker_title">Model</string>

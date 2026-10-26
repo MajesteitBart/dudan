@@ -2,6 +2,7 @@ package nl.bartvandermeeren.dudan
 
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonObject
+import nl.bartvandermeeren.dudan.data.DELIVER_APP
 import nl.bartvandermeeren.dudan.data.DELIVER_NOWHERE
 import nl.bartvandermeeren.dudan.data.DeliveryTarget
 import nl.bartvandermeeren.dudan.data.HermesApi
@@ -10,6 +11,7 @@ import nl.bartvandermeeren.dudan.data.JobChanges
 import nl.bartvandermeeren.dudan.data.JobDraft
 import nl.bartvandermeeren.dudan.data.JobList
 import nl.bartvandermeeren.dudan.data.ServerCapabilities
+import nl.bartvandermeeren.dudan.data.newTaskDelivery
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -81,6 +83,9 @@ class JobsApiTest {
         assertTrue(inbox.enabled)
         // Stock Hermes has no delivery targets: the editor shows no choice and sends no deliver.
         assertEquals(emptyList<DeliveryTarget>(), hermes.deliveryTargets)
+        // Nor a chat for results, or shadow mode.
+        assertNull(brief.sessionId)
+        assertFalse(brief.lastShadow)
     }
 
     @Test
@@ -98,6 +103,42 @@ class JobsApiTest {
         assertTrue(dentist.editable)
         assertNull(dentist.deliver)
         assertEquals(listOf(DeliveryTarget("telegram", "Telegram (Bart)"), DeliveryTarget("mail", "mail")), clark.deliveryTargets)
+    }
+
+    @Test
+    fun readsWhereClarkDeliversToTheApp() {
+        val list = JobList.from(
+            json(
+                """
+                {"jobs": [
+                  {"id": "dentist-2", "name": "dentist-2", "schedule": {"expr": "0 9 * * *"}, "deliver": "@dudan",
+                   "session_id": "task-dentist-2", "last_shadow": true},
+                  {"id": "heartbeat", "name": "heartbeat", "schedule": {"expr": "*/30 7-22 * * *"}, "deliver": "telegram",
+                   "session_id": null, "last_shadow": false}
+                ],
+                "delivery_targets": [{"id": "@dudan", "label": "This app"}, {"id": "telegram", "label": "Telegram (Bart)"}]}
+                """,
+            ),
+        )
+        val (dentist, heartbeat) = list.jobs
+        assertEquals(DELIVER_APP, dentist.deliver)
+        assertEquals("task-dentist-2", dentist.sessionId)
+        assertTrue(dentist.lastShadow)
+        assertNull(heartbeat.sessionId)
+        assertFalse(heartbeat.lastShadow)
+        assertEquals(DELIVER_APP, newTaskDelivery(list.deliveryTargets))
+    }
+
+    @Test
+    fun aNewTaskDeliversToTheAppWhenTheServerOffersIt() {
+        val app = DeliveryTarget(DELIVER_APP, "This app")
+        val telegram = DeliveryTarget("telegram", "Telegram (Bart)")
+        // Preferred also when it isn't listed first.
+        assertEquals(DELIVER_APP, newTaskDelivery(listOf(telegram, app)))
+        // A Clark without it starts on its first destination, as before.
+        assertEquals("telegram", newTaskDelivery(listOf(telegram)))
+        // Stock Hermes lists none; the editor then offers no choice.
+        assertEquals(DELIVER_NOWHERE, newTaskDelivery(emptyList()))
     }
 
     @Test

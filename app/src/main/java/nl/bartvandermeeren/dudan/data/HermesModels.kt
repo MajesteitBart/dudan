@@ -31,6 +31,7 @@ internal fun JsonObject.int(key: String): Int? =
 internal fun JsonObject.bool(key: String): Boolean? =
     (this[key] as? JsonPrimitive)?.let { it.booleanOrNull ?: it.intOrNull?.let { n -> n != 0 } }
 
+/** A chat in the drawer. [jobId] is set on a chat Clark made for a scheduled task's results; Hermes sends none. */
 data class SessionSummary(
     val id: String,
     val title: String?,
@@ -40,6 +41,7 @@ data class SessionSummary(
     val lastActive: Double?,
     val pinned: Boolean,
     val messageCount: Int,
+    val jobId: String? = null,
 ) {
     val displayTitle: String
         get() = title?.let(AttachmentNotes::clean)?.trim()?.takeIf { it.isNotEmpty() }
@@ -58,6 +60,7 @@ data class SessionSummary(
                 lastActive = o.dbl("last_active") ?: o.dbl("started_at"),
                 pinned = o.bool("pinned") ?: false,
                 messageCount = o.int("message_count") ?: 0,
+                jobId = o.str("job_id")?.takeIf { it.isNotBlank() },
             )
         }
     }
@@ -68,6 +71,10 @@ data class ToolCallRef(val id: String?, val name: String, val arguments: String?
 /** Rows of a session's transcript. [sessionId] is the live session Hermes resolved, which changes when it compresses a chat. */
 data class MessagePage(val sessionId: String?, val messages: List<HermesMessage>)
 
+/** Which scheduled task delivered a result row, from Clark's `scheduled: {job_id, title}`; either can be missing. */
+data class ScheduledRef(val jobId: String?, val title: String?)
+
+/** A transcript row. [scheduled] is set on a scheduled task's result; see [isScheduledResult]. */
 data class HermesMessage(
     val id: String?,
     val role: String,
@@ -79,8 +86,18 @@ data class HermesMessage(
     val displayKind: String?,
     val reasoning: String?,
     val attachments: List<OutboundAttachment> = emptyList(),
+    val scheduled: ScheduledRef? = null,
 ) {
+    /**
+     * Clark writes a scheduled task's result into its chat between turns, as an assistant row with this display kind.
+     * Nobody asked for it in that chat, so it belongs to no turn.
+     */
+    val isScheduledResult: Boolean get() = role == "assistant" && displayKind == SCHEDULED_RESULT
+
     companion object {
+        /** The `display_kind` of a scheduled task's result in Clark's transcript. */
+        const val SCHEDULED_RESULT = "scheduled_result"
+
         fun from(o: JsonObject): HermesMessage = HermesMessage(
             id = o.str("id"),
             role = o.str("role").orEmpty(),
@@ -92,6 +109,9 @@ data class HermesMessage(
             displayKind = o.str("display_kind"),
             reasoning = o.str("reasoning_content") ?: o.str("reasoning"),
             attachments = OutboundAttachment.parse(o["attachments"]),
+            scheduled = o["scheduled"].asObject()?.let { s ->
+                ScheduledRef(s.str("job_id")?.takeIf { it.isNotBlank() }, s.str("title")?.takeIf { it.isNotBlank() })
+            },
         )
 
         private fun JsonElement?.parseToolCalls(): List<ToolCallRef> {
@@ -294,7 +314,8 @@ data class ServerCapabilities(val model: String?, val endpoints: Set<String>, va
  * display text; [scheduleExpr] the raw schedule (a cron, Clark's `at YYYY-MM-DDTHH:MM`, Hermes' `run_at` or
  * `every Nm`) and [scheduleKind] Hermes' `cron`, `interval` or `once`. [editable] is false for tasks the server
  * won't let the app change, with [editNote] saying why; [nameEditable] is false where the name is the task's id.
- * [deliver] is where results go, null when the server doesn't say.
+ * [deliver] is where results go, null when the server doesn't say. Clark also sends [sessionId], the chat in dudan its
+ * results go to, and [lastShadow], whether its last run's results were held back because Clark runs in shadow mode.
  */
 data class JobInfo(
     val id: String,
@@ -313,6 +334,8 @@ data class JobInfo(
     val editNote: String? = null,
     val nameEditable: Boolean = true,
     val deliver: String? = null,
+    val sessionId: String? = null,
+    val lastShadow: Boolean = false,
 ) {
     /** The zone whose clock the server runs this task's cron on, when it says and it's a zone Java knows. */
     val zoneId: ZoneId? get() = timezone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
@@ -343,6 +366,8 @@ data class JobInfo(
                 editNote = o.str("edit_note")?.takeIf { it.isNotBlank() },
                 nameEditable = o.bool("name_editable") ?: true,
                 deliver = o.str("deliver"),
+                sessionId = o.str("session_id")?.takeIf { it.isNotBlank() },
+                lastShadow = o.bool("last_shadow") ?: false,
             )
         }
     }
@@ -367,6 +392,16 @@ data class JobList(val jobs: List<JobInfo>, val deliveryTargets: List<DeliveryTa
 
 /** What "Nowhere (job log only)" sends as `deliver`. */
 const val DELIVER_NOWHERE = "none"
+
+/** Clark's target for results that go to a chat in dudan: the task's own chat, or the chat that scheduled it. */
+const val DELIVER_APP = "@dudan"
+
+/**
+ * Where a new task's results go: to this app when the server offers it, else to the first place it offers, else
+ * nowhere. A task that reaches nobody is rarely meant.
+ */
+fun newTaskDelivery(targets: List<DeliveryTarget>): String =
+    targets.firstOrNull { it.id == DELIVER_APP }?.id ?: targets.firstOrNull()?.id ?: DELIVER_NOWHERE
 
 /** POST /api/jobs. [timezone] and [deliver] stay out of the body when null. */
 data class JobDraft(val name: String, val schedule: String, val prompt: String, val timezone: String?, val deliver: String? = null) {
