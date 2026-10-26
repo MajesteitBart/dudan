@@ -23,7 +23,7 @@
 - Rich replies: when a table, chart, steps, choices or a short form help, the agent adds an [OpenUI](https://www.openui.com) block to its answer, and dudan draws it as native UI in the chat. Buttons, follow-up suggestions and form submits send your next message. See [Rich replies](#rich-replies).
 - Skills: type `$` in a message and the prompt bar lists Hermes' skills with their descriptions, narrowing as you type. A picked skill goes in as a tag such as `$github-pr-workflow`, in the accent color, and stays colored in the sent message. Tags that match no skill, such as `$5`, stay plain text. The attach menu's Skill entry starts a tag, and the side-key overlay has the same list. The message goes to Hermes as typed. The tagged skills go along in that turn's instructions, after the rich reply rules and the turn's context, and ask the agent to load each skill with `skill_view` before it answers.
 - The Skills screen lists Hermes' skills by category. Tap one for its description and Use in chat, which starts a chat with its tag. A Hermes with the [skills patch](../tools/hermes-patches/README.md) also sends the skill's SKILL.md, its path and its extra files. See [Skills](setup.md#skills).
-- Search, pin, rename and delete chats; run, pause or resume scheduled tasks.
+- Search, pin, rename and delete chats. Run, pause or resume scheduled tasks, and add, change or delete them where the server allows it. See [Scheduled tasks](#scheduled-tasks).
 - Phone control: Hermes can open apps and links, set timers and alarms, and control media on the phone, whichever channel you ask it from. See [Phone control](setup.md#phone-control).
 - English and Dutch UI.
 
@@ -50,6 +50,29 @@ When a button or form submit can't send because a reply is still coming in, duda
 
 Copy, share, the reply notification and read-aloud turn each block into the markdown it stands for: a table stays a table, and steps become a numbered list.
 
+## Scheduled tasks
+
+The clock in the drawer's bottom row opens Scheduled tasks. Each task shows its name, when it runs in a short sentence ("Weekdays at 07:30", "Elke 30 minuten, 07:00–22:59"), its next run on the phone's clock and the first lines of its instruction, with Run now and Pause or Resume. A schedule dudan can't put into words shows as the server wrote it, and a task that runs on another time zone's clock names that zone.
+
+New task, at the bottom of the screen, opens the editor; so does tapping a task or its Edit button. The editor has a name, the instruction for the agent, and When:
+
+- Once: a date and a time, or In 1 hour, Tonight 20:00 or Tomorrow 09:00.
+- Repeat: every 5, 10, 15, 20 or 30 minutes, or every 1, 2, 3, 4, 6, 8 or 12 hours. It can be limited to the hours between two whole hours of the day (07:00 to 22:59, for example) and to some days of the week.
+- Daily, Weekly and Monthly: a time, plus the days of the week or the day of the month. Months without that day are skipped, as cron does.
+- Custom: a five-field cron (minute, hour, day of the month, month, day of the week, with Sunday as 0), checked as you type.
+
+Under the picker the editor says what the schedule means and lists its next three runs, or says why it can't be saved yet, such as a time that has passed. Delete asks first. Back asks before it throws away changes.
+
+dudan sends a schedule as a cron, or for Once as a local date-time with the phone's UTC offset, such as `2026-10-27T09:00:00+01:00`, together with the phone's time zone. An edit sends only the fields that changed. A schedule you don't touch isn't sent, so one the picker can't show, like Hermes' `every 90m`, stays as it is when you only change the instruction. When the server refuses something, such as a cron it doesn't accept, the editor shows its reason.
+
+What each server offers:
+
+- Stock Hermes has all the job endpoints without listing them in `/v1/capabilities`, so dudan offers New task, Edit and Delete. Hermes doesn't take a time zone and runs crons on its own configured clock.
+- Clark lists `job_create`, `job_update`, `job_delete` and `job` next to `jobs`. It also sends `delivery_targets`, and the editor then asks where results go: one of those destinations, or nowhere, which keeps them in the job log. Clark names a task by its ID, so an existing task keeps its name. A task Clark won't let the app change, such as one written by hand on the server, shows Clark's reason instead of Edit.
+- A Clark from before job management lists `jobs` without `job_create`; dudan then only runs, pauses and resumes.
+
+When dudan can't load the capabilities, it shows the controls and lets the server's answers speak for themselves.
+
 ## Known limits
 
 - [Agent screen](agent-screen.md) requires desktop protocol version 1 from a compatible Clark server. Hermes servers without it show no desktop controls. Watching uses PNG polling; video streaming, recording and teaching are not implemented. After losing control or reconnecting, the agent stays paused until Return control. If its model turn already ended, send a continuation message after handing back.
@@ -62,6 +85,7 @@ Copy, share, the reply notification and read-aloud turn each block into the mark
 - A chat shows its latest 500 rows, Hermes' default page. Background results land at the end, so they always show. After a restart, dudan reads older pages to find background work that is still out, but only work started in the last six hours; results of older work appear when you open the chat, not live.
 - Uploads run while dudan is open. When Android stops the app during a large upload, pick the file again; the service deletes the abandoned part after 24 hours.
 - Hermes' API server doesn't expand skills in a message the way Telegram's `/skill-name` does, so the agent loads each tagged skill itself, with one `skill_view` call per skill. Hermes puts a turn's instructions in the system prompt, ahead of the chat history, so a turn with tags can't reuse the provider's prompt cache for that history.
+- The editor works out a task's next runs on the phone's clock. A Hermes set to another time zone runs the same cron on its own clock, so its runs differ from the preview by the zones' difference.
 - Stock Hermes answers the skill list with HTTP 500 until upstream merges a one-line fix. Without the list, the Skills screen explains the error and `$` tags stay plain text. See [Skills](setup.md#skills).
 - OpenUI blocks can't fetch data: `Query` renders its defaults, and `Mutation` and `@Run` do nothing. dudan draws the chat library's common components; card blocks such as `SnippetCardBlock` show their text without their layout, and icons cover a few dozen lucide names.
 - The wake word only listens while the phone is unlocked with the screen on, and pauses during calls and while voice input records. On a locked phone it stays off on purpose: the agent can act on the phone and on its server, so anyone near the phone could use it. The microphone stays open while it listens, so Android shows its microphone dot and dudan keeps a notification up. The spotter knows English sounds only: a phrase works best as two or three words spelled the way they sound in English, and can have at most five. It needs dudan to be the default assistant to open the overlay and to come back after a restart.
