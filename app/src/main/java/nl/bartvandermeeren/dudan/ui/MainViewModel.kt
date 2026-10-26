@@ -26,8 +26,10 @@ import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.flatMapLatest
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.receiveAsFlow
 import kotlinx.coroutines.flow.stateIn
 import kotlinx.coroutines.launch
@@ -42,6 +44,7 @@ import nl.bartvandermeeren.dudan.chat.PreparedImage
 import nl.bartvandermeeren.dudan.chat.SkillTags
 import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
+import nl.bartvandermeeren.dudan.data.AppVisibility
 import nl.bartvandermeeren.dudan.data.FileRef
 import nl.bartvandermeeren.dudan.data.MAX_ATTACHMENT_BYTES
 import nl.bartvandermeeren.dudan.data.ModelCatalog
@@ -104,6 +107,13 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             }
         }
         viewModelScope.launch {
+            _currentId.collect { AppVisibility.openSessionId = it }
+        }
+        viewModelScope.launch {
+            // A task chat on screen counts as seen up to its newest result, which the catch-up check then doesn't report.
+            conversation.map { it.sessionId to newestScheduledMs(it) }.distinctUntilChanged().collect { markScheduledSeen() }
+        }
+        viewModelScope.launch {
             // Chats, runs and models belong to one server; switching servers starts clean.
             var previousServer: String? = null
             settings.collect { s ->
@@ -148,6 +158,18 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
     fun onAppResumed() {
         engine.load(_currentId.value)
         if (engine.sessions.value.loadedOnce) engine.refreshSessions()
+        markScheduledSeen()
+    }
+
+    private fun newestScheduledMs(c: Conversation): Long? = c.messages.mapNotNull { if (it.scheduled != null) it.finishedAtMs else null }.maxOrNull()
+
+    private fun markScheduledSeen() {
+        if (!AppVisibility.activityResumed) return
+        val c = conversation.value
+        val newest = newestScheduledMs(c) ?: return
+        val server = settings.value?.serverUrl ?: return
+        // The milliseconds drop the server's fraction of one; one more covers the row itself.
+        viewModelScope.launch { container.scheduledResults.markSeen(server, c.sessionId, (newest + 1) / 1000.0) }
     }
 
     /** The user asks the agent to act on background results that came in after its turn. */

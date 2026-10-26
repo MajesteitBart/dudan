@@ -20,10 +20,14 @@ import nl.bartvandermeeren.dudan.chat.ChatEngine
 import nl.bartvandermeeren.dudan.device.PhoneControl
 import nl.bartvandermeeren.dudan.voice.SpeechText
 
-/** Which dudan surfaces the user can currently see; replies they can see need no notification. */
+/**
+ * Which dudan surfaces the user can currently see; replies they can see need no notification. [openSessionId] is the
+ * chat the app shows, or last showed before it went to the background.
+ */
 object AppVisibility {
     @Volatile var activityResumed = false
     @Volatile var overlayShown = false
+    @Volatile var openSessionId: String? = null
     val anyVisible: Boolean get() = activityResumed || overlayShown
 }
 
@@ -75,33 +79,48 @@ class ReplyNotifier(
         }
     }
 
-    /** [body] is plain text; callers turn markdown into it first. */
-    private fun post(sessionId: String, channel: String, @StringRes channelName: Int, title: String, body: String) {
-        if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
-        val manager = context.getSystemService(NotificationManager::class.java) ?: return
-        manager.createNotificationChannel(NotificationChannel(channel, context.getString(channelName), NotificationManager.IMPORTANCE_DEFAULT))
-        val open = Intent(context, MainActivity::class.java)
-            .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
-            .putExtra(MainActivity.EXTRA_SESSION_ID, sessionId)
-        val pending = PendingIntent.getActivity(
-            context, sessionId.hashCode(), open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
-        )
-        val text = body.replace(Regex("\\s+"), " ").take(400)
-        val notification = NotificationCompat.Builder(context, channel)
-            .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setContentIntent(pending)
-            .setAutoCancel(true)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .build()
-        // One notification per chat: a later reply or result replaces the earlier one.
-        runCatching { NotificationManagerCompat.from(context).notify(sessionId.hashCode(), notification) }
-    }
+    // One notification per chat: a later reply or result replaces the earlier one.
+    private fun post(sessionId: String, channel: String, @StringRes channelName: Int, title: String, body: String) =
+        postChatNotification(context, sessionId, channel, channelName, title, body)
 
     private companion object {
         const val CHANNEL = "replies"
         const val BACKGROUND_CHANNEL = "background"
     }
+}
+
+/**
+ * Posts a notification that opens [sessionId] in the app, when the user allows notifications. [body] is plain text;
+ * callers turn markdown into it first. A later notification with the same [tag] and [id] replaces this one.
+ */
+internal fun postChatNotification(
+    context: Context,
+    sessionId: String,
+    channel: String,
+    @StringRes channelName: Int,
+    title: String,
+    body: String,
+    tag: String? = null,
+    id: Int = sessionId.hashCode(),
+) {
+    if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
+    val manager = context.getSystemService(NotificationManager::class.java) ?: return
+    manager.createNotificationChannel(NotificationChannel(channel, context.getString(channelName), NotificationManager.IMPORTANCE_DEFAULT))
+    val open = Intent(context, MainActivity::class.java)
+        .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        .putExtra(MainActivity.EXTRA_SESSION_ID, sessionId)
+    val pending = PendingIntent.getActivity(
+        context, sessionId.hashCode(), open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
+    )
+    val text = body.replace(Regex("\\s+"), " ").take(400)
+    val notification = NotificationCompat.Builder(context, channel)
+        .setSmallIcon(R.drawable.ic_notification)
+        .setContentTitle(title)
+        .setContentText(text)
+        .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+        .setContentIntent(pending)
+        .setAutoCancel(true)
+        .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+        .build()
+    runCatching { NotificationManagerCompat.from(context).notify(tag, id, notification) }
 }

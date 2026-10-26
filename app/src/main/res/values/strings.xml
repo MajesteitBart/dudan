@@ -213,6 +213,7 @@
     <string name="open_full_chat">Open full chat</string>
     <string name="notification_channel_replies">Replies</string>
     <string name="notification_channel_background">Background work</string>
+    <string name="notification_channel_scheduled">Scheduled tasks</string>
     <string name="assist_not_configured">dudan isn\'t connected to Hermes yet. Tap to set it up.</string>
 
     <!-- Settings -->

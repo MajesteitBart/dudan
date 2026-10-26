@@ -208,6 +208,7 @@
     <string name="open_full_chat">Volledig gesprek openen</string>
     <string name="notification_channel_replies">Antwoorden</string>
     <string name="notification_channel_background">Achtergrondwerk</string>
+    <string name="notification_channel_scheduled">Geplande taken</string>
     <string name="assist_not_configured">dudan is nog niet verbonden met Hermes. Tik om het in te stellen.</string>
 
     <!-- Settings -->

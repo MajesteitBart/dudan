@@ -9,7 +9,9 @@ import nl.bartvandermeeren.dudan.chat.StepKind
 import nl.bartvandermeeren.dudan.chat.UiMessage
 import nl.bartvandermeeren.dudan.data.HermesJson
 import nl.bartvandermeeren.dudan.data.HermesMessage
+import nl.bartvandermeeren.dudan.data.ScheduledCatchUp
 import nl.bartvandermeeren.dudan.data.ScheduledRef
+import nl.bartvandermeeren.dudan.data.SeenMarks
 import nl.bartvandermeeren.dudan.data.SessionSummary
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -130,5 +132,99 @@ class ScheduledHistoryTest {
         assertNull(chat.jobId)
         // Hermes sends no job_id at all.
         assertNull(SessionSummary.from(HermesJson.parseToJsonElement("""{"id":"20260101_x","source":"api_server"}""").jsonObject)!!.jobId)
+    }
+}
+
+class ScheduledCatchUpTest {
+    private fun session(id: String, lastActive: Double?, jobId: String? = id.removePrefix("task-"), title: String? = "Morning brief") =
+        SessionSummary(id, title, null, "dudan", null, lastActive, false, 0, jobId)
+
+    private fun reply(id: Int, timestamp: Double) = ScheduledRows.row("""{"id":"$id","role":"assistant","content":"Hi","timestamp":$timestamp}""")
+
+    @Test
+    fun theFirstRoundCountsEverythingAsSeen() {
+        val sessions = listOf(session("task-brief", 900.0), session("task-late", 1_050.0), session("dudan_1", 990.0, jobId = null))
+        val seen = ScheduledCatchUp.start("http://clark", sessions, nowSeconds = 1_000.0)
+        assertEquals(1_000.0, seen.since, 0.0)
+        // A server clock a little ahead of the phone's still counts as seen.
+        assertEquals(mapOf("task-brief" to 1_000.0, "task-late" to 1_050.0), seen.marks)
+        assertTrue(ScheduledCatchUp.due(sessions, seen).isEmpty())
+    }
+
+    @Test
+    fun onlyTaskChatsWithSomethingAfterTheirMarkAreRead() {
+        val seen = SeenMarks("http://clark", since = 1_000.0, marks = mapOf("task-brief" to 1_200.0))
+        val sessions = listOf(
+            session("task-brief", 1_200.0),
+            session("task-weekly", 1_300.0),
+            // A task chat Clark made after the first round counts from then.
+            session("task-new", 1_001.0),
+            session("task-old", 999.0),
+            // A chat without a job id, such as every chat on stock Hermes, is never read.
+            session("dudan_1", 5_000.0, jobId = null),
+        )
+        assertEquals(listOf("task-weekly", "task-new"), ScheduledCatchUp.due(sessions, seen).map { it.id })
+        assertEquals(1_000.0, seen.markFor("task-new"), 0.0)
+    }
+
+    @Test
+    fun onlyResultsAfterTheMarkAreNew() {
+        val rows = listOf(
+            ScheduledRows.result(1, "Old", 1_000.0),
+            reply(2, 1_100.0),
+            ScheduledRows.result(4, "Newest", 1_300.0),
+            ScheduledRows.result(3, "New", 1_200.0),
+        )
+        assertEquals(listOf("3", "4"), ScheduledCatchUp.fresh(rows, mark = 1_000.0).map { it.id })
+        assertTrue(ScheduledCatchUp.fresh(rows, mark = 1_300.0).isEmpty())
+    }
+
+    @Test
+    fun aChatCountsAsSeenUpToItsNewestRowOnceThatCaughtUpWithItsActivity() {
+        val rows = listOf(ScheduledRows.result(3, "New", 1_200.0))
+        assertEquals(1_200.0, ScheduledCatchUp.advance(1_000.0, lastActive = 1_150.0, rows, nowSeconds = 1_300.0), 0.0)
+        assertEquals(1_250.0, ScheduledCatchUp.advance(1_000.0, lastActive = 1_250.0, rows, nowSeconds = 2_000.0), 0.0)
+        // Clark marked the chat active but hasn't written the result yet: look again next round.
+        assertEquals(1_200.0, ScheduledCatchUp.advance(1_000.0, lastActive = 1_250.0, rows, nowSeconds = 1_260.0), 0.0)
+        assertEquals(1_000.0, ScheduledCatchUp.advance(1_000.0, lastActive = 1_250.0, emptyList(), nowSeconds = 1_260.0), 0.0)
+        // Never back.
+        assertEquals(1_500.0, ScheduledCatchUp.advance(1_500.0, lastActive = 1_250.0, rows, nowSeconds = 1_260.0), 0.0)
+    }
+
+    @Test
+    fun marksOnlyMoveForwardAndSurviveARoundTrip() {
+        val seen = SeenMarks("http://clark:8652", since = 1_000.25, marks = mapOf("task-brief" to 1_200.5))
+        assertEquals(seen, SeenMarks.decode(seen.encode()))
+        assertEquals(seen, seen.seen("task-brief", 1_100.0))
+        assertEquals(1_300.0, seen.seen("task-brief", 1_300.0).markFor("task-brief"), 0.0)
+        assertEquals(seen, seen.seen("bad\tid", 2_000.0))
+        assertNull(SeenMarks.decode(null))
+        assertNull(SeenMarks.decode("http://clark"))
+        assertEquals(SeenMarks("s", 5.0), SeenMarks.decode("s\n5.0\nbroken line\n\tno id"))
+    }
+
+    @Test
+    fun aChatThatLosesItsMarkDoesNotReportOldResultsAgain() {
+        var seen = SeenMarks("s", since = 0.0)
+        (1..SeenMarks.LIMIT + 2).forEach { seen = seen.seen("task-$it", it.toDouble()) }
+        assertEquals(SeenMarks.LIMIT, seen.marks.size)
+        assertNull(seen.marks["task-1"])
+        assertEquals(2.0, seen.since, 0.0)
+        assertEquals(2.0, seen.markFor("task-1"), 0.0)
+    }
+
+    @Test
+    fun aNotificationNamesTheTaskAndShowsTheStartOfTheResult() {
+        val long = "**Agenda**: " + "word ".repeat(80)
+        val row = ScheduledRows.result(1, long, 1.0)
+        val text = ScheduledCatchUp.preview(row)
+        assertEquals(ScheduledCatchUp.PREVIEW_CHARS, text.length)
+        assertTrue(text.startsWith("Agenda: word"))
+        assertTrue(text.endsWith("…"))
+        assertEquals("Morning brief", ScheduledCatchUp.title(row, session("task-brief", 1.0, title = "Other")))
+        val unnamed = ScheduledRows.row("""{"id":"1","role":"assistant","content":"","display_kind":"scheduled_result","scheduled":{"job_id":"brief"}}""")
+        assertEquals("", ScheduledCatchUp.preview(unnamed))
+        assertEquals("Chat title", ScheduledCatchUp.title(unnamed, session("task-brief", 1.0, title = "Chat title")))
+        assertEquals("brief", ScheduledCatchUp.title(unnamed, session("task-brief", 1.0, title = null)))
     }
 }

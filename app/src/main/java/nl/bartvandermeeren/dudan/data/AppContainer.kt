@@ -78,6 +78,9 @@ class AppContainer(context: Context) {
 
     val phoneControl = PhoneControl(appContext, settingsSnapshot)
 
+    /** Notifications for scheduled task results that came in while dudan wasn't looking. */
+    val scheduledResults = ScheduledResultsCheck(appContext)
+
     /**
      * Starts the wake word listener when it's on. Call when dudan comes on screen or the assistant service
      * binds: those are the moments Android lets a microphone service start.
@@ -100,6 +103,12 @@ class AppContainer(context: Context) {
         }
         appScope.launch {
             settings.flow.map { it.phoneControl }.distinctUntilChanged().collect(phoneControl::sync)
+        }
+        // The catch-up check for scheduled results needs a server to ask.
+        appScope.launch {
+            settings.flow.map { it.isConfigured }.distinctUntilChanged().collect { configured ->
+                if (configured) ScheduledResultsWorker.schedule(appContext) else ScheduledResultsWorker.cancel(appContext)
+            }
         }
         // Fetch the voice models the phone's languages and the speech language use on the first unmetered
         // network, also when only the overlay runs. An English phone gets Kokoro; a Dutch or German one, or

@@ -46,7 +46,7 @@ With a compatible Clark server, an [Agent screen](docs/agent-screen.md) card sho
 
 Watch the agent's steps as it works, expand the details when you need them, and answer approval requests before Hermes runs commands that require your permission. Text and file tasks keep running on the server if your connection drops; dudan catches up when you're back. You'll get a notification when a reply arrives while you're elsewhere.
 
-Search, pin and rename chats. Browse Hermes skills, or type `$` in a message to tell the agent which skill to use. Run, pause or resume scheduled tasks, or add and change them with a picker for once, every few minutes or hours, daily, weekly, monthly or a cron of your own. With Clark, each task's results arrive in a chat of their own. Conversations from other Hermes channels can appear in your chat list too.
+Search, pin and rename chats. Browse Hermes skills, or type `$` in a message to tell the agent which skill to use. Run, pause or resume scheduled tasks, or add and change them with a picker for once, every few minutes or hours, daily, weekly, monthly or a cron of your own. With Clark, each task's results arrive in a chat of their own, with a notification. Conversations from other Hermes channels can appear in your chat list too.
 
 ## Pick the model and the mood
 
