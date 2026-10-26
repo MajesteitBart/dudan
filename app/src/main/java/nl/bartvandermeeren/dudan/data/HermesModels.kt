@@ -1,5 +1,6 @@
 package nl.bartvandermeeren.dudan.data
 
+import java.time.ZoneId
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -7,6 +8,8 @@ import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.booleanOrNull
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
@@ -271,6 +274,12 @@ data class ServerCapabilities(val model: String?, val endpoints: Set<String>, va
     /** GET /v1/skills/{name}, which stock Hermes lacks; tools/hermes-patches adds it. */
     val readsSkills: Boolean get() = "skill" in endpoints
 
+    /**
+     * Whether the app may create, change and delete scheduled tasks. Stock Hermes advertises no job endpoints
+     * but has them all; Clark lists `jobs`, and only a Clark that also lists `job_create` takes the new ones.
+     */
+    val managesJobs: Boolean get() = "job_create" in endpoints || "jobs" !in endpoints
+
     companion object {
         fun from(o: JsonObject?): ServerCapabilities = ServerCapabilities(
             model = o?.str("model"),
@@ -280,6 +289,13 @@ data class ServerCapabilities(val model: String?, val endpoints: Set<String>, va
     }
 }
 
+/**
+ * A scheduled task from GET /api/jobs, in Hermes' shape or Clark's imitation of it. [schedule] is the server's own
+ * display text; [scheduleExpr] the raw schedule (a cron, Clark's `at YYYY-MM-DDTHH:MM`, Hermes' `run_at` or
+ * `every Nm`) and [scheduleKind] Hermes' `cron`, `interval` or `once`. [editable] is false for tasks the server
+ * won't let the app change, with [editNote] saying why; [nameEditable] is false where the name is the task's id.
+ * [deliver] is where results go, null when the server doesn't say.
+ */
 data class JobInfo(
     val id: String,
     val name: String,
@@ -290,7 +306,102 @@ data class JobInfo(
     val nextRunAt: String?,
     val lastRunAt: String?,
     val lastStatus: String?,
-)
+    val scheduleExpr: String? = null,
+    val scheduleKind: String? = null,
+    val timezone: String? = null,
+    val editable: Boolean = true,
+    val editNote: String? = null,
+    val nameEditable: Boolean = true,
+    val deliver: String? = null,
+) {
+    /** The zone whose clock the server runs this task's cron on, when it says and it's a zone Java knows. */
+    val zoneId: ZoneId? get() = timezone?.let { runCatching { ZoneId.of(it) }.getOrNull() }
+
+    companion object {
+        fun from(o: JsonObject): JobInfo? {
+            val id = o.str("id") ?: return null
+            val schedule = o["schedule"]
+            val scheduleObject = schedule.asObject()
+            val expr = scheduleObject?.let { s ->
+                s.str("expr") ?: s.str("run_at") ?: s.int("minutes")?.let { "every ${it}m" } ?: s.str("value")
+            } ?: (schedule as? JsonPrimitive)?.contentOrNull
+            val kind = scheduleObject?.str("kind") ?: expr?.let { if (it.trimStart().startsWith("at ")) "once" else "cron" }
+            return JobInfo(
+                id = id,
+                name = o.str("name") ?: o.str("prompt")?.take(60) ?: id,
+                schedule = o.str("schedule_display") ?: scheduleObject?.str("display") ?: expr,
+                prompt = o.str("prompt"),
+                enabled = o.bool("enabled") ?: true,
+                paused = o.bool("paused") ?: (o.str("state") == "paused"),
+                nextRunAt = o.str("next_run_at"),
+                lastRunAt = o.str("last_run_at"),
+                lastStatus = o.str("last_status"),
+                scheduleExpr = expr,
+                scheduleKind = kind,
+                timezone = o.str("timezone") ?: scheduleObject?.str("timezone"),
+                editable = o.bool("editable") ?: true,
+                editNote = o.str("edit_note")?.takeIf { it.isNotBlank() },
+                nameEditable = o.bool("name_editable") ?: true,
+                deliver = o.str("deliver"),
+            )
+        }
+    }
+}
+
+/** A place a task's results can go, from the list's `delivery_targets`; only Clark sends these. */
+data class DeliveryTarget(val id: String, val label: String)
+
+/** GET /api/jobs: the tasks and, when the server has them, the places results can go. */
+data class JobList(val jobs: List<JobInfo>, val deliveryTargets: List<DeliveryTarget> = emptyList()) {
+    companion object {
+        fun from(root: JsonObject?): JobList = JobList(
+            jobs = root?.get("jobs").asArray()?.mapNotNull { it.asObject()?.let(JobInfo::from) }.orEmpty(),
+            deliveryTargets = root?.get("delivery_targets").asArray()?.mapNotNull { element ->
+                val o = element.asObject() ?: return@mapNotNull null
+                val id = o.str("id") ?: return@mapNotNull null
+                DeliveryTarget(id, o.str("label")?.takeIf { it.isNotBlank() } ?: id)
+            }.orEmpty(),
+        )
+    }
+}
+
+/** What "Nowhere (job log only)" sends as `deliver`. */
+const val DELIVER_NOWHERE = "none"
+
+/** POST /api/jobs. [timezone] and [deliver] stay out of the body when null. */
+data class JobDraft(val name: String, val schedule: String, val prompt: String, val timezone: String?, val deliver: String? = null) {
+    fun toJson(): JsonObject = buildJsonObject {
+        put("name", name)
+        put("schedule", schedule)
+        put("prompt", prompt)
+        if (timezone != null) put("timezone", timezone)
+        if (deliver != null) put("deliver", deliver)
+    }
+}
+
+/**
+ * PATCH /api/jobs/{id}: only the fields that changed. [timezone] goes along with [schedule] only, since Hermes
+ * drops keys it doesn't know and answers a body with nothing left in it with a 400.
+ */
+data class JobChanges(
+    val name: String? = null,
+    val schedule: String? = null,
+    val prompt: String? = null,
+    val timezone: String? = null,
+    val deliver: String? = null,
+) {
+    val isEmpty: Boolean get() = name == null && schedule == null && prompt == null && deliver == null
+
+    fun toJson(): JsonObject = buildJsonObject {
+        if (name != null) put("name", name)
+        if (schedule != null) {
+            put("schedule", schedule)
+            if (timezone != null) put("timezone", timezone)
+        }
+        if (prompt != null) put("prompt", prompt)
+        if (deliver != null) put("deliver", deliver)
+    }
+}
 
 data class RunStatus(
     val status: String,

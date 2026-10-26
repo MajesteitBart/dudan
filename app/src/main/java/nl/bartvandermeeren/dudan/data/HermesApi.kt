@@ -331,30 +331,30 @@ class HermesApi(
 
     // ---- Scheduled jobs -------------------------------------------------------------------------
 
-    suspend fun jobs(): List<JobInfo> {
-        val root = getJson("api", "jobs", query = mapOf("include_disabled" to "true"))
-        return root.asObject()?.get("jobs").asArray().orEmpty().mapNotNull { it.asObject()?.let(::parseJob) }
+    /** The tasks, paused and disabled ones included, and where their results can go; one request. */
+    suspend fun jobs(): JobList = JobList.from(getJson("api", "jobs", query = mapOf("include_disabled" to "true")).asObject())
+
+    /** One task with its whole prompt; the list may cut it short. A server without this endpoint answers 404, see [lacksJobEndpoint]. */
+    suspend fun job(id: String): JobInfo = jobFrom(getJson("api", "jobs", id))
+
+    suspend fun createJob(draft: JobDraft): JobInfo? =
+        sendJson(request("api", "jobs").post(draft.toJson().toBody()).build()).asObject()?.get("job").asObject()?.let(JobInfo::from)
+
+    suspend fun updateJob(id: String, changes: JobChanges): JobInfo? {
+        require(!changes.isEmpty) { "Nothing to change" }
+        return sendJson(request("api", "jobs", id).patch(changes.toJson().toBody()).build()).asObject()?.get("job").asObject()?.let(JobInfo::from)
+    }
+
+    suspend fun deleteJob(id: String) {
+        send(request("api", "jobs", id).delete().build())
     }
 
     suspend fun jobAction(jobId: String, action: String) {
         send(request("api", "jobs", jobId, action).post(JsonObject(emptyMap()).toBody()).build())
     }
 
-    private fun parseJob(o: JsonObject): JobInfo? {
-        val id = o.str("id") ?: return null
-        val schedule = o["schedule"].let { it.asObject()?.str("display") ?: it.asObject()?.str("expr") ?: (it as? JsonPrimitive)?.contentOrNull }
-        return JobInfo(
-            id = id,
-            name = o.str("name") ?: o.str("prompt")?.take(60) ?: id,
-            schedule = o.str("schedule_display") ?: schedule,
-            prompt = o.str("prompt"),
-            enabled = o.bool("enabled") ?: true,
-            paused = o.bool("paused") ?: (o.str("state") == "paused"),
-            nextRunAt = o.str("next_run_at"),
-            lastRunAt = o.str("last_run_at"),
-            lastStatus = o.str("last_status"),
-        )
-    }
+    private fun jobFrom(root: JsonElement): JobInfo =
+        root.asObject()?.get("job").asObject()?.let(JobInfo::from) ?: throw HermesException(500, "Hermes returned no job")
 
     // ---- Plumbing -------------------------------------------------------------------------------
 
@@ -445,6 +445,13 @@ class HermesApi(
             if (url.endsWith("/v1")) url = url.removeSuffix("/v1")
             return url
         }
+
+        /**
+         * Whether [e], from [job], says the server has no GET /api/jobs/{id} at all rather than no such task: a 404
+         * without Clark's `job_not_found`. Then the list's prompt is all there is. Hermes says "Job not found" without a
+         * code, but its list carries whole prompts.
+         */
+        fun lacksJobEndpoint(e: Throwable): Boolean = e is HermesException && e.status == 404 && e.code != "job_not_found"
 
         internal fun errorFrom(status: Int, body: String): HermesException {
             val root = runCatching { HermesJson.parseToJsonElement(body) }.getOrNull().asObject()

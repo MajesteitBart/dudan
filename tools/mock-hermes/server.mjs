@@ -6,6 +6,9 @@
 // Hermes; MOCK_SKILLS_500=1 makes GET /v1/skills fail with the 500 stock Hermes gives.
 // A message with a $skill tag shows a skill_view step for each tagged skill. The log shows the
 // instructions and system_message each turn received.
+// Scheduled tasks can be listed, created, changed, deleted, paused, resumed and run, in stock Hermes'
+// shape; MOCK_CLARK_JOBS=1 answers like Clark's dudan channel and MOCK_CLARK_JOBS=old like a Clark
+// from before job management (see jobs.mjs).
 //
 // Usage: node tools/mock-hermes/server.mjs [port] [upload-port]
 //   port         the Hermes API (default 8642)
@@ -30,6 +33,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileReply, openUiReply } from "./openui-demo.mjs";
 import { DESKTOP, DESKTOP_SESSION, desktopFeature, handleDesktop, seedDesktopConversation } from "./desktop.mjs";
+import { handleJobs, jobEndpoints, seedJobs } from "./jobs.mjs";
 
 const PORT = Number(process.argv[2] ?? 8642);
 const UPLOAD_PORT = Number(process.argv[3] ?? 8645);
@@ -120,6 +124,7 @@ function seed() {
   if (DESKTOP) sessions.set(DESKTOP_SESSION, seedDesktopConversation(LANG, rowId, t));
 }
 seed();
+seedJobs(LANG);
 
 // Questions containing "english" get a short English answer, for testing the English voice.
 const answer = (question) => LANG === "en" || /english/i.test(question)
@@ -420,6 +425,7 @@ const server = http.createServer(async (req, res) => {
       sessions: { method: "GET", path: "/api/sessions" },
       session_create: { method: "POST", path: "/api/sessions" },
       session: { method: "GET", path: "/api/sessions/{session_id}" },
+      ...jobEndpoints(),
     };
     return send(res, 200, { object: "hermes.api_server.capabilities", platform: "hermes-agent", model: "hermes-agent", features: { run_submission: true, ...desktopFeature() }, endpoints });
   }
@@ -475,13 +481,7 @@ const server = http.createServer(async (req, res) => {
       path: `${skill.category}/${skill.name}/SKILL.md`, content, body: skill.body, linked_files: skill.files ?? {},
     });
   }
-  if (path === "/api/jobs" && req.method === "GET") {
-    return send(res, 200, { jobs: [
-      { id: "a1b2c3d4e5f6", name: "Morning brief", schedule: { display: "every day at 07:30" }, prompt: "Summarise my agenda and inbox", enabled: true, next_run_at: "2026-09-26T07:30:00" },
-      { id: "b1b2c3d4e5f6", name: "Weekly review", schedule: { display: "Fridays 16:00" }, prompt: "Review the week in Todoist", enabled: false },
-    ] });
-  }
-  if (parts[0] === "api" && parts[1] === "jobs" && req.method === "POST") return send(res, 200, { job: { id: parts[2] } });
+  if (await handleJobs(req, res, parts, url, send, readBody)) return;
 
   if (path === "/api/sessions" && req.method === "GET") {
     const list = [...sessions.values()].map((s) => ({ ...s.meta, preview: textOf(s.messages.find((m) => m.role === "user")?.content ?? "").slice(0, 60) }));

@@ -416,10 +416,17 @@ fun Toggle(title: String, detail: String, checked: Boolean, modifier: Modifier =
 
 /**
  * Superhuman's primary button: a dark body in the sky's hue with the label, and a gradient tile
- * holding an arrow.
+ * holding an arrow, or another [icon] such as a plus for adding something.
  */
 @Composable
-fun CtaButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier, enabled: Boolean = true, busy: @Composable (() -> Unit)? = null) {
+fun CtaButton(
+    label: String,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
+    icon: ImageVector = Icons.AutoMirrored.Rounded.ArrowForward,
+    busy: @Composable (() -> Unit)? = null,
+) {
     val shape = RoundedCornerShape(16.dp)
     val accent = LocalAccent.current
     val sky = LocalSky.current
@@ -445,7 +452,7 @@ fun CtaButton(label: String, onClick: () -> Unit, modifier: Modifier = Modifier,
                 .background(if (enabled) tile else Brush.linearGradient(listOf(Palette.Disabled, Palette.Disabled))),
             contentAlignment = Alignment.Center,
         ) {
-            Icon(Icons.AutoMirrored.Rounded.ArrowForward, contentDescription = null, tint = if (enabled) arrow else Palette.TextTertiary, modifier = Modifier.size(22.dp))
+            Icon(icon, contentDescription = null, tint = if (enabled) arrow else Palette.TextTertiary, modifier = Modifier.size(22.dp))
         }
     }
 }
