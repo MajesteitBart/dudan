@@ -94,6 +94,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import java.time.format.TextStyle
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.userMessage
@@ -124,6 +125,9 @@ import nl.bartvandermeeren.dudan.ui.theme.Palette
 /** What `editing` holds while a new task is being written; task ids never start with a plus. */
 private const val NEW_JOB = "+new"
 
+/** When the list looks again after Run now, for the task chat and the run's status. */
+private val RESULT_CHECKS_MS = listOf(5_000L, 15_000L)
+
 private val DraftSaver = listSaver<ScheduleDraft, Any>(save = { it.encode() }, restore = { ScheduleDraft.decode(it) })
 
 /**
@@ -143,6 +147,8 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
     var editing by rememberSaveable { mutableStateOf<String?>(null) }
     val listState = rememberLazyListState()
     suspend fun load() {
+        // The chats too, so Results shows for a task chat that came after the drawer last loaded.
+        vm.refreshSessions()
         try {
             list = vm.api.jobs()
             error = null
@@ -175,6 +181,11 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
             }
             load()
             busyJob = null
+            // Run now answers before the run ends; its result reaches the task chat a little later.
+            if (action == "run") for (wait in RESULT_CHECKS_MS) {
+                delay(wait)
+                load()
+            }
         }
     }
     val done: (Boolean) -> Unit = { changed ->
