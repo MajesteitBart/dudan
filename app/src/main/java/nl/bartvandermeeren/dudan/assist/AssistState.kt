@@ -89,7 +89,8 @@ class AssistState(
                 seenTurnSeq = turn.seq
                 if (shown && speakNextReply && turn.sessionId == sessionId && settings?.speakReplies == true) {
                     speakNextReply = false
-                    speaker.speak(turn.messageId, turn.text, settings?.speechLanguage)
+                    // An answer with only files has nothing to read, and the overlay doesn't show files.
+                    if (turn.text.isNotBlank()) speaker.speak(turn.messageId, turn.text, settings?.speechLanguage)
                 }
             }
         }

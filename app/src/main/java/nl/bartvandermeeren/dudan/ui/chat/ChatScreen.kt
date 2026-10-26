@@ -51,7 +51,6 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -344,7 +343,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
     val messages = conversation.messages
     val listState = rememberLazyListState()
     // Saving a file the agent returned keeps going when its row scrolls away, until the chat closes.
-    val saveScope = rememberCoroutineScope()
+    val saves = rememberAttachmentSaves()
     var follow by remember { mutableStateOf(true) }
     var previousCount by remember(conversation.sessionId) { mutableIntStateOf(0) }
 
@@ -396,7 +395,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, speakingId: St
                             onSpeak = { vm.toggleSpeak(message.id, message.text) },
                             onRetry = vm::retry,
                             onApproval = vm::resolveApproval,
-                            attachments = { OutboundAttachments(vm.api, conversation.sessionId, message.attachments, saveScope) },
+                            attachments = { OutboundAttachments(vm.api, conversation.sessionId, message.attachments, saves) },
                         )
                     }
                 }

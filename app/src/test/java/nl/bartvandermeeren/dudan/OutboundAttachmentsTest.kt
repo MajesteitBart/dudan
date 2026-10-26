@@ -6,6 +6,8 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.jsonObject
 import nl.bartvandermeeren.dudan.chat.*
 import nl.bartvandermeeren.dudan.data.*
+import nl.bartvandermeeren.dudan.ui.chat.removeAfterFailedSave
+import nl.bartvandermeeren.dudan.ui.components.ImageLimits
 import okhttp3.OkHttpClient
 import okhttp3.mockwebserver.MockResponse
 import okhttp3.mockwebserver.MockWebServer
@@ -74,6 +76,81 @@ class OutboundAttachmentsTest {
             row("""{"id":"a","role":"assistant","content":"","attachments":[$attachment]}"""),
         ))
         assertTrue(HistoryMapper.reconcile(listOf(question, answer), saved).caughtUp)
+    }
+
+    @Test fun aLiveFileOnlyAnswerKeepsItsIdWhenTheTranscriptCatchesUp() {
+        // Its row holds the file's Save; a new id would draw the row again.
+        val question = UiMessage("local-q", Role.User, text = "Send it")
+        val answer = UiMessage("local-a", Role.Assistant, state = MessageState.Done, attachments = parse("[$attachment]"))
+        val saved = HistoryMapper.map(listOf(
+            row("""{"id":"q","role":"user","content":"Send it"}"""),
+            row("""{"id":"a","role":"assistant","content":"","attachments":[$attachment]}"""),
+        ))
+        val caughtUp = HistoryMapper.reconcile(listOf(question, answer), saved)
+        assertTrue(caughtUp.caughtUp)
+        assertEquals("local-a", caughtUp.messages.single { it.attachments.isNotEmpty() }.id)
+        // Also when the files sit on the work, with no reply after it.
+        val work = HistoryMapper.map(listOf(
+            row("""{"id":"q","role":"user","content":"Send it"}"""),
+            row("""{"id":"call","role":"assistant","content":"","tool_calls":[{"id":"c1","function":{"name":"attach_file","arguments":"{}"}}],"attachments":[$attachment]}"""),
+            row("""{"id":"result","role":"tool","content":"attached","tool_call_id":"c1"}"""),
+        ))
+        assertEquals("local-a", HistoryMapper.reconcile(listOf(question, answer), work).messages.single { it.attachments.isNotEmpty() }.id)
+        // Another file in the same turn isn't this answer.
+        val other = saved.map { it.copy(attachments = it.attachments.map { file -> file.copy(index = 1) }) }
+        assertFalse(HistoryMapper.reconcile(listOf(question, answer), other).messages.any { it.id == "local-a" })
+    }
+
+    @Test fun aFailedSaveOnlyRemovesAFileItCreatedOrStartedWriting() {
+        // The picker's new document is empty: remove it.
+        assertTrue(removeAfterFailedSave(pickedSize = 0, opened = false))
+        // The user chose to overwrite an existing file and the download or the check failed: keep it.
+        assertFalse(removeAfterFailedSave(pickedSize = 2048, opened = false))
+        assertFalse(removeAfterFailedSave(pickedSize = null, opened = false))
+        // Writing truncated it, so what is left is partial either way.
+        assertTrue(removeAfterFailedSave(pickedSize = 2048, opened = true))
+    }
+
+    private fun png(interlaced: Boolean) = byteArrayOf(0x89.toByte(), 'P'.code.toByte(), 'N'.code.toByte(), 'G'.code.toByte(), 0x0D, 0x0A, 0x1A, 0x0A) +
+        byteArrayOf(0, 0, 0, 13) + "IHDR".toByteArray() + byteArrayOf(0, 0, 0x40, 0, 0, 0, 0x40, 0) +
+        byteArrayOf(8, 6, 0, 0, if (interlaced) 1 else 0) + ByteArray(4)
+
+    /** SOI, an APP0 segment, a frame header of [frame] type with three components, and a first scan with [scanned] of them. */
+    private fun jpeg(frame: Int, scanned: Int = 3): ByteArray {
+        fun bytes(vararg values: Int) = values.map { it.toByte() }.toByteArray()
+        val app0 = bytes(0xFF, 0xE0, 0, 16) + "JFIF".toByteArray() + ByteArray(10)
+        val sof = bytes(0xFF, frame, 0, 17, 8, 0x10, 0, 0x10, 0, 3) + ByteArray(9)
+        val sos = bytes(0xFF, 0xDA, 0, 6 + 2 * scanned, scanned) + ByteArray(2 * scanned + 3)
+        return bytes(0xFF, 0xD8) + app0 + bytes(0xFF, 0xFF) + sof + sos + ByteArray(64)
+    }
+
+    private fun webp(chunk: String) = "RIFF".toByteArray() + ByteArray(4) + "WEBP".toByteArray() + chunk.toByteArray() + ByteArray(32)
+
+    private fun limit(bytes: ByteArray) = ImageLimits.maxPixels(bytes.inputStream())
+
+    @Test fun decodersThatHoldTheWholeImageGetTheSmallerPixelLimit() {
+        assertEquals(ImageLimits.STREAMED_PIXELS, limit(png(interlaced = false)))
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(png(interlaced = true)))
+        assertEquals(ImageLimits.STREAMED_PIXELS, limit(jpeg(0xC0)))
+        assertEquals(ImageLimits.STREAMED_PIXELS, limit(jpeg(0xC1)))
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(jpeg(0xC2)))
+        // Sequential, but one component per scan.
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(jpeg(0xC0, scanned = 1)))
+        // A scan before any frame header, or a file that ends early.
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(byteArrayOf(-1, -40, -1, -38, 0, 8, 3) + ByteArray(16)))
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(jpeg(0xC0).copyOf(26)))
+        assertEquals(ImageLimits.STREAMED_PIXELS, limit(webp("VP8 ")))
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(webp("VP8L")))
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(webp("VP8X")))
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit("GIF89a".toByteArray() + ByteArray(32)))
+        assertEquals(ImageLimits.BUFFERED_PIXELS, limit(ByteArray(0)))
+
+        // A 50 MP phone photo decodes row by row; the same size interlaced doesn't.
+        assertTrue(ImageLimits.allows(8_160, 6_120, ImageLimits.STREAMED_PIXELS))
+        assertFalse(ImageLimits.allows(8_160, 6_120, ImageLimits.BUFFERED_PIXELS))
+        assertFalse(ImageLimits.allows(16_384, 16_384, ImageLimits.STREAMED_PIXELS))
+        assertFalse(ImageLimits.allows(16_385, 1, ImageLimits.STREAMED_PIXELS))
+        assertFalse(ImageLimits.allows(0, 100, ImageLimits.STREAMED_PIXELS))
     }
 
     @Test fun unsafeMetadataCannotSelectAnotherUrlOrFilesystemPath() {

@@ -50,7 +50,10 @@ class ReplyNotifier(
                 if (turn == null || turn.seq <= lastSeq) return@collect
                 lastSeq = turn.seq
                 if (!AppVisibility.anyVisible && !PhoneControl.openedSomething(turn.tools)) {
-                    post(turn.sessionId, CHANNEL, R.string.notification_channel_replies, settings.current().assistantName, turn.text)
+                    // An answer with only files names them; file names aren't markdown.
+                    val body = if (turn.text.isNotBlank()) SpeechText.fromMarkdown(turn.text)
+                    else context.resources.getQuantityString(R.plurals.attachment_notification, turn.files.size, turn.files.size, turn.files.joinToString(", "))
+                    post(turn.sessionId, CHANNEL, R.string.notification_channel_replies, settings.current().assistantName, body)
                 }
             }
         }
@@ -67,12 +70,13 @@ class ReplyNotifier(
                         context.getString(R.string.background_partly_failed, result.failedCount, result.taskCount)
                     else -> context.getString(R.string.background_failed)
                 }
-                post(arrival.sessionId, BACKGROUND_CHANNEL, R.string.notification_channel_background, title, result.summary)
+                post(arrival.sessionId, BACKGROUND_CHANNEL, R.string.notification_channel_background, title, SpeechText.fromMarkdown(result.summary))
             }
         }
     }
 
-    private fun post(sessionId: String, channel: String, @StringRes channelName: Int, title: String, markdown: String) {
+    /** [body] is plain text; callers turn markdown into it first. */
+    private fun post(sessionId: String, channel: String, @StringRes channelName: Int, title: String, body: String) {
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) != PackageManager.PERMISSION_GRANTED) return
         val manager = context.getSystemService(NotificationManager::class.java) ?: return
         manager.createNotificationChannel(NotificationChannel(channel, context.getString(channelName), NotificationManager.IMPORTANCE_DEFAULT))
@@ -82,7 +86,7 @@ class ReplyNotifier(
         val pending = PendingIntent.getActivity(
             context, sessionId.hashCode(), open, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
         )
-        val text = SpeechText.fromMarkdown(markdown).replace(Regex("\\s+"), " ").take(400)
+        val text = body.replace(Regex("\\s+"), " ").take(400)
         val notification = NotificationCompat.Builder(context, channel)
             .setSmallIcon(R.drawable.ic_notification)
             .setContentTitle(title)

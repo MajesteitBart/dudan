@@ -156,8 +156,9 @@ object HistoryMapper {
 
     /**
      * Replies this app streamed keep their ids on the saved copies, so a reply being read aloud keeps
-     * its stop button. Each question is matched to its saved copy in order (by id when it has one,
-     * else the next question with the same text), and a reply only within its own question's turn.
+     * its stop button and a file being saved keeps its row. Each question is matched to its saved copy
+     * in order (by id when it has one, else the next question with the same text), and a reply only
+     * within its own question's turn: by its text, or by its files when it has no text.
      */
     private fun keepReplyIds(shown: List<UiMessage>, transcript: List<UiMessage>): List<UiMessage> {
         val ids = mutableMapOf<Int, String>()
@@ -170,9 +171,16 @@ object HistoryMapper {
                 if (turn >= 0) next = turn + 1
                 return@forEach
             }
-            if (message.role != Role.Assistant || message.id.startsWith("h_") || message.text.isBlank() || turn < 0) return@forEach
+            if (message.role != Role.Assistant || message.id.startsWith("h_") || turn < 0) return@forEach
+            if (message.text.isBlank() && message.attachments.isEmpty()) return@forEach
             val end = (turn + 1 until transcript.size).firstOrNull { transcript[it].role == Role.User } ?: transcript.size
-            val reply = (turn + 1 until end).lastOrNull { transcript[it].role == Role.Assistant && transcript[it].text.trim() == message.text.trim() }
+            // A reply with only files is matched by them, on the saved reply or on the work that holds them.
+            val files = message.attachments.mapTo(HashSet()) { Triple(it.sessionId, it.inputId, it.index) }
+            val reply = (turn + 1 until end).lastOrNull { i ->
+                val saved = transcript[i]
+                saved.role == Role.Assistant && if (message.text.isNotBlank()) saved.text.trim() == message.text.trim()
+                else saved.attachments.any { Triple(it.sessionId, it.inputId, it.index) in files }
+            }
             if (reply != null) ids[reply] = message.id
         }
         return if (ids.isEmpty()) transcript else transcript.mapIndexed { index, message -> ids[index]?.let { message.copy(id = it) } ?: message }

@@ -33,11 +33,13 @@ The response streams into a private temporary file in the app's cache, under `ca
 
 ## Showing and saving
 
-PNG, JPEG, WebP and GIF files up to 16 MiB get a preview; a GIF shows its first frame. An image over 16,384 pixels on a side is refused before decoding, and a preview is decoded at no more than 1,600 pixels on its longest side. Recent previews stay in memory, up to 24 MB, so scrolling back doesn't download them again. Larger images and other files show as a card with their name and size.
+PNG, JPEG, WebP and GIF files up to 16 MiB get a preview; a GIF shows its first frame. A preview is decoded at no more than 1,600 pixels on its longest side, one image at a time. Before decoding, dudan reads the image's size and header and refuses an image over 16,384 pixels on a side or over 100 megapixels in total. Some decoders hold the whole image in memory, whatever size the preview is: those for interlaced PNG, progressive JPEG and JPEG with more than one scan, WebP other than simple lossy, and GIF. For those, and for anything it doesn't recognise, the limit is 24 megapixels. An image that is refused, or that Android can't decode, shows as a card like other files and isn't downloaded again for a preview while the app runs. Recent previews stay in memory, up to 24 MB, so scrolling back doesn't download them again. Larger images and other files show as a card with their name and size.
 
-Save file opens the document picker with the file's name and type, then downloads and verifies the file again and writes it to the picked place. When that fails, dudan deletes the file the picker created, so no empty or partial file stays behind. A save keeps going when its row scrolls away and stops when the chat closes; a preview stops downloading when its row scrolls away. A 404 or 410 shows that the file is no longer available. Other errors ask to try again; a failed preview has a Retry button.
+Save file opens the document picker with the file's name and type, then downloads and verifies the file again and writes it to the picked place. When that fails, dudan deletes the picked file if it is empty, which a new file from the picker is, or if writing to it had started, so no empty or partial file stays behind. When you chose to overwrite an existing file, the picker returns that file, and a failed download or check leaves it as it was. A save keeps going when its row scrolls away and stops when the chat closes. Its progress and result live with the chat, not the row, so a row that comes back shows them, and Save file stays off while the save runs. A preview stops downloading when its row scrolls away. A 404 or 410 shows that the file is no longer available. Other errors ask to try again; a failed preview has a Retry button.
 
-The side-key overlay doesn't show an answer's files, since the document picker needs an activity. Open the chat in the app to see them.
+When an answer with only files arrives while dudan isn't on screen, its notification names the files.
+
+The side-key overlay doesn't show an answer's files, since the document picker needs an activity, and it doesn't read an answer with only files aloud. Open the chat in the app to see them.
 
 ## Retention and rollback
 
@@ -47,4 +49,4 @@ The feature is additive. A server without it sends no `attachments`, and an olde
 
 ## Tests
 
-`OutboundAttachmentsTest` covers the documented entry, file-only answers in the history, one copy per answer across rows and repeated terminal events, a live file-only answer the transcript doesn't hold yet, old servers, unsafe metadata, the encoded route with the bearer header, size and digest mismatches, 410, refused redirects and run status. Clark tests its side in `test/channels/dudan/attachments.test.ts`.
+`OutboundAttachmentsTest` covers the documented entry, file-only answers in the history, one copy per answer across rows and repeated terminal events, a live file-only answer the transcript doesn't hold yet and its id once it does, which picked file a failed save deletes, the pixel limit per image format, old servers, unsafe metadata, the encoded route with the bearer header, size and digest mismatches, 410, refused redirects and run status. `ChatEngineTest` checks that an answer with only files completes its turn for the reply notification. Clark tests its side in `test/channels/dudan/attachments.test.ts`.
