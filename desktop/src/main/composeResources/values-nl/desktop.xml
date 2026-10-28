@@ -89,4 +89,5 @@
     <string name="desktop_setup_help">Hermes klaarzetten voor dudan</string>
     <string name="desktop_show_key">Sleutel tonen</string>
     <string name="desktop_hide_key">Sleutel verbergen</string>
+    <string name="desktop_show_in_folder">Tonen in map</string>
 </resources>

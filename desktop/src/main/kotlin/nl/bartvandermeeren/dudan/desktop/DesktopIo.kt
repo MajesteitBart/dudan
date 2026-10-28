@@ -3,6 +3,7 @@ package nl.bartvandermeeren.dudan.desktop
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.toComposeImageBitmap
 import java.awt.FileDialog
+import java.awt.KeyboardFocusManager
 import java.awt.RenderingHints
 import java.awt.Frame
 import java.awt.GraphicsEnvironment
@@ -74,6 +75,22 @@ object DesktopFiles {
         }
         dialog.isVisible = true
         return dialog.files.orEmpty().filter(::isImage)
+    }
+
+    /**
+     * Windows' own save dialog, over the dudan window that has the focus, starting at [name]; null when
+     * cancelled. The dialog asks before replacing a file.
+     */
+    fun saveAs(title: String, name: String): File? {
+        val owner = KeyboardFocusManager.getCurrentKeyboardFocusManager().activeWindow as? Frame
+        val dialog = FileDialog(owner, title, FileDialog.SAVE).apply { file = name }
+        dialog.isVisible = true
+        return dialog.files.orEmpty().firstOrNull()
+    }
+
+    /** Explorer with [file] selected. It doesn't open the file: what the agent made isn't run. */
+    fun showInFolder(file: File) {
+        runCatching { ProcessBuilder("explorer.exe", "/select,", file.absolutePath).start() }
     }
 
     /** A picture on the clipboard (a screenshot taken with Win+Shift+S, say), as PNG bytes; null when there is none. */

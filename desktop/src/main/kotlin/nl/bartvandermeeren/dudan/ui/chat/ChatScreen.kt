@@ -282,6 +282,7 @@ private fun LoadError(message: String, onRetry: () -> Unit) {
 private fun MessageList(vm: MainViewModel, settings: AppSettings, skills: List<SkillInfo>, chatTitle: String?) {
     val conversation by vm.conversation.collectAsState()
     val speakingId by vm.speaker.speakingId.collectAsState()
+    val saves = rememberAttachmentSaves()
     val desktops = rememberConversationDesktops(vm.api, conversation.sessionId)
     // A desktop shows while it works; a stopped one leaves the conversation.
     val working = remember(desktops.sessions) { desktops.sessions.filter { it.state != DesktopState.Stopped } }
@@ -345,6 +346,7 @@ private fun MessageList(vm: MainViewModel, settings: AppSettings, skills: List<S
                         onRetry = vm::retry,
                         onApproval = vm::resolveApproval,
                         chatTitle = chatTitle,
+                        attachments = { OutboundAttachments(vm.api, conversation.sessionId, message.attachments, saves) },
                     )
                 }
             }

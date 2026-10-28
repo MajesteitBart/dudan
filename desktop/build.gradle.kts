@@ -27,7 +27,10 @@ kotlin {
 // Dutch. src/main/composeResources adds what only the Windows app has.
 val sharedResources by tasks.registering(Sync::class) {
     from(rootProject.file("app/src/main/res")) {
-        include("values/strings.xml", "values-nl/strings.xml", "values/agent_screen.xml", "values-nl/agent_screen.xml")
+        include(
+            "values/strings.xml", "values-nl/strings.xml", "values/agent_screen.xml", "values-nl/agent_screen.xml",
+            "values/outbound_attachments.xml", "values-nl/outbound_attachments.xml",
+        )
     }
     // Compose resources have no nodpi qualifier; these PNGs are drawn at their own size anyway.
     from(rootProject.file("app/src/main/res/drawable-nodpi")) {

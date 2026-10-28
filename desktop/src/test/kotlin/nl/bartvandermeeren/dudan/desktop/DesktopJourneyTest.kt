@@ -42,6 +42,7 @@ import nl.bartvandermeeren.dudan.ui.components.LocalWindowShown
 import nl.bartvandermeeren.dudan.chat.Role
 import nl.bartvandermeeren.dudan.data.DesktopState
 import nl.bartvandermeeren.dudan.ui.chat.AgentScreenViewer
+import nl.bartvandermeeren.dudan.ui.chat.AttachmentSaves
 import nl.bartvandermeeren.dudan.ui.chat.DesktopController
 import nl.bartvandermeeren.dudan.ui.theme.DudanTheme
 import nl.bartvandermeeren.dudan.ui.DudanRoot
@@ -367,6 +368,40 @@ class DesktopJourneyTest {
             // The new shortcut starts a chat; the old one types on.
             composer().performKeyInput { withKeyDown(Key.CtrlLeft) { pressKey(Key.T) } }
             waitForText("Hello, Bart")
+        } finally {
+            scope.cancel()
+            profile.deleteRecursively()
+        }
+    }
+
+    /**
+     * A file the agent returned: the card under the mock's morning brief (MOCK_CLARK_JOBS=1), then a save over
+     * an existing file through the real download, which checks the size and SHA-256 before replacing it.
+     */
+    @Test
+    fun returnedFile() = runDesktopComposeUiTest(width = 1180, height = 780) {
+        val profile = Files.createTempDirectory("dudan-files").toFile()
+        val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
+        try {
+            val store = DesktopSettings(profile)
+            kotlinx.coroutines.runBlocking { store.saveSetup(mock!!, "dev-key-dudan-0000000000", "Bart", "") }
+            val vm = MainViewModel(store, scope)
+            val chat = kotlinx.coroutines.runBlocking { vm.api.listSessions(null) }.firstOrNull { it.jobId != null }
+            assumeTrue("Start the mock with MOCK_CLARK_JOBS=1 for a returned file", chat != null)
+            setContent { DudanRoot(vm, OverlayHost(), ChatHostActions(onPickImages = {}, onScreenshot = {}), shortcutTaken = false) }
+            waitUntil(timeoutMillis = 10_000) { vm.sessions.value.loadedOnce }
+            runOnIdle { vm.openSession(chat!!.id) }
+            waitForText("Save file", substring = false, timeout = 15_000)
+            shot("journey-21-returned-file")
+
+            val file = vm.conversation.value.messages.flatMap { it.attachments }.first()
+            val folder = File(profile, "saved").apply { mkdirs() }
+            val target = File(folder, file.name).apply { writeText("an older file") }
+            val saves = AttachmentSaves(scope)
+            runOnIdle { saves.start(vm.api, file, target) }
+            waitUntil(timeoutMillis = 10_000) { saves[file] is AttachmentSaves.State.Saved }
+            assertEquals(file.size, target.length())
+            assertTrue("no partial file stays behind", folder.listFiles().orEmpty().none { it.name.endsWith(".part") })
         } finally {
             scope.cancel()
             profile.deleteRecursively()

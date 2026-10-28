@@ -13,6 +13,7 @@ dudan for Windows brings the same Hermes chats to a PC. It talks to Hermes the w
 - With a Clark server that has an [Agent screen](agent-screen.md), the chat shows the task's desktop as a card, live. Open shows it in a window of its own, beside the chat. Take control pauses the agent: click on the screen and your keyboard, mouse and wheel work on the agent's desktop, and a field takes longer text to paste. Return control hands it back. The card stops polling while dudan sits in the tray. An open Agent screen window keeps watching, also with the main window in the tray, until it's minimized: then it lets go of control, as a phone does when the viewer leaves the screen.
 - The model picker in the prompt bar has the same two defaults: one for chats started in the window, and a quick one for quick questions.
 - `$` lists Hermes' skills, as on the phone.
+- Files the agent returns show under its answer, as on the phone. Save file asks where in Windows' own dialog, checks the file's size and SHA-256, and Show in folder points Explorer at it; nothing the agent made is opened or run.
 - Pictures go to the model as images. Attach them with +, drag them onto the window, or paste one with Ctrl+V, a screenshot from Win+Shift+S included. + > Screenshot hides dudan for a moment and attaches the screen behind it.
 - Ctrl+Alt+Space opens a quick question at the top of the screen: a small card that starts a new chat on the quick model each time. Ask about screen attaches the screen as it was when the card opened. The capture stays in memory and is dropped when the card closes. Esc or a click elsewhere puts the card away; the answer goes on, and Open in dudan continues the chat in the main window.
 - The first start asks for the server and key on one card, with a link to the Hermes side of the setup.
@@ -35,7 +36,7 @@ When another app already holds the quick question's keys, Settings > Keyboard sh
 ## Not on Windows yet
 
 - Voice input: no dictation, Live mode or wake word. Replies are read aloud, see above.
-- Files other than pictures, and files the agent returns.
+- Sending files other than pictures, and previews of pictures the agent returns.
 - The Search, Skills and Scheduled tasks screens.
 - Phone control has no counterpart: turns from the PC never mention phone tools.
 

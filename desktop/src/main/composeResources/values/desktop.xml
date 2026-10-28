@@ -90,4 +90,5 @@
     <string name="desktop_setup_help">Setting up Hermes for dudan</string>
     <string name="desktop_show_key">Show key</string>
     <string name="desktop_hide_key">Hide key</string>
+    <string name="desktop_show_in_folder">Show in folder</string>
 </resources>

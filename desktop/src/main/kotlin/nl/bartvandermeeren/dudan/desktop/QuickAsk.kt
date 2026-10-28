@@ -72,6 +72,8 @@ import androidx.compose.material3.TextButton
 import kotlinx.coroutines.delay
 import nl.bartvandermeeren.dudan.ui.chat.AssistantMessageItem
 import nl.bartvandermeeren.dudan.ui.chat.BackgroundResultItem
+import nl.bartvandermeeren.dudan.ui.chat.OutboundAttachments
+import nl.bartvandermeeren.dudan.ui.chat.rememberAttachmentSaves
 import nl.bartvandermeeren.dudan.ui.chat.UserMessageItem
 import nl.bartvandermeeren.dudan.ui.components.Attachment
 import nl.bartvandermeeren.dudan.ui.components.Composer
@@ -195,6 +197,7 @@ fun QuickAskPanel(quick: QuickAsk, vm: MainViewModel, onOpenInApp: () -> Unit) {
     val settings by vm.settings.collectAsState()
     val conversation by remember(quick.sessionId) { quick.conversation }.collectAsState()
     val speakingId by vm.speaker.speakingId.collectAsState()
+    val saves = rememberAttachmentSaves()
     val focus = remember { FocusRequester() }
     LaunchedEffect(quick.openings) { runCatching { focus.requestFocus() } }
     val messages = conversation.messages
@@ -243,6 +246,7 @@ fun QuickAskPanel(quick: QuickAsk, vm: MainViewModel, onOpenInApp: () -> Unit) {
                             onRetry = { vm.engine.retry(quick.sessionId) },
                             onApproval = { vm.engine.resolveApproval(quick.sessionId, it) },
                             showDisclaimer = false,
+                            attachments = { OutboundAttachments(vm.api, quick.sessionId, message.attachments, saves) },
                         )
                     }
                 }
