@@ -15,10 +15,10 @@ class SingleInstanceTest {
     fun aSecondStartShowsTheFirstAndStops() {
         val port = freePort()
         val shown = CountDownLatch(1)
-        val first = SingleInstance(port) { shown.countDown() }
+        val first = SingleInstance("bart|", port) { shown.countDown() }
         try {
             assertTrue(first.claim())
-            assertFalse(SingleInstance(port) {}.claim())
+            assertFalse(SingleInstance("bart|", port) {}.claim())
             assertTrue("the first dudan was asked to show itself", shown.await(2, TimeUnit.SECONDS))
         } finally {
             first.release()
@@ -29,18 +29,35 @@ class SingleInstanceTest {
     fun anotherProgramOnThePortDoesNotKeepDudanFromStarting() {
         ServerSocket(0, 1, InetAddress.getLoopbackAddress()).use { stranger ->
             // It accepts the connection but never answers as dudan would.
-            assertTrue(SingleInstance(stranger.localPort) {}.claim())
+            assertTrue(SingleInstance("bart|", stranger.localPort) {}.claim())
         }
     }
 
     @Test
-    fun aTestProfileGetsAPortOfItsOwn() {
-        val installed = SingleInstance.portFor(null)
-        val profile = SingleInstance.portFor("E:/tmp/dudan-dev")
+    fun eachAccountAndProfileIsADudanOfItsOwn() {
+        val installed = SingleInstance.identityOf("Bart", null)
+        val profile = SingleInstance.identityOf("Bart", "E:/tmp/dudan-dev")
         assertTrue(profile != installed)
-        assertTrue(profile in installed + 1..installed + 1000)
-        // The same folder, written another way, is the same profile.
-        assertTrue(profile == SingleInstance.portFor("e:\\TMP\\dudan-dev"))
-        assertTrue(installed == SingleInstance.portFor(" "))
+        assertTrue(SingleInstance.identityOf("Sanne", null) != installed)
+        // The same folder, written another way, is the same profile, and a blank one is none.
+        assertTrue(profile == SingleInstance.identityOf("bart", "e:\\TMP\\dudan-dev"))
+        assertTrue(installed == SingleInstance.identityOf("Bart", " "))
+        assertTrue(SingleInstance.portFor(installed) in 48652 until 49652)
+    }
+
+    @Test
+    fun anotherAccountsDudanOnThePortIsNotThisOne() {
+        val port = freePort()
+        var shown = false
+        val other = SingleInstance("sanne|", port) { shown = true }
+        try {
+            assertTrue(other.claim())
+            // Bart's dudan finds Sanne's on the port, which doesn't answer him, so his runs.
+            assertTrue(SingleInstance("bart|", port) {}.claim())
+            Thread.sleep(200)
+            assertFalse("the other account's dudan was asked to show itself", shown)
+        } finally {
+            other.release()
+        }
     }
 }

@@ -50,9 +50,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import java.awt.image.BufferedImage
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -89,7 +91,11 @@ import org.jetbrains.compose.resources.stringResource
  * window opens and kept in memory only, until the window closes; it's sent only when the user asks
  * about the screen.
  */
-class QuickAsk(private val vm: MainViewModel, private val scope: CoroutineScope) {
+class QuickAsk(
+    private val vm: MainViewModel,
+    private val scope: CoroutineScope,
+    private val grab: () -> BufferedImage? = ScreenCapture::grab,
+) {
     var visible by mutableStateOf(false)
         private set
     var sessionId by mutableStateOf(vm.engine.startNew(ModelProfile.Assistant))
@@ -107,8 +113,23 @@ class QuickAsk(private val vm: MainViewModel, private val scope: CoroutineScope)
         private set
     private var preparing: Job? = null
 
+    /**
+     * Grabs the screen and shows a new question. One already up goes away first, as the main window does for
+     * its screenshot, so the picture shows what's behind it rather than the last answer.
+     */
     fun open() {
-        val shot = ScreenCapture.grab()
+        if (!visible) {
+            show(grab())
+            return
+        }
+        close()
+        scope.launch {
+            delay(HIDE_MS)
+            show(grab())
+        }
+    }
+
+    private fun show(shot: BufferedImage?) {
         newQuestion()
         visible = true
         vm.quickOnScreen.value = sessionId
@@ -162,6 +183,11 @@ class QuickAsk(private val vm: MainViewModel, private val scope: CoroutineScope)
     /** What an OpenUI button or follow-up in the answer sends, in this chat. */
     fun sendFromReply(reply: String): Boolean =
         vm.engine.send(sessionId, reply, origin = TurnOrigin(TurnOrigin.Surface.Assistant, device = TurnOrigin.Device.Desktop))
+
+    private companion object {
+        /** Long enough for Windows to take the window off the screen before the capture. */
+        const val HIDE_MS = 350L
+    }
 
     /** Hands the chat to the main window, as the overlay hands off to the full app. */
     fun openInApp(showMain: () -> Unit) {

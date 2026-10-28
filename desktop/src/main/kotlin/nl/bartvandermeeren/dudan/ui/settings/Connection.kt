@@ -93,13 +93,23 @@ internal class ConnectionForm(private val vm: MainViewModel, private val scope: 
 
     val canConnect: Boolean get() = url.isNotBlank() && key.isNotBlank() && test != TestState.Testing
 
-    /** Asks the server for its model with these credentials, and saves them once it answers. */
+    /** Counts tests; one whose address or key changed while the server answered is no longer current. */
+    private var attempt = 0
+
+    /**
+     * Asks the server for its model with these credentials, and saves them once it answers: the values as
+     * they were when the test began, so what's saved is what was tested.
+     */
     fun connect() {
         if (!canConnect) return
+        val mine = ++attempt
+        val tested = listOf(url, key, name, assistant)
         test = TestState.Testing
         scope.launch {
             try {
+                val (url, key, name, assistant) = tested
                 val model = vm.apiFor(HermesApi.ServerConfig(HermesApi.normalizeBaseUrl(url), key.trim())).verify()
+                if (mine != attempt) return@launch
                 vm.store.saveSetup(url, key, name, assistant)
                 test = TestState.Ok(model)
                 vm.refreshSessions()
@@ -107,13 +117,14 @@ internal class ConnectionForm(private val vm: MainViewModel, private val scope: 
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                test = TestState.Failed(e.userMessage())
+                if (mine == attempt) test = TestState.Failed(e.userMessage())
             }
         }
     }
 
-    /** A changed address or key hasn't been tested yet. */
+    /** A changed address or key hasn't been tested yet, and a test still running is for the old one. */
     fun edited() {
+        attempt++
         test = TestState.Idle
     }
 }

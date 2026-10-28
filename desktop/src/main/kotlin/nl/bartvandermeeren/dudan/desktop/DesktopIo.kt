@@ -114,9 +114,15 @@ object DesktopFiles {
 /**
  * One dudan per Windows account and profile. The first one listens on a loopback port; a second start
  * tells it to show its window and exits, as a click on the Start menu entry should while dudan sits in
- * the tray. A DUDAN_HOME profile is a dudan of its own, so it runs beside the installed one.
+ * the tray. A DUDAN_HOME profile is a dudan of its own, so it runs beside the installed one. Loopback
+ * ports are shared by every account signed in on the PC, so the port and the handshake carry [identity]:
+ * another account's dudan on the port isn't this one.
  */
-class SingleInstance(private val port: Int = portFor(System.getenv("DUDAN_HOME")), private val onShow: () -> Unit) {
+class SingleInstance(
+    private val identity: String = identityOf(System.getProperty("user.name"), System.getenv("DUDAN_HOME")),
+    private val port: Int = portFor(identity),
+    private val onShow: () -> Unit,
+) {
     private var server: ServerSocket? = null
 
     /**
@@ -136,7 +142,7 @@ class SingleInstance(private val port: Int = portFor(System.getenv("DUDAN_HOME")
                 runCatching {
                     client.use {
                         it.soTimeout = 1_000
-                        if (it.getInputStream().bufferedReader().readLine() == SHOW) {
+                        if (it.getInputStream().bufferedReader().readLine() == "$SHOW $identity") {
                             it.getOutputStream().write("$SHOWN\n".toByteArray())
                             onShow()
                         }
@@ -150,7 +156,7 @@ class SingleInstance(private val port: Int = portFor(System.getenv("DUDAN_HOME")
     private fun otherDudanShowed(): Boolean = runCatching {
         Socket(InetAddress.getLoopbackAddress(), port).use {
             it.soTimeout = 1_000
-            it.getOutputStream().write("$SHOW\n".toByteArray())
+            it.getOutputStream().write("$SHOW $identity\n".toByteArray())
             it.getInputStream().bufferedReader().readLine() == SHOWN
         }
     }.getOrDefault(false)
@@ -165,8 +171,11 @@ class SingleInstance(private val port: Int = portFor(System.getenv("DUDAN_HOME")
         private const val SHOW = "dudan:show"
         private const val SHOWN = "dudan:shown"
 
-        /** The port for a profile: the fixed one, or one of the thousand above it picked by the [home] folder. */
-        fun portFor(home: String?): Int =
-            if (home.isNullOrBlank()) PORT else PORT + 1 + Math.floorMod(java.io.File(home).absolutePath.lowercase().hashCode(), 1000)
+        /** The Windows account and the DUDAN_HOME profile, if any; the same folder written another way is the same profile. */
+        fun identityOf(user: String?, home: String?): String =
+            user.orEmpty().lowercase() + "|" + home?.takeIf { it.isNotBlank() }?.let { java.io.File(it).absolutePath.lowercase() }.orEmpty()
+
+        /** One of a thousand ports from the fixed one up, picked by [identity]. */
+        fun portFor(identity: String): Int = PORT + Math.floorMod(identity.hashCode(), 1000)
     }
 }
