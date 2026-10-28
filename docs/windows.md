@@ -52,6 +52,10 @@ dudan for Windows is the `:desktop` Gradle module, a Compose Multiplatform app o
 
 `packageMsi` bundles a Java runtime and downloads the WiX toolset the first time. The build fetches sherpa-onnx's JVM and Windows jars into `desktop/libs` once, checked against their SHA-256. The version is `packageVersion` in `desktop/build.gradle.kts`.
 
+### Publish a release
+
+Windows releases live on GitHub beside the phone's, with the tag `windows-v<version>`, the title `dudan for Windows v<version>`, and two files: `dudan-<version>.msi` and `SHA256SUMS`. Raise `packageVersion` and merge that to `main`; Windows Installer only replaces an installed dudan with a higher version. Then, on `main`, run the tests, `./gradlew :desktop:packageMsi`, and publish the MSI with its checksum as a pre-release.
+
 To develop without a live agent, run the mock server in English, with its Agent screen, and point a separate profile at it. A `DUDAN_HOME` profile runs beside an installed dudan instead of handing over to it, but another dudan holding Ctrl+Alt+Space keeps that shortcut, so Settings says it's taken:
 
 ```
