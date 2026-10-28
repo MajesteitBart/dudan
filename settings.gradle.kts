@@ -15,4 +15,5 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "dudan"
+include(":core")
 include(":app")

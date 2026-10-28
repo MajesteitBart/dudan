@@ -14,8 +14,11 @@ data class TurnOrigin(
     val spoken: Boolean = false,
     /** The attached image is a screenshot of the phone's screen ("Ask about screen"). */
     val screenshot: Boolean = false,
+    /** The Android app or the Windows app. */
+    val device: Device = Device.Phone,
 ) {
     enum class Surface { App, Assistant, Live }
+    enum class Device { Phone, Desktop }
 }
 
 /**
@@ -38,16 +41,26 @@ object TurnInstructions {
         ).joinToString("\n\n")
 
     /**
-     * The turn's context. Without [phoneControl] it says nothing about phone tools. A spoken turn with a
-     * [speechLanguage] setting asks for the reply in that language, the one the user speaks and hears it in.
+     * The turn's context. Without [phoneControl] it says nothing about phone tools, and a turn from the
+     * Windows app never does. A spoken turn with a [speechLanguage] setting asks for the reply in that
+     * language, the one the user speaks and hears it in.
      */
     fun context(origin: TurnOrigin, phoneControl: Boolean?, speechLanguage: String? = null): String = buildList {
-        add("The user is talking to you through dudan, the Hermes app on their Android phone.")
+        val desktop = origin.device == TurnOrigin.Device.Desktop
+        add(
+            if (desktop) "The user is talking to you through dudan, the Hermes app on their Windows PC."
+            else "The user is talking to you through dudan, the Hermes app on their Android phone.",
+        )
         when (origin.surface) {
             TurnOrigin.Surface.App -> Unit
             TurnOrigin.Surface.Assistant -> add(
-                "They opened you as the phone's assistant, with the side button, in a panel over whatever they were doing. " +
-                    "Keep the answer short.",
+                if (desktop) {
+                    "They opened you with a keyboard shortcut, in a small window over whatever they were doing. " +
+                        "Keep the answer short."
+                } else {
+                    "They opened you as the phone's assistant, with the side button, in a panel over whatever they were doing. " +
+                        "Keep the answer short."
+                },
             )
             TurnOrigin.Surface.Live -> add("This is Live mode, a hands-free voice conversation.")
         }
@@ -63,7 +76,7 @@ object TurnInstructions {
             )
         }
         if (origin.screenshot) add("The attached image is a screenshot of their screen from the moment they opened you.")
-        when (phoneControl) {
+        when (phoneControl.takeUnless { desktop }) {
             true -> add(
                 "If you have the phone tools ($PHONE_TOOLS), they act on this same phone. When they ask for something the phone does, " +
                     "such as a timer or alarm, opening an app, directions or music, do it with those tools " +

@@ -488,7 +488,7 @@ private suspend fun Call.await(): Response = suspendCancellableCoroutine { conti
 private fun JsonArray?.orEmpty(): JsonArray = this ?: JsonArray(emptyList())
 
 /** Flattens /api/model/options into pickable rows without depending on its exact shape. */
-internal object ModelCatalogParser {
+object ModelCatalogParser {
     fun parse(root: JsonObject): ModelCatalog {
         val currentProvider = root.str("current_provider") ?: root["current"].asObject()?.str("provider") ?: root.str("provider")
         val currentModel = root.str("current_model") ?: root["current"].asObject()?.str("model") ?: root.str("model")

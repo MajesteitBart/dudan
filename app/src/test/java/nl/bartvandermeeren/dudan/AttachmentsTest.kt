@@ -70,7 +70,14 @@ class AttachmentNotesTest {
         assertEquals("What's in these?", text)
         assertEquals(listOf(pdf.name, video.name, notes.name, voice.name), files.map { it.name })
         assertEquals(listOf(pdf.path, video.path, notes.path, voice.path), files.map { it.path })
-        assertEquals("video/*", files[1].mime)
+        // History has no MIME type, so it comes from the name, as on the phone.
+        assertEquals("video/mp4", files[1].mime)
+    }
+
+    @Test
+    fun unknownExtensionsFallBackToTheNoteKind() {
+        val odd = FileRef("take.zzv", "video/x-unknown", 1, "/home/bart/.hermes/uploads/dudan/1_take.zzv")
+        assertEquals("video/*", AttachmentNotes.parse(AttachmentNotes.compose("", listOf(odd))).second.single().mime)
     }
 
     @Test

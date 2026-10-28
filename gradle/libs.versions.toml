@@ -15,6 +15,12 @@ junit = "4.13.2"
 commons-compress = "1.28.0"
 # 1.7.2 is the last Haze on Compose 1.10; 1.7.3 and 2.x pull in Compose 1.12.
 haze = "1.7.2"
+# The Windows app. 1.10 is Compose 1.10, the same as the Android app's BOM, so UI code moves between them.
+compose-multiplatform = "1.10.3"
+compose-multiplatform-material3 = "1.9.0"
+# The last release of the extended icons; Compose Multiplatform no longer publishes them.
+compose-multiplatform-icons = "1.7.3"
+jna = "5.19.1"
 
 [libraries]
 androidx-core-ktx = { module = "androidx.core:core-ktx", version.ref = "androidx-core" }
@@ -33,6 +39,8 @@ compose-foundation = { module = "androidx.compose.foundation:foundation" }
 compose-material3 = { module = "androidx.compose.material3:material3" }
 compose-material-icons-extended = { module = "androidx.compose.material:material-icons-extended" }
 kotlinx-coroutines-android = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-android", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-core = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "kotlinx-coroutines" }
+kotlinx-coroutines-swing = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-swing", version.ref = "kotlinx-coroutines" }
 kotlinx-coroutines-test = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 kotlinx-serialization-json = { module = "org.jetbrains.kotlinx:kotlinx-serialization-json", version.ref = "kotlinx-serialization-json" }
 okhttp = { module = "com.squareup.okhttp3:okhttp", version.ref = "okhttp" }
@@ -44,8 +52,15 @@ commonmark-ext-autolink = { module = "org.commonmark:commonmark-ext-autolink", v
 junit = { module = "junit:junit", version.ref = "junit" }
 commons-compress = { module = "org.apache.commons:commons-compress", version.ref = "commons-compress" }
 haze = { module = "dev.chrisbanes.haze:haze", version.ref = "haze" }
+jna-platform = { module = "net.java.dev.jna:jna-platform", version.ref = "jna" }
+desktop-material3 = { module = "org.jetbrains.compose.material3:material3", version.ref = "compose-multiplatform-material3" }
+desktop-icons-extended = { module = "org.jetbrains.compose.material:material-icons-extended", version.ref = "compose-multiplatform-icons" }
+desktop-resources = { module = "org.jetbrains.compose.components:components-resources", version.ref = "compose-multiplatform" }
+desktop-ui-test = { module = "org.jetbrains.compose.ui:ui-test-junit4", version.ref = "compose-multiplatform" }
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+compose-multiplatform = { id = "org.jetbrains.compose", version.ref = "compose-multiplatform" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }

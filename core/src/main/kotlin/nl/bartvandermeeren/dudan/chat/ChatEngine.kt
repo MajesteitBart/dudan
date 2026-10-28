@@ -51,6 +51,8 @@ class ChatEngine(
     private val watchPauses: List<Long> = listOf(3_000, 5_000, 10_000, 15_000, 20_000, 30_000),
     /** Hermes' skills, to tell `$skill` tags from other dollar signs. Keep it before [currentSettings], which callers pass as a trailing lambda. */
     private val skills: suspend () -> List<SkillInfo> = { emptyList() },
+    /** The app this engine runs in, which every turn tells Hermes; see [TurnOrigin]. */
+    private val device: TurnOrigin.Device = TurnOrigin.Device.Phone,
     private val currentSettings: suspend () -> AppSettings,
 ) {
     /**
@@ -69,6 +71,7 @@ class ChatEngine(
         var review: ReviewRequest? = null,
     ) {
         val input: String = AttachmentNotes.compose(text, files)
+        val startedAt = System.currentTimeMillis()
         var job: Job? = null
         var runId: String? = null
         var stopRequested = false
@@ -83,6 +86,7 @@ class ChatEngine(
      * time the chat opens or the app returns.
      */
     private class Watch(val sessionId: String) {
+        val startedAt = System.currentTimeMillis()
         val pending = mutableSetOf<String>()
         /** Results that came in (by [BackgroundResult.key]) but the chat doesn't show yet. */
         val unshown = mutableSetOf<String>()
@@ -100,6 +104,23 @@ class ChatEngine(
 
     private val _sessions = MutableStateFlow(SessionsState())
     val sessions: StateFlow<SessionsState> = _sessions.asStateFlow()
+
+    /**
+     * What this process is doing for a chat: a turn running ([turn]), or background work it's watching for.
+     * [since] is when that began, in epoch milliseconds.
+     */
+    data class Activity(val since: Long, val turn: Boolean)
+
+    private val _activity = MutableStateFlow<Map<String, Activity>>(emptyMap())
+    /** The chats this process is working in, by session id; the Windows chat list groups them as working. */
+    val activity: StateFlow<Map<String, Activity>> = _activity.asStateFlow()
+
+    private fun syncActivity() {
+        _activity.value = buildMap {
+            watches.values.filter { it.pending.isNotEmpty() }.forEach { put(it.sessionId, Activity(it.startedAt, turn = false)) }
+            turns.values.forEach { put(it.sessionId, Activity(it.startedAt, turn = true)) }
+        }
+    }
 
     /** Emits every successfully finished assistant turn; read-aloud and notifications key off it. */
     private val _completedTurns = MutableStateFlow<CompletedTurn?>(null)
@@ -147,6 +168,7 @@ class ChatEngine(
         announced.clear()
         conversations.clear()
         _sessions.value = SessionsState()
+        syncActivity()
     }
 
     /**
@@ -252,9 +274,10 @@ class ChatEngine(
                     return@launch
                 }
                 show(sessionId, rows)
-                // Asked the same way from every surface, so another dudan reviewing this result sends the
-                // same request and joins the run instead of hitting the key's conflict check.
-                if (flow.value.awaitingReview) startTurn(sessionId, prompt, origin = TurnOrigin(), review = request)
+                // Asked the same way from every surface of one app, so another dudan reviewing this result
+                // sends the same request and joins the run instead of hitting the key's conflict check. The
+                // phone and the PC name their device, so a review started on both at once fails on one.
+                if (flow.value.awaitingReview) startTurn(sessionId, prompt, origin = TurnOrigin(device = device), review = request)
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -271,7 +294,7 @@ class ChatEngine(
         text: String,
         images: List<PreparedImage> = emptyList(),
         files: List<FileRef> = emptyList(),
-        origin: TurnOrigin = TurnOrigin(),
+        origin: TurnOrigin = TurnOrigin(device = device),
     ): Boolean = startTurn(sessionId, text, images, files, origin)
 
     private fun startTurn(
@@ -279,7 +302,7 @@ class ChatEngine(
         text: String,
         images: List<PreparedImage> = emptyList(),
         files: List<FileRef> = emptyList(),
-        origin: TurnOrigin = TurnOrigin(),
+        origin: TurnOrigin = TurnOrigin(device = device),
         review: ReviewRequest? = null,
     ): Boolean {
         val flow = flowFor(sessionId)
@@ -296,6 +319,7 @@ class ChatEngine(
         if (wasNew) addOptimisticSession(sessionId, text.ifBlank { files.joinToString(", ") { it.name } })
         val turn = Turn(sessionId, user.id, assistant.id, text, images, files, origin, review)
         turns[sessionId] = turn
+        syncActivity()
         turn.job = scope.launch { runTurn(turn) }
         return true
     }
@@ -321,7 +345,7 @@ class ChatEngine(
         }
         // A question loaded from the transcript lost its origin; an assistant chat still says where it was asked.
         val origin = lastUser.origin
-            ?: TurnOrigin(if (profileOf(sessionId) == ModelProfile.Assistant) TurnOrigin.Surface.Assistant else TurnOrigin.Surface.App)
+            ?: TurnOrigin(if (profileOf(sessionId) == ModelProfile.Assistant) TurnOrigin.Surface.Assistant else TurnOrigin.Surface.App, device = device)
         send(sessionId, lastUser.text, images, lastUser.files, origin)
     }
 
@@ -420,6 +444,7 @@ class ChatEngine(
                 api.deleteSession(sessionId)
                 turns.remove(sessionId)
                 watches.remove(sessionId)?.job?.cancel()
+                syncActivity()
                 conversations.remove(sessionId)
                 _sessions.update { state -> state.copy(items = state.items.filterNot { it.id == sessionId }) }
                 onDone()
@@ -504,6 +529,7 @@ class ChatEngine(
                 }
             }
             if (turns[sessionId] === turn) turns.remove(sessionId)
+            syncActivity()
             val message = conversations[sessionId]?.value?.messages?.firstOrNull { it.id == turn.messageId }
             // Only files listed under this chat show in it, so only those count.
             val files = message?.attachments.orEmpty().filter { it.sessionId == sessionId }.map { it.name }
@@ -568,6 +594,7 @@ class ChatEngine(
         watch ?: return
         watch.pending += outstanding
         forgetShown(watch)
+        syncActivity()
         if (watch.pending.isEmpty() && watch.unshown.isEmpty()) {
             if (watch.job?.isActive != true) watches.remove(sessionId)
             return
@@ -619,7 +646,10 @@ class ChatEngine(
             val result = BackgroundWork.parse(row)
             val id = result.delegationId ?: return@forEachIndexed
             if (id !in watch.pending) return@forEachIndexed
-            if (!result.interim) watch.pending -= id
+            if (!result.interim) {
+                watch.pending -= id
+                syncActivity()
+            }
             // Delegation ids are unique per Hermes profile, and the server URL includes the profile.
             // The session id isn't stable: compression moves a chat to a new one.
             val key = "$server|${result.key}"
@@ -667,6 +697,7 @@ class ChatEngine(
             }
         } finally {
             if (watches[watch.sessionId] === watch) watches.remove(watch.sessionId)
+            syncActivity()
         }
     }
 
@@ -786,7 +817,7 @@ class ChatEngine(
         _sessions.update { state ->
             if (state.items.any { it.id == sessionId }) state
             else state.copy(
-                items = listOf(SessionSummary(sessionId, null, text.ifBlank { "…" }, "api_server", now, now, false, 1)) + state.items,
+                items = listOf(SessionSummary(sessionId, null, text.ifBlank { "…" }, "api_server", now, now, false, 1, local = true)) + state.items,
             )
         }
     }

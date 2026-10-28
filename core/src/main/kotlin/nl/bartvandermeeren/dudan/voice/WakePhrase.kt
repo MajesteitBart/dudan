@@ -58,7 +58,7 @@ object WakePhrase {
      * The most spellings of a phrase the spotter listens for. "Ok hey ok" already has eight; words after
      * that keep the spelling they were written in, so a phrase never spells out into thousands of lines.
      */
-    internal const val MAX_VARIANTS = 8
+    const val MAX_VARIANTS = 8
 
     /**
      * The spotter's keywords file for [phrase]: a line of tokens per spelling, or null when the phrase is

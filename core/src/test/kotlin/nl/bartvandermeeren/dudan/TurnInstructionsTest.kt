@@ -66,6 +66,19 @@ class TurnInstructionsTest {
     }
 
     @Test
+    fun desktopTurnsSayTheUserIsOnTheirPcAndNeverMentionThePhone() {
+        val app = TurnInstructions.context(TurnOrigin(device = TurnOrigin.Device.Desktop), phoneControl = true)
+        assertTrue(app, app.startsWith("The user is talking to you through dudan, the Hermes app on their Windows PC."))
+        assertTrue(app, app.contains("dudan renders Markdown"))
+        val quick = TurnInstructions.context(TurnOrigin(Surface.Assistant, screenshot = true, device = TurnOrigin.Device.Desktop), phoneControl = false)
+        assertTrue(quick, quick.contains("with a keyboard shortcut"))
+        assertTrue(quick, quick.contains("screenshot of their screen"))
+        listOf(app, quick).forEach { text ->
+            assertFalse(text, text.contains("phone", ignoreCase = true) || text.contains("side button"))
+        }
+    }
+
+    @Test
     fun theOpenUiPromptComesFirstAndUnchangedSoItStaysCached() {
         val shown = TurnInstructions.build(TurnOrigin(), phoneControl = true, richReplies = true)
         assertTrue(shown.startsWith(OpenUiPrompt.instructions + "\n\n## This turn\n\n"))

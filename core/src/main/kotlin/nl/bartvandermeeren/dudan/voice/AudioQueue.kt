@@ -7,9 +7,9 @@ import java.util.concurrent.TimeUnit
 /**
  * Synthesized audio waiting to be played, capped at [maxSamples] so synthesis runs a little ahead of
  * playback but never holds a whole long reply in memory. A piece bigger than the cap still fits once
- * the queue is empty.
+ * the queue is empty. Both apps' voices use it.
  */
-internal class AudioQueue(private val maxSamples: Int) {
+class AudioQueue(private val maxSamples: Int) {
     private val queue = LinkedBlockingQueue<FloatArray>()
     private val room = Semaphore(maxSamples)
 

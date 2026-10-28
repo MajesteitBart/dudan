@@ -16,10 +16,7 @@ object VoiceLanguages {
     const val OTHER = "*"
 
     /** Supertonic 3's languages, from its README. */
-    val SUPERTONIC = setOf(
-        "ar", "bg", "cs", "da", "de", "el", "en", "es", "et", "fi", "fr", "hi", "hr", "hu", "id", "it",
-        "ja", "ko", "lt", "lv", "nl", "pl", "pt", "ro", "ru", "sk", "sl", "sv", "tr", "uk", "vi",
-    )
+    val SUPERTONIC = Supertonic.LANGUAGES
 
     /** The engine and voice that read a reply. [voice] is null for Android's voice. */
     data class Resolved(val engine: VoiceEngine, val voice: String?)

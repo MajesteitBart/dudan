@@ -14,7 +14,7 @@ import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.doubleOrNull
 import kotlinx.serialization.json.intOrNull
 
-internal val HermesJson = Json {
+val HermesJson = Json {
     ignoreUnknownKeys = true
     isLenient = true
     explicitNulls = false
@@ -48,6 +48,8 @@ data class SessionSummary(
     val pinned: Boolean,
     val messageCount: Int,
     val jobId: String? = null,
+    /** Made by this app for a chat Hermes hasn't listed yet, so its times are the device's clock, not Hermes'. */
+    val local: Boolean = false,
 ) {
     val displayTitle: String
         get() = title?.let(AttachmentNotes::clean)?.trim()?.takeIf { it.isNotEmpty() }

@@ -301,11 +301,12 @@ fun BackgroundResultItem(
         result.status == BackgroundStatus.Failed && !result.interim -> Icons.Outlined.ErrorOutline to Palette.Danger
         else -> Icons.Outlined.ErrorOutline to Palette.SparkAmber
     }
+    val taskCount = result.taskCount
     val title = when {
         result.interim -> stringResource(R.string.background_task_failed)
         result.status == BackgroundStatus.Completed -> stringResource(R.string.background_done)
-        result.status == BackgroundStatus.PartlyFailed && result.taskCount != null ->
-            stringResource(R.string.background_partly_failed, result.failedCount, result.taskCount)
+        result.status == BackgroundStatus.PartlyFailed && taskCount != null ->
+            stringResource(R.string.background_partly_failed, result.failedCount, taskCount)
         else -> stringResource(R.string.background_failed)
     }
     Column(modifier.fillMaxWidth().padding(horizontal = 18.dp)) {

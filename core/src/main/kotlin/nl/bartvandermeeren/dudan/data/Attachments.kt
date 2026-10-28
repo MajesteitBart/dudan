@@ -1,6 +1,6 @@
 package nl.bartvandermeeren.dudan.data
 
-import android.webkit.MimeTypeMap
+import java.net.URLConnection
 
 /** Files up to this size can be attached; the upload service on the Hermes host enforces the same limit. */
 const val MAX_ATTACHMENT_BYTES = 250L * 1024 * 1024
@@ -98,8 +98,9 @@ object AttachmentNotes {
     }
 
     private fun mimeFor(name: String, kind: String): String {
+        // On Android this reads the same table as MimeTypeMap; on Windows, the JDK's own.
         val extension = name.substringAfterLast('.', "").lowercase()
-        val guessed = runCatching { MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension) }.getOrNull()
+        val guessed = runCatching { URLConnection.guessContentTypeFromName("file.$extension") }.getOrNull()
         return guessed ?: when (kind) {
             "a video attachment" -> "video/*"
             "an audio file attachment" -> "audio/*"
