@@ -12,10 +12,6 @@ import java.io.File
  * Kokoro has no Dutch.
  */
 class KokoroVoice(context: Context, model: ModelPackage) : SherpaVoice(context, model, "kokoro") {
-    data class Voice(val id: String, val speakerId: Int, val label: String) {
-        val british: Boolean get() = id.startsWith("b")
-    }
-
     // British and American voices need different lexicons, so they load different engines.
     override fun engineKey(voiceId: String): Any = voiceFor(voiceId).british
 
@@ -48,23 +44,10 @@ class KokoroVoice(context: Context, model: ModelPackage) : SherpaVoice(context, 
         tts.generateWithCallback(text, voiceFor(voiceId).speakerId, 1.0f, sink)
     }
 
-    private fun voiceFor(id: String) = VOICES.firstOrNull { it.id == id } ?: VOICES.first()
+    private fun voiceFor(id: String) = Kokoro.voice(id)
 
     companion object {
-        const val DEFAULT = "af_heart"
-
-        /** English voices in the Kokoro v1.0 speaker table (ids from the model's id2speaker metadata). */
-        val VOICES = listOf(
-            Voice("af_heart", 3, "Heart · US"),
-            Voice("af_bella", 2, "Bella · US"),
-            Voice("af_nicole", 6, "Nicole · US"),
-            Voice("af_sarah", 9, "Sarah · US"),
-            Voice("am_michael", 16, "Michael · US"),
-            Voice("am_fenrir", 14, "Fenrir · US"),
-            Voice("am_puck", 18, "Puck · US"),
-            Voice("bf_emma", 21, "Emma · UK"),
-            Voice("bm_george", 26, "George · UK"),
-            Voice("bm_fable", 25, "Fable · UK"),
-        )
+        const val DEFAULT = Kokoro.DEFAULT
+        val VOICES = Kokoro.VOICES
     }
 }

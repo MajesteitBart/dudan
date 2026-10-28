@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -59,6 +60,7 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
 import nl.bartvandermeeren.dudan.R
+import nl.bartvandermeeren.dudan.openui.BarScale
 import nl.bartvandermeeren.dudan.openui.OpenUiText
 import nl.bartvandermeeren.dudan.openui.UiNode
 import nl.bartvandermeeren.dudan.openui.formatNumber
@@ -393,10 +395,12 @@ private fun DrawScope.drawLineSeries(
 
 // ---- Horizontal bars ------------------------------------------------------------------------------
 
+/** Bars around a zero line (see BarScale): negative values grow to the left, as they hang below a vertical chart's baseline. */
 @Composable
 private fun HorizontalBars(labels: List<String>, series: List<Series>, stacked: Boolean, selected: Int?, onSelect: (Int?) -> Unit) {
-    val totals = labels.indices.map { i -> if (stacked) series.sumOf { max(0.0, it.values.getOrNull(i) ?: 0.0) } else series.maxOf { max(0.0, it.values.getOrNull(i) ?: 0.0) } }
-    val maxValue = totals.maxOrNull()?.takeIf { it > 0 } ?: 1.0
+    val rows = labels.indices.map { i -> series.map { BarScale.clean(it.values.getOrNull(i)) } }
+    val totals = rows.map { row -> if (stacked) row.sum() else row.maxOrNull() ?: 0.0 }
+    val scale = BarScale.of(rows, stacked)
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         labels.forEachIndexed { i, label ->
             val alpha = if (selected == null || selected == i) 1f else 0.45f
@@ -411,22 +415,31 @@ private fun HorizontalBars(labels: List<String>, series: List<Series>, stacked: 
                 if (stacked) {
                     BoxWithConstraints(Modifier.fillMaxWidth().height(14.dp)) {
                         val full = maxWidth
-                        Row(horizontalArrangement = Arrangement.spacedBy(2.dp)) {
-                            series.forEachIndexed { s, item ->
-                                val v = max(0.0, item.values.getOrNull(i) ?: 0.0)
-                                if (v > 0) Box(Modifier.width(full * (v / maxValue).toFloat()).height(14.dp).clip(RoundedCornerShape(4.dp)).background(seriesColor(s).copy(alpha = alpha)))
-                            }
+                        BarScale.stack(rows[i]).forEachIndexed { s, (start, end) ->
+                            if (start == end) return@forEachIndexed
+                            val (left, right) = scale.bar(start, end)
+                            // 2 dp short of its share, for the gap between segments.
+                            Box(
+                                Modifier
+                                    .offset(x = full * left)
+                                    .width((full * (right - left) - 2.dp).coerceAtLeast(1.dp))
+                                    .height(14.dp)
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(seriesColor(s).copy(alpha = alpha)),
+                            )
                         }
                     }
                 } else {
-                    series.forEachIndexed { s, item ->
-                        val v = max(0.0, item.values.getOrNull(i) ?: 0.0)
+                    rows[i].forEachIndexed { s, v ->
                         BoxWithConstraints(Modifier.fillMaxWidth().height(if (series.size > 1) 10.dp else 14.dp)) {
+                            val (left, right) = scale.bar(0.0, v)
                             Box(
                                 Modifier
-                                    .width(maxWidth * (v / maxValue).toFloat())
+                                    .offset(x = maxWidth * left)
+                                    .width(maxWidth * (right - left))
                                     .height(if (series.size > 1) 10.dp else 14.dp)
-                                    .clip(RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp))
+                                    // Rounded at the value's end, square at the zero line.
+                                    .clip(if (v < 0) RoundedCornerShape(topStart = 4.dp, bottomStart = 4.dp) else RoundedCornerShape(topEnd = 4.dp, bottomEnd = 4.dp))
                                     .background(seriesColor(s).copy(alpha = alpha)),
                             )
                         }

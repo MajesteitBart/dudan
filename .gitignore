@@ -13,6 +13,7 @@ captures/
 .research/
 /artifacts/
 /app/libs/
+/desktop/libs/
 __pycache__/
 /tools/brand-assets/node_modules/
 /website/tools/node_modules/

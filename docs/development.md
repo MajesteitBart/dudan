@@ -7,10 +7,12 @@
 Requires JDK 17 and the Android SDK (compileSdk 36). The first build downloads the sherpa-onnx AAR (Kokoro's runtime, 39 MB) from GitHub into `app/libs` and checks its SHA-256.
 
 ```
-./gradlew testDebugUnitTest      # protocol, reducer and parser tests
+./gradlew testDebugUnitTest      # protocol, reducer and parser tests in :app and :core
 ./gradlew assembleDebug          # app/build/outputs/apk/debug, package nl.bartvandermeeren.aight.debug, arm64 + x86_64
 ./gradlew assembleRelease        # app/build/outputs/apk/release, minified and signed, arm64 only
 ```
+
+The Android app (`:app`) builds on `:core`, the code it shares with the Windows app: the Hermes client, the chat engine, OpenUI and the schedule logic. [dudan for Windows](windows.md) covers `:desktop`.
 
 Release signing reads `signing.properties` and `signing/dudan-release.jks`. Both are git-ignored and only exist on the build machine. Keep a copy of the keystore: Android only accepts updates signed with the same key, so losing it means uninstalling and setting the app up again. Without `signing.properties`, release builds fall back to the debug key.
 

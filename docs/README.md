@@ -3,6 +3,7 @@
 [Back to dudan](../README.md)
 
 - [Setup](setup.md): connect Hermes, configure the assistant, enable phone control, send files and fix Hermes' skill list.
+- [Windows](windows.md): the PC app, its chat list, shortcuts and read-aloud, what it doesn't do yet, and how to build it.
 - [Development](development.md): build and sign an APK, use the mock server and find your way around the code.
 - [Reference](reference.md): appearance, voice behavior, rich replies, known limits and model credits.
 - [Upgrading](upgrading.md): keep an existing installation, credentials and server configuration working.

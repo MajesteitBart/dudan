@@ -15,8 +15,6 @@ import java.io.File
  * one plays.
  */
 class SupertonicVoice(context: Context, model: ModelPackage) : SherpaVoice(context, model, "supertonic") {
-    data class Voice(val id: String, val speakerId: Int, val female: Boolean, val number: Int)
-
     // One engine holds every voice; the voice is picked per call.
     override fun engineKey(voiceId: String): Any = Unit
 
@@ -58,21 +56,14 @@ class SupertonicVoice(context: Context, model: ModelPackage) : SherpaVoice(conte
         }
     }
 
-    private fun voiceFor(id: String) = VOICES.firstOrNull { it.id == id } ?: VOICES.first()
+    private fun voiceFor(id: String) = Supertonic.voice(id)
 
     companion object {
-        const val DEFAULT = "M2"
-
-        /** Denoising steps. Naturalness rises steeply up to 8 and barely after; each step costs time. */
-        private const val STEPS = 8
-        /** Supertonic's own default pace. */
-        private const val SPEED = 1.05f
-        private const val PAUSE_SECONDS = 0.3f
-        /** Longer pieces read more naturally but take longer before they play. */
-        private const val MAX_CHUNK = 200
-
-        /** The ten preset styles, in voice.bin order (the style files sorted by name). */
-        val VOICES = (1..5).map { Voice("F$it", it - 1, female = true, number = it) } +
-            (1..5).map { Voice("M$it", it + 4, female = false, number = it) }
+        const val DEFAULT = Supertonic.DEFAULT
+        val VOICES = Supertonic.VOICES
+        private const val STEPS = Supertonic.STEPS
+        private const val SPEED = Supertonic.SPEED
+        private const val PAUSE_SECONDS = Supertonic.PAUSE_SECONDS
+        private const val MAX_CHUNK = Supertonic.MAX_CHUNK
     }
 }
