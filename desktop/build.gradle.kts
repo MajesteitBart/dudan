@@ -132,7 +132,7 @@ compose.desktop {
         nativeDistributions {
             targetFormats(TargetFormat.Msi)
             packageName = "dudan"
-            packageVersion = "0.1.0"
+            packageVersion = "0.2.0"
             description = "Your Hermes agent, one shortcut away"
             vendor = "Bart van der Meeren"
             copyright = "MIT License"
