@@ -62,15 +62,14 @@ class SettingsRepository(private val context: Context) {
         val id = stringPreferencesKey("${prefix}model_id")
         val label = stringPreferencesKey("${prefix}model_label")
         val effort = stringPreferencesKey("${prefix}effort")
+        val serviceTier = stringPreferencesKey("${prefix}service_tier")
         val fast = booleanPreferencesKey("${prefix}fast")
         val legacyReasoning = stringPreferencesKey("${prefix}reasoning")
     }
 
     private object Keys {
-        val serverUrl = stringPreferencesKey("server_url")
-        val apiKey = stringPreferencesKey("api_key_enc")
+        val harness = stringPreferencesKey("harness")
         val userName = stringPreferencesKey("user_name")
-        val assistantName = stringPreferencesKey("assistant_name")
         val listenOnInvoke = booleanPreferencesKey("listen_on_invoke")
         val wakeWord = booleanPreferencesKey("wake_word")
         val wakePhrase = stringPreferencesKey("wake_phrase")
@@ -92,7 +91,6 @@ class SettingsRepository(private val context: Context) {
         val phoneControl = booleanPreferencesKey("phone_control")
         val phoneToken = stringPreferencesKey("phone_token_enc")
         val richReplies = booleanPreferencesKey("rich_replies")
-        val uploadUrl = stringPreferencesKey("upload_url")
     }
 
     private fun keysFor(profile: ModelProfile) = when (profile) {
@@ -109,53 +107,81 @@ class SettingsRepository(private val context: Context) {
         model = this[keys.id],
         label = this[keys.label],
         effort = storedEffort(this[keys.effort], this[keys.legacyReasoning], defaultEffort),
-        fast = this[keys.fast] ?: false,
+        serviceTier = this[keys.serviceTier] ?: "priority".takeIf { this[keys.fast] == true },
     )
 
     private fun Preferences.readVoices(): Map<String, LanguageVoice> = this[Keys.voices]?.let(::decodeVoices)
         ?: legacyVoices(this[Keys.legacyTtsEngine], this[Keys.legacyKokoroVoice], this[Keys.legacyDutchTtsEngine], this[Keys.legacySupertonicVoice])
 
-    private fun Preferences.toSettings() = AppSettings(
-        serverUrl = this[Keys.serverUrl].orEmpty(),
-        apiKey = this[Keys.apiKey]?.let(SecretBox::decrypt).orEmpty(),
-        userName = this[Keys.userName].orEmpty(),
-        assistantName = this[Keys.assistantName]?.takeIf { it.isNotBlank() && it != "aight" } ?: AppSettings.DEFAULT_ASSISTANT_NAME,
-        listenOnInvoke = this[Keys.listenOnInvoke] ?: true,
-        wakeWord = this[Keys.wakeWord] ?: false,
-        wakePhrase = this[Keys.wakePhrase]?.takeIf { it.isNotBlank() } ?: WakePhrase.DEFAULT,
-        speakReplies = this[Keys.speakReplies] ?: true,
-        showAllChannels = this[Keys.showAllChannels] ?: false,
-        reduceTransparency = this[Keys.reduceTransparency] ?: false,
-        accent = this[Keys.accent] ?: "Moon",
-        sky = this[Keys.sky] ?: "Dusk",
-        speechLanguage = this[Keys.speechLanguage].orEmpty(),
-        model = readModel(Keys.chatsModel, null),
-        assistantModel = readModel(Keys.assistantModel, ReasoningEffort.Low),
-        voices = readVoices(),
-        sttEngine = this[Keys.sttEngine]?.let { runCatching { SttEngine.valueOf(it) }.getOrNull() } ?: SttEngine.Orukeet,
-        speechPauseMs = this[Keys.speechPauseMs]?.coerceIn(Endpointer.END_SILENCE_RANGE_MS) ?: Endpointer.DEFAULT_END_SILENCE_MS,
-        phoneControl = this[Keys.phoneControl] ?: false,
-        phoneToken = this[Keys.phoneToken]?.let(SecretBox::decrypt).orEmpty(),
-        richReplies = this[Keys.richReplies] ?: true,
-        uploadUrl = this[Keys.uploadUrl].orEmpty(),
-    )
+    // The default preset keeps the original preference keys so existing installations keep their connection.
+    private class ProfileKeys(harness: Harness) {
+        private val prefix = if (harness == Harness.Default) "" else "${harness.name}_"
+        val url = stringPreferencesKey("${prefix}server_url")
+        val key = stringPreferencesKey("${prefix}api_key_enc")
+        val assistant = stringPreferencesKey("${prefix}assistant_name")
+        val upload = stringPreferencesKey("${prefix}upload_url")
+    }
+
+    private fun Preferences.connection(harness: Harness): HarnessConnection {
+        val keys = ProfileKeys(harness)
+        return HarnessConnection(
+            this[keys.url].orEmpty(),
+            this[keys.key]?.let(SecretBox::decrypt).orEmpty(),
+            this[keys.assistant]?.takeIf { it.isNotBlank() && it != "aight" } ?: harness.defaultAssistantName,
+        )
+    }
+
+    private fun Preferences.toSettings(): AppSettings {
+        val harness = Harness.fromName(this[Keys.harness])
+        val active = connection(harness)
+        return AppSettings(
+            harness = harness,
+            otherConnections = Harness.entries.filter { it != harness && this[ProfileKeys(it).url] != null }.associateWith { connection(it) },
+            serverUrl = active.url,
+            apiKey = active.key,
+            userName = this[Keys.userName].orEmpty(),
+            assistantName = active.assistant,
+            listenOnInvoke = this[Keys.listenOnInvoke] ?: true,
+            wakeWord = this[Keys.wakeWord] ?: false,
+            wakePhrase = this[Keys.wakePhrase]?.takeIf { it.isNotBlank() } ?: WakePhrase.DEFAULT,
+            speakReplies = this[Keys.speakReplies] ?: true,
+            showAllChannels = this[Keys.showAllChannels] ?: false,
+            reduceTransparency = this[Keys.reduceTransparency] ?: false,
+            accent = this[Keys.accent] ?: "Moon",
+            sky = this[Keys.sky] ?: "Dusk",
+            speechLanguage = this[Keys.speechLanguage].orEmpty(),
+            model = readModel(Keys.chatsModel, null),
+            assistantModel = readModel(Keys.assistantModel, ReasoningEffort.Low),
+            voices = readVoices(),
+            sttEngine = this[Keys.sttEngine]?.let { runCatching { SttEngine.valueOf(it) }.getOrNull() } ?: SttEngine.Orukeet,
+            speechPauseMs = this[Keys.speechPauseMs]?.coerceIn(Endpointer.END_SILENCE_RANGE_MS) ?: Endpointer.DEFAULT_END_SILENCE_MS,
+            phoneControl = this[Keys.phoneControl] ?: false,
+            phoneToken = this[Keys.phoneToken]?.let(SecretBox::decrypt).orEmpty(),
+            richReplies = this[Keys.richReplies] ?: true,
+            uploadUrl = this[ProfileKeys(harness).upload].orEmpty(),
+        )
+    }
 
     /**
      * Saves everything from the setup form in one edit. Saving the connection flips the app out of
      * setup mode, which disposes the form's coroutine scope, so separate writes after it would be lost.
      */
-    suspend fun saveSetup(serverUrl: String, apiKey: String, userName: String, assistantName: String, speechLanguage: String) {
+    suspend fun saveSetup(serverUrl: String, apiKey: String, userName: String, assistantName: String, speechLanguage: String, harness: Harness) {
         context.dataStore.edit {
-            it[Keys.userName] = userName.trim()
-            it[Keys.assistantName] = assistantName.trim()
-            it[Keys.speechLanguage] = speechLanguage.trim()
             val url = HermesApi.normalizeBaseUrl(serverUrl)
-            if (it[Keys.serverUrl] != url) {
+            val previous = Harness.fromName(it[Keys.harness])
+            val keys = ProfileKeys(harness)
+            if (it[keys.url] != url) it.remove(keys.upload)
+            it[Keys.harness] = harness.name
+            it[Keys.userName] = userName.trim()
+            it[keys.assistant] = assistantName.trim()
+            it[Keys.speechLanguage] = speechLanguage.trim()
+            if (previous != harness || it[keys.url] != url) {
                 // Models picked on another server may not exist on this one, nor their thinking level or fast mode.
                 ModelProfile.entries.forEach { profile -> it.clearModel(keysFor(profile)) }
             }
-            it[Keys.serverUrl] = url
-            it[Keys.apiKey] = SecretBox.encrypt(apiKey.trim())
+            it[keys.url] = url
+            it[keys.key] = SecretBox.encrypt(apiKey.trim())
         }
     }
 
@@ -164,6 +190,7 @@ class SettingsRepository(private val context: Context) {
         remove(keys.id)
         remove(keys.label)
         remove(keys.effort)
+        remove(keys.serviceTier)
         remove(keys.fast)
         remove(keys.legacyReasoning)
     }
@@ -193,7 +220,8 @@ class SettingsRepository(private val context: Context) {
     suspend fun setRichReplies(value: Boolean) = context.dataStore.edit { it[Keys.richReplies] = value }
     suspend fun setUploadUrl(value: String) = context.dataStore.edit {
         val url = value.trim()
-        if (url.isEmpty()) it.remove(Keys.uploadUrl) else it[Keys.uploadUrl] = HermesApi.normalizeBaseUrl(url)
+        val upload = ProfileKeys(Harness.fromName(it[Keys.harness])).upload
+        if (url.isEmpty()) it.remove(upload) else it[upload] = HermesApi.normalizeBaseUrl(url)
     }
 
     suspend fun setPhoneControl(enabled: Boolean) = context.dataStore.edit {
@@ -216,7 +244,8 @@ class SettingsRepository(private val context: Context) {
             put(keys.id, choice.model)
             put(keys.label, choice.label)
             prefs[keys.effort] = choice.effort?.wire ?: HERMES_EFFORT
-            prefs[keys.fast] = choice.fast
+            prefs.remove(keys.fast)
+            put(keys.serviceTier, choice.serviceTier)
             prefs.remove(keys.legacyReasoning)
         }
     }

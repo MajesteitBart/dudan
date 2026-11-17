@@ -3,14 +3,12 @@ package nl.bartvandermeeren.dudan.data
 import nl.bartvandermeeren.dudan.voice.Endpointer
 import nl.bartvandermeeren.dudan.voice.WakePhrase
 
-/**
- * Hermes' `reasoning_effort` levels the picker offers, weakest first. A level the model doesn't
- * support is lowered by Hermes to the nearest one below it, or to the model's weakest level.
- */
+/** Reasoning efforts understood by the model picker and the runs API. */
 enum class ReasoningEffort(val wire: String) {
-    Off("none"), Low("low"), Medium("medium"), High("high"), ExtraHigh("xhigh"), Max("max");
+    Off("none"), Minimal("minimal"), Low("low"), Medium("medium"), High("high"), ExtraHigh("xhigh"), Max("max"), Ultra("ultra");
 
     companion object {
+        val legacy = listOf(Off, Low, Medium, High, ExtraHigh, Max)
         fun fromWire(value: String?): ReasoningEffort? = entries.firstOrNull { it.wire == value }
     }
 }
@@ -40,9 +38,24 @@ data class ModelChoice(
     val label: String? = null,
     /** Null leaves the effort to Hermes' own setting. */
     val effort: ReasoningEffort? = null,
-    /** Priority processing (Hermes' `fast` option). The picker only offers it for models that report it. */
-    val fast: Boolean = false,
+    /** Provider service tier ID. Null selects standard processing. */
+    val serviceTier: String? = null,
 )
+
+/** Both harnesses expose the Runs API. The assistant name identifies the agent inside the harness. */
+enum class Harness(val defaultUrl: String, val exampleUrl: String = defaultUrl) {
+    Booper("http://100.91.52.84:8652"),
+    Hermes("", "http://my-server:8642");
+
+    val defaultAssistantName: String get() = if (this == Booper) AppSettings.DEFAULT_ASSISTANT_NAME else name
+
+    companion object {
+        val Default = Booper
+        fun fromName(name: String?) = entries.find { it.name == name } ?: Default
+    }
+}
+
+data class HarnessConnection(val url: String, val key: String, val assistant: String)
 
 data class AppSettings(
     val serverUrl: String = "",
@@ -77,14 +90,21 @@ data class AppSettings(
     val phoneToken: String = "",
     /** Ask Hermes for OpenUI blocks (tables, charts, forms) in replies; see openui/OpenUiPrompt. */
     val richReplies: Boolean = true,
-    /** The upload service for attachments; empty means the Hermes host on port 8645. */
+    /** The upload service for attachments; empty uses the built-in Booper endpoint or the Hermes sidecar. */
     val uploadUrl: String = "",
+    val harness: Harness = Harness.Default,
+    val otherConnections: Map<Harness, HarnessConnection> = emptyMap(),
 ) {
+    fun connectionFor(selected: Harness): HarnessConnection {
+        if (selected == harness) return HarnessConnection(serverUrl.ifBlank { selected.defaultUrl }, apiKey, assistantName)
+        return otherConnections[selected] ?: HarnessConnection(selected.defaultUrl, "", selected.defaultAssistantName)
+    }
+
     val isConfigured: Boolean get() = serverUrl.isNotBlank() && apiKey.isNotBlank()
     val server: HermesApi.ServerConfig get() = HermesApi.ServerConfig(serverUrl, apiKey)
 
-    /** The upload service runs next to Hermes and takes the same API key. */
-    val uploads: UploadClient.Config get() = UploadClient.Config(UploadClient.baseUrlFor(serverUrl, uploadUrl), apiKey)
+    /** Uploads take the active connection’s API key. */
+    val uploads: UploadClient.Config get() = UploadClient.Config(UploadClient.baseUrlFor(serverUrl, uploadUrl, harness), apiKey)
 
     fun modelFor(profile: ModelProfile): ModelChoice = when (profile) {
         ModelProfile.Chats -> model
@@ -92,6 +112,6 @@ data class AppSettings(
     }
 
     companion object {
-        const val DEFAULT_ASSISTANT_NAME = "dudan"
+        const val DEFAULT_ASSISTANT_NAME = "Clark"
     }
 }

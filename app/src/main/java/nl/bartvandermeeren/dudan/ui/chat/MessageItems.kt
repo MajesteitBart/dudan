@@ -94,6 +94,7 @@ import nl.bartvandermeeren.dudan.ui.components.pane
 import nl.bartvandermeeren.dudan.ui.components.rememberImageBitmap
 import nl.bartvandermeeren.dudan.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import nl.bartvandermeeren.dudan.voice.SpeechText
 
@@ -207,13 +208,13 @@ fun AssistantMessageItem(
                         message.stopping -> R.string.status_stopping
                         message.reconnecting -> R.string.status_reconnecting
                         else -> R.string.status_thinking
-                    },
+                    }, LocalHarness.current.name,
                 ),
             )
         }
         if (hasWork) WorkPanel(message)
         if (message.isStreaming && message.reconnecting && hasWork) {
-            Text(stringResource(R.string.status_reconnecting), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+            Text(stringResource(R.string.status_reconnecting, LocalHarness.current.name), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
         }
         message.approval?.let { ApprovalCard(it, onApproval) }
         if (message.text.isNotBlank()) {

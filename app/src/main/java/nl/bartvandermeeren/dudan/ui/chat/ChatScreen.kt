@@ -92,6 +92,7 @@ import nl.bartvandermeeren.dudan.ui.components.pane
 import nl.bartvandermeeren.dudan.ui.openui.LocalOpenUiHost
 import nl.bartvandermeeren.dudan.ui.openui.OpenUiHost
 import nl.bartvandermeeren.dudan.ui.openui.openExternalUrl
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 
 /** Callbacks the activity provides because they need permissions or activity result launchers. */
@@ -148,7 +149,7 @@ fun ChatPane(
     val activeModel = settings.modelFor(profile)
     val modelTitle = activeModel.label?.takeIf { it != activeModel.model }
         ?: (activeModel.model ?: catalog?.currentModel)?.let(::prettyModelName)
-        ?: stringResource(R.string.model_default)
+        ?: stringResource(R.string.model_default, LocalHarness.current.name)
     val modelSubtitle = modelModeLabel(activeModel)
 
     Column(modifier.fillMaxSize()) {
@@ -483,7 +484,7 @@ private fun ConversationMenu(vm: MainViewModel, session: nl.bartvandermeeren.dud
         GlassDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text(stringResource(R.string.delete_chat_title)) },
-            text = { Text(stringResource(R.string.delete_chat_body, session?.displayTitle.orEmpty())) },
+            text = { Text(stringResource(R.string.delete_chat_body, session?.displayTitle.orEmpty(), LocalHarness.current.name)) },
             confirmButton = {
                 TextButton(onClick = {
                     confirmDelete = false

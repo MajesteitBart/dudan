@@ -15,6 +15,8 @@ import kotlinx.coroutines.withContext
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import nl.bartvandermeeren.dudan.data.AppSettings
+import nl.bartvandermeeren.dudan.data.Harness
+import nl.bartvandermeeren.dudan.data.HarnessConnection
 import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.data.ModelChoice
 import nl.bartvandermeeren.dudan.data.ModelProfile
@@ -61,11 +63,17 @@ class DesktopSettings(val dir: File = defaultDir()) {
         val label: String? = null,
         /** Hermes' wire name, "default" to leave it to Hermes, or null for the profile's default. */
         val effort: String? = null,
-        val fast: Boolean = false,
+        val fast: Boolean = false, // Older settings stored priority as a switch.
+        val serviceTier: String? = null,
     )
 
     @Serializable
+    private data class StoredConnection(val url: String, val encryptedKey: String, val assistant: String)
+
+    @Serializable
     private data class Stored(
+        val harness: String = Harness.Default.name,
+        val otherConnections: Map<String, StoredConnection> = emptyMap(),
         val serverUrl: String = "",
         /** DPAPI-encrypted, Base64. */
         val apiKey: String = "",
@@ -122,21 +130,29 @@ class DesktopSettings(val dir: File = defaultDir()) {
     }
 
     /** Saves the setup form in one go. Models picked on another server may not exist on this one. */
-    suspend fun saveSetup(serverUrl: String, apiKey: String, userName: String, assistantName: String) = edit {
+    suspend fun saveSetup(serverUrl: String, apiKey: String, userName: String, assistantName: String, harness: Harness = Harness.Default) = edit {
         val url = HermesApi.normalizeBaseUrl(serverUrl)
-        val sameServer = url == it.serverUrl
+        val previous = Harness.fromName(it.harness)
+        val sameServer = previous == harness && url == it.serverUrl
+        val others = it.otherConnections.toMutableMap()
+        if (previous != harness && it.serverUrl.isNotBlank()) {
+            others[previous.name] = StoredConnection(it.serverUrl, it.apiKey, it.assistantName)
+        }
+        others.remove(harness.name)
         it.copy(
             serverUrl = url,
+            harness = harness.name,
+            otherConnections = others,
             apiKey = protect(apiKey.trim()),
             userName = userName.trim(),
-            assistantName = assistantName.trim().ifBlank { AppSettings.DEFAULT_ASSISTANT_NAME },
+            assistantName = assistantName.trim().ifBlank { harness.defaultAssistantName },
             model = if (sameServer) it.model else StoredModel(),
             assistantModel = if (sameServer) it.assistantModel else StoredModel(),
         )
     }
 
     suspend fun setModel(profile: ModelProfile, choice: ModelChoice) = edit {
-        val stored = StoredModel(choice.provider, choice.model, choice.label, choice.effort?.wire ?: HERMES_EFFORT, choice.fast)
+        val stored = StoredModel(choice.provider, choice.model, choice.label, choice.effort?.wire ?: HERMES_EFFORT, serviceTier = choice.serviceTier)
         when (profile) {
             ModelProfile.Chats -> it.copy(model = stored)
             ModelProfile.Assistant -> it.copy(assistantModel = stored)
@@ -170,6 +186,10 @@ class DesktopSettings(val dir: File = defaultDir()) {
 
     private fun Stored.toSettings() = AppSettings(
         serverUrl = serverUrl,
+        harness = Harness.fromName(harness),
+        otherConnections = Harness.entries.mapNotNull { preset ->
+            otherConnections[preset.name]?.let { preset to HarnessConnection(it.url, unprotect(it.encryptedKey), it.assistant) }
+        }.toMap(),
         apiKey = unprotect(apiKey),
         userName = userName,
         assistantName = assistantName.ifBlank { AppSettings.DEFAULT_ASSISTANT_NAME },
@@ -207,7 +227,7 @@ class DesktopSettings(val dir: File = defaultDir()) {
             null -> defaultEffort
             else -> ReasoningEffort.fromWire(effort) ?: defaultEffort
         },
-        fast = fast,
+        serviceTier = serviceTier ?: "priority".takeIf { fast },
     )
 
     companion object {

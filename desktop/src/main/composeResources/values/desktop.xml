@@ -87,7 +87,7 @@
     <string name="desktop_voice_try_again">Try again</string>
     <string name="desktop_voice_cancel">Stop download</string>
     <string name="desktop_setup_key_note">The key is encrypted and stays on this PC.</string>
-    <string name="desktop_setup_help">Setting up Hermes for dudan</string>
+    <string name="desktop_setup_help">Setting up %1$s for dudan</string>
     <string name="desktop_show_key">Show key</string>
     <string name="desktop_hide_key">Hide key</string>
     <string name="desktop_show_in_folder">Show in folder</string>

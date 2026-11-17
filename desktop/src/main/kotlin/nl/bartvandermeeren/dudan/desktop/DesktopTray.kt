@@ -153,7 +153,7 @@ fun TrayMenuWindow(at: Point, vm: MainViewModel, onOpen: () -> Unit, onQuickAsk:
             window.requestFocus()
             onDispose { window.removeWindowFocusListener(focus) }
         }
-        DudanTheme(settings.reduceTransparency, Accent.from(settings.accent), Sky.from(settings.sky), prefs.textScale) {
+        DudanTheme(settings.reduceTransparency, Accent.from(settings.accent), Sky.from(settings.sky), prefs.textScale, settings.harness) {
             Box(Modifier.fillMaxSize().padding(MenuMargin), contentAlignment = Alignment.BottomCenter) {
                 TrayMenu(
                     quickKeys = prefs.shortcut(ShortcutAction.QuickAsk)?.label(),

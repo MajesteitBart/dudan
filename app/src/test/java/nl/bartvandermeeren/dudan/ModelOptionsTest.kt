@@ -28,6 +28,21 @@ class ModelOptionsTest {
     )
 
     @Test
+    fun modelSpecificOptionsSurviveOnlyOnModelsThatOfferThem() {
+        val discovered = ModelCatalogParser.parse(HermesJson.parseToJsonElement("""
+            {"current_provider":"clark","current_model":"sol","providers":[{"slug":"clark","models":["sol","astra"],
+             "capabilities":{"sol":{"reasoning_levels":["low","ultra"],"service_tiers":[{"id":"ultrafast","name":"Ultrafast","description":"Higher usage"}]},
+                             "astra":{"reasoning":true,"fast":true,"reasoning_levels":["low"],"service_tiers":[]}}}]}
+        """) as JsonObject)
+        val choice = ModelChoice(effort = ReasoningEffort.Ultra, serviceTier = "ultrafast")
+        val model = discovered.optionFor(choice)!!
+        assertEquals(listOf(ReasoningEffort.Low, ReasoningEffort.Ultra), model.efforts)
+        assertEquals("Higher usage", model.tiers.single().description)
+        assertEquals(choice, discovered.supported(choice))
+        assertEquals(ModelChoice(model = "astra"), discovered.supported(choice.copy(model = "astra")))
+    }
+
+    @Test
     fun readsWhatEachModelTakes() {
         val astra = catalog.options.single { it.model == "gpt-6-astra" }
         assertEquals(true to true, astra.reasoning to astra.fast)
@@ -49,14 +64,14 @@ class ModelOptionsTest {
 
     @Test
     fun dropsWhatTheModelDoesNotTake() {
-        val wants = ModelChoice(effort = ReasoningEffort.High, fast = true)
+        val wants = ModelChoice(effort = ReasoningEffort.High, serviceTier = "priority")
         // gpt-4o has no thinking level; Codex Spark has no fast mode.
         assertEquals(wants.copy("openai-api", "gpt-4o", effort = null), catalog.supported(wants.copy("openai-api", "gpt-4o")))
-        assertEquals(wants.copy("openai-codex", "gpt-5.3-codex-spark", fast = false), catalog.supported(wants.copy("openai-codex", "gpt-5.3-codex-spark")))
+        assertEquals(wants.copy("openai-codex", "gpt-5.3-codex-spark", serviceTier = null), catalog.supported(wants.copy("openai-codex", "gpt-5.3-codex-spark")))
         // The server default (gpt-6-astra) takes both.
         assertEquals(wants, catalog.supported(wants))
         // Hermes doesn't say for hermes-4-405b: keep the level, but only offer fast mode where it's reported.
-        assertEquals(wants.copy("nous", "hermes-4-405b", fast = false), catalog.supported(wants.copy("nous", "hermes-4-405b")))
+        assertEquals(wants.copy("nous", "hermes-4-405b", serviceTier = null), catalog.supported(wants.copy("nous", "hermes-4-405b")))
         // A model the catalog doesn't list stays as it is.
         assertEquals(wants.copy("other", "x"), catalog.supported(wants.copy("other", "x")))
     }

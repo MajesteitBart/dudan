@@ -12,7 +12,7 @@ import kotlinx.coroutines.sync.withLock
 import nl.bartvandermeeren.dudan.chat.userMessage
 
 /** Hermes' skills, loaded once per server and shared by the `$` list, the Skills screen and the chat engine. */
-class SkillCatalog(private val api: HermesApi, private val scope: CoroutineScope) {
+class SkillCatalog(private val api: HermesApi, private val scope: CoroutineScope, private val harness: () -> Harness = { Harness.Default }) {
     /**
      * [skills] is null until the first list arrives; a failed reload keeps the last one. [error] and
      * [errorStatus] say why the last load failed. [readsSkills] is true when the server can send one
@@ -52,7 +52,7 @@ class SkillCatalog(private val api: HermesApi, private val scope: CoroutineScope
      * Stock Hermes answers the list with a 500 every time (see docs/setup.md#skills), so after one, a `$`
      * in a message doesn't wait for another try. Other failures, such as a server out of reach, do retry.
      */
-    private val broken: Boolean get() = _state.value.let { it.skills == null && it.errorStatus == 500 }
+    private val broken: Boolean get() = _state.value.let { harness() == Harness.Hermes && it.skills == null && it.errorStatus == 500 }
 
     /** Forgets the list; call when the server changes. */
     fun reset() {
@@ -78,7 +78,7 @@ class SkillCatalog(private val api: HermesApi, private val scope: CoroutineScope
             throw e
         } catch (e: Exception) {
             val status = (e as? HermesApi.HermesException)?.status
-            if (started == generation) _state.update { it.copy(error = e.userMessage(), errorStatus = status) }
+            if (started == generation) _state.update { it.copy(error = e.userMessage(harness()), errorStatus = status) }
             null
         }
     }

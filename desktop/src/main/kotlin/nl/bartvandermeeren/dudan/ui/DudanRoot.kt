@@ -47,7 +47,7 @@ import org.jetbrains.compose.resources.getString
 fun DudanSurface(vm: MainViewModel, overlay: OverlayHost, glow: Boolean, dim: Boolean, content: @Composable () -> Unit) {
     val settings by vm.settings.collectAsState()
     val prefs by vm.prefs.collectAsState()
-    DudanTheme(settings.reduceTransparency, Accent.from(settings.accent), Sky.from(settings.sky), prefs.textScale) {
+    DudanTheme(settings.reduceTransparency, Accent.from(settings.accent), Sky.from(settings.sky), prefs.textScale, settings.harness) {
         val haze = rememberHazeState()
         Box(Modifier.fillMaxSize()) {
             GlassBackdrop(Modifier.hazeSource(haze), glow = glow, dim = dim)

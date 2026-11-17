@@ -463,10 +463,10 @@ data class RunStatus(
         }
 }
 
-/**
- * One model the user can pick, flattened from Hermes' /api/model/options payload. [reasoning] and
- * [fast] say whether it takes a thinking level and priority processing; null when Hermes doesn't say.
- */
+/** An optional service tier advertised by the provider. Standard processing has no tier ID. */
+data class ServiceTier(val id: String, val name: String, val description: String? = null)
+
+/** Per-model capabilities, including compatibility with servers that expose only boolean flags. */
 data class ModelOption(
     val provider: String,
     val providerName: String,
@@ -475,7 +475,13 @@ data class ModelOption(
     val isCurrent: Boolean,
     val reasoning: Boolean? = null,
     val fast: Boolean? = null,
-)
+    val reasoningLevels: List<ReasoningEffort>? = null,
+    val serviceTiers: List<ServiceTier>? = null,
+    val effortDescriptions: Map<String, String> = emptyMap(),
+) {
+    val efforts get() = reasoningLevels ?: if (reasoning == false) emptyList() else ReasoningEffort.legacy
+    val tiers get() = serviceTiers ?: if (fast == true) listOf(ServiceTier("priority", "Fast")) else emptyList()
+}
 
 data class ModelCatalog(val currentProvider: String?, val currentModel: String?, val options: List<ModelOption>) {
     /** The model [choice] runs on: the one it names, or the server default when it names none. */
@@ -487,8 +493,8 @@ data class ModelCatalog(val currentProvider: String?, val currentModel: String?,
     fun supported(choice: ModelChoice): ModelChoice {
         val option = optionFor(choice) ?: return choice
         return choice.copy(
-            effort = choice.effort.takeIf { option.reasoning != false },
-            fast = choice.fast && option.fast == true,
+            effort = choice.effort?.takeIf { it in option.efforts },
+            serviceTier = choice.serviceTier?.takeIf { id -> option.tiers.any { it.id == id } },
         )
     }
 }

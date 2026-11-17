@@ -65,6 +65,7 @@ import nl.bartvandermeeren.dudan.ui.components.glass
 import nl.bartvandermeeren.dudan.ui.components.outlined
 import nl.bartvandermeeren.dudan.ui.theme.Accent
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import nl.bartvandermeeren.dudan.ui.theme.Sky
 import org.jetbrains.compose.resources.stringResource
@@ -132,7 +133,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, onBack: () -> Unit,
             ShortcutsSection(vm, settings, shortcutTaken)
 
             Section(stringResource(Res.string.section_history)) {
-                Toggle(stringResource(Res.string.show_all_channels), stringResource(Res.string.show_all_channels_detail), settings.showAllChannels) { on ->
+                Toggle(stringResource(Res.string.show_all_channels), stringResource(Res.string.show_all_channels_detail, LocalHarness.current.name), settings.showAllChannels) { on ->
                     scope.launch {
                         vm.store.setShowAllChannels(on)
                         vm.refreshSessions()
@@ -155,9 +156,9 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
     val name = choice.label?.takeIf { it != choice.model }
         ?: choice.model?.let(::prettyModelName)
         ?: catalog?.currentModel?.let { stringResource(Res.string.model_server_default_named, prettyModelName(it)) }
-        ?: stringResource(Res.string.model_default)
+        ?: stringResource(Res.string.model_default, LocalHarness.current.name)
     val mode = modelModeLabel(choice)
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -166,20 +167,18 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
                 picking = true
             }
             .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(
-                stringResource(if (profile == ModelProfile.Chats) Res.string.profile_chats else Res.string.profile_assistant),
-                style = MaterialTheme.typography.bodyLarge,
-                color = Palette.TextPrimary,
-            )
-            Text(
-                stringResource(if (profile == ModelProfile.Chats) Res.string.profile_chats_detail else Res.string.desktop_profile_assistant_detail),
-                style = MaterialTheme.typography.bodySmall,
-                color = Palette.TextSecondary,
-            )
-        }
+        Text(
+            stringResource(if (profile == ModelProfile.Chats) Res.string.profile_chats else Res.string.profile_assistant),
+            style = MaterialTheme.typography.bodyLarge,
+            color = Palette.TextPrimary,
+        )
+        Text(
+            stringResource(if (profile == ModelProfile.Chats) Res.string.profile_chats_detail else Res.string.desktop_profile_assistant_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = Palette.TextSecondary,
+        )
         Text(if (mode.isEmpty()) name else "$name · $mode", style = MaterialTheme.typography.labelLarge, color = LocalAccent.current.soft)
     }
     if (picking) ModelPickerSheet(vm, settings, initialProfile = profile, onDismiss = { picking = false })

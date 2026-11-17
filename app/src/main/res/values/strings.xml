@@ -13,10 +13,10 @@
     <string name="search_hint">Search your chats</string>
     <string name="no_results">No chats match that.</string>
     <string name="skills">Skills</string>
-    <string name="skills_intro">Skills Hermes can use. Tap one to see what it does. Type $ in a message to use one.</string>
+    <string name="skills_intro">Skills %1$s can use. Tap one to see what it does. Type $ in a message to use one.</string>
     <string name="skill_use">Use in chat</string>
     <string name="skill_files">Files</string>
-    <string name="skills_hermes_bug">Hermes couldn\'t list its skills: it answered with error 500. That\'s a known bug in Hermes, and the fix is one line.</string>
+    <string name="skills_hermes_bug">%1$s couldn\'t list its skills: it answered with error 500. That\'s a known bug in %1$s, and the fix is one line.</string>
     <string name="skills_hermes_bug_fix">How to fix it</string>
     <string name="scheduled_tasks">Scheduled tasks</string>
     <string name="no_jobs">No scheduled tasks.</string>
@@ -105,7 +105,7 @@
     <string name="rename_chat">Rename chat</string>
     <string name="delete">Delete</string>
     <string name="delete_chat_title">Delete chat?</string>
-    <string name="delete_chat_body">This deletes \"%1$s\" from Hermes, including its history.</string>
+    <string name="delete_chat_body">This deletes \"%1$s\" from %2$s, including its history.</string>
     <string name="cancel">Cancel</string>
     <string name="save">Save</string>
 
@@ -139,7 +139,7 @@
 
     <!-- Agent work -->
     <string name="status_thinking">Thinking</string>
-    <string name="status_reconnecting">Connection dropped. Hermes keeps working; waiting for the result</string>
+    <string name="status_reconnecting">Connection dropped. %1$s keeps working; waiting for the result</string>
     <string name="status_stopped">Stopped</string>
     <string name="status_stopping">Stopping</string>
     <string name="image_prepare_failed">Couldn\'t read one of the images. Try attaching it again.</string>
@@ -176,15 +176,19 @@
 
     <!-- Models -->
     <string name="model_picker_title">Model</string>
-    <string name="model_default">Hermes</string>
+    <string name="model_default">%1$s</string>
     <string name="model_default_detail">Server default: %1$s</string>
     <string name="reasoning_title">Thinking level</string>
-    <string name="reasoning_default">Hermes default</string>
+    <string name="reasoning_default">%1$s default</string>
     <string name="effort_off">Off</string>
     <string name="effort_low">Low</string>
     <string name="effort_medium">Medium</string>
     <string name="effort_high">High</string>
     <string name="effort_xhigh">Extra high</string>
+    <string name="service_tier">Service tier</string>
+    <string name="tier_standard">Standard</string>
+    <string name="effort_minimal">Minimal</string>
+    <string name="effort_ultra">Ultra</string>
     <string name="effort_max">Max</string>
     <string name="fast_mode">Fast mode</string>
     <string name="fast_mode_detail">Priority processing: quicker replies, higher cost</string>
@@ -214,11 +218,11 @@
     <string name="notification_channel_replies">Replies</string>
     <string name="notification_channel_background">Background work</string>
     <string name="notification_channel_scheduled">Scheduled tasks</string>
-    <string name="assist_not_configured">dudan isn\'t connected to Hermes yet. Tap to set it up.</string>
+    <string name="assist_not_configured">dudan isn\'t connected to %1$s yet. Tap to set it up.</string>
 
     <!-- Settings -->
-    <string name="setup_title">Connect to Hermes</string>
-    <string name="setup_intro">Point dudan at your Hermes Agent API server. Over Tailscale, use the MagicDNS name, for example http://my-server:8642.</string>
+    <string name="setup_title">Connect to %1$s</string>
+    <string name="setup_intro">Connect dudan to the %1$s API server. Over Tailscale, use the server’s MagicDNS name.</string>
     <string name="section_connection">Connection</string>
     <string name="section_assistant">Assistant</string>
     <string name="section_history">History</string>
@@ -265,7 +269,8 @@
     <string name="voice_female">Female %1$d</string>
     <string name="voice_male">Male %1$d</string>
     <string name="server_url">Server URL</string>
-    <string name="api_key">API key (API_SERVER_KEY)</string>
+    <string name="harness">Harness</string>
+    <string name="api_key">API key</string>
     <string name="your_name">Your name</string>
     <string name="assistant_name">Assistant name</string>
     <string name="connect">Connect</string>
@@ -304,7 +309,7 @@
     <string name="speech_language">Speech language</string>
     <string name="speech_language_hint">Automatic, or e.g. nl-NL</string>
     <string name="show_all_channels">Show chats from all channels</string>
-    <string name="show_all_channels_detail">Include Telegram, CLI and other Hermes sessions in Recent</string>
+    <string name="show_all_channels_detail">Include Telegram, CLI and other %1$s sessions in Recent</string>
     <string name="accent_color">Accent color</string>
     <string name="accent_moon">Moon</string>
     <string name="accent_lavender">Lavender</string>
@@ -326,21 +331,21 @@
 
     <!-- Phone control -->
     <string name="section_phone_control">Phone control</string>
-    <string name="phone_control">Let Hermes use this phone</string>
-    <string name="phone_control_detail">Hermes can open apps and links, set timers and alarms, and control what\'s playing. It reaches the phone over Tailscale only, with a key of its own.</string>
-    <string name="phone_control_reachable">Hermes can reach this phone at %1$s</string>
-    <string name="phone_control_no_tailscale">Tailscale isn\'t connected on this phone, so Hermes can\'t reach it.</string>
+    <string name="phone_control">Let %1$s use this phone</string>
+    <string name="phone_control_detail">%1$s can open apps and links, set timers and alarms, and control what\'s playing. It reaches the phone over Tailscale only, with a key of its own.</string>
+    <string name="phone_control_reachable">%2$s can reach this phone at %1$s</string>
+    <string name="phone_control_no_tailscale">Tailscale isn\'t connected on this phone, so %1$s can\'t reach it.</string>
     <string name="phone_control_starting">Starting phone control…</string>
     <string name="phone_control_failed">Phone control didn\'t start: %1$s</string>
-    <string name="phone_control_background">Hermes can only open apps while dudan is on screen. Make dudan the default assistant above, or allow Display over other apps. Until then, the phone shows a notification to tap.</string>
+    <string name="phone_control_background">%1$s can only open apps while dudan is on screen. Make dudan the default assistant above, or allow Display over other apps. Until then, the phone shows a notification to tap.</string>
     <string name="phone_control_background_allow">Allow Display over other apps</string>
-    <string name="phone_control_copy">Copy Hermes setup</string>
-    <string name="phone_control_copied">Copied. Paste it on the Hermes host; each part says where it goes.</string>
+    <string name="phone_control_copy">Copy %1$s setup</string>
+    <string name="phone_control_copied">Copied. Paste it on the %1$s host; each part says where it goes.</string>
     <string name="phone_control_renew">New key</string>
-    <string name="phone_control_renewed">New key made. Copy the Hermes setup again; the old key no longer works.</string>
+    <string name="phone_control_renewed">New key made. Copy the %1$s setup again; the old key no longer works.</string>
     <string name="notification_channel_phone_control">Phone control</string>
-    <string name="notification_channel_phone_actions">Actions from Hermes</string>
-    <string name="phone_control_notification_title">Hermes can use this phone</string>
+    <string name="notification_channel_phone_actions">Actions from %1$s</string>
+    <string name="phone_control_notification_title">%1$s can use this phone</string>
     <string name="phone_control_notification_text">To open apps and links when you ask. Tap to change.</string>
     <string name="phone_action_title">%1$s wants to open something</string>
     <string name="phone_action_tap_to_open">Tap to open %1$s</string>
@@ -354,7 +359,7 @@
     <string name="file_too_large">%1$s is larger than %2$d MB.</string>
     <string name="upload_failed">Couldn\'t upload %1$s: %2$s</string>
     <string name="upload_rejected_key">The upload service rejected the API key.</string>
-    <string name="upload_unreachable">Can\'t reach the upload service on the Hermes host. See Settings, Replies and files.</string>
+    <string name="upload_unreachable">Can\'t reach the upload service on the %1$s host. See Settings, Replies and files.</string>
     <string name="upload_not_service">This address answers, but not as the dudan upload service. Check the upload URL.</string>
 
     <!-- Replies and files settings -->
@@ -362,7 +367,8 @@
     <string name="rich_replies">Rich replies</string>
     <string name="rich_replies_detail">Tables, charts, steps, forms and suggested follow-ups in replies, drawn with OpenUI</string>
     <string name="upload_server">Upload server</string>
-    <string name="upload_server_detail">Files up to 250 MB go to dudan\'s upload service on the Hermes host, and the agent reads them there. Leave this empty to use port 8645 when Hermes uses HTTP. If Hermes uses HTTPS, enter the upload service address.</string>
+    <string name="upload_builtin_detail">Files up to 250 MB go to the built-in %1$s upload service. Leave this empty to use the server URL from your connection.</string>
+    <string name="upload_server_detail">Files up to 250 MB go to dudan\'s upload service on the %1$s host, and the agent reads them there. Leave this empty to use port 8645 when %1$s uses HTTP. If %1$s uses HTTPS, enter the upload service address.</string>
     <string name="upload_check">Check the upload service</string>
     <string name="upload_checking">Checking…</string>
     <string name="upload_ok">The upload service answers.</string>

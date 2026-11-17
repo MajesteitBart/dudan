@@ -23,6 +23,7 @@ import kotlinx.coroutines.flow.asStateFlow
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.data.AppSettings
 import nl.bartvandermeeren.dudan.data.AppVisibility
+import nl.bartvandermeeren.dudan.data.Harness
 
 /**
  * Lets Hermes act on this phone: [PhoneControlService] serves [tools] over MCP while the setting is on,
@@ -108,7 +109,7 @@ class PhoneControl(private val context: Context, private val settings: StateFlow
         }
         val manager = context.getSystemService(NotificationManager::class.java)
         manager.createNotificationChannel(
-            NotificationChannel(ACTIONS_CHANNEL, context.getString(R.string.notification_channel_phone_actions), NotificationManager.IMPORTANCE_HIGH),
+            NotificationChannel(ACTIONS_CHANNEL, context.getString(R.string.notification_channel_phone_actions, settings.value.harness.name), NotificationManager.IMPORTANCE_HIGH),
         )
         val id = NOTIFY_ID_BASE + (what.hashCode() and 0xffff)
         val pending = PendingIntent.getActivity(context, id, intent, PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -128,7 +129,23 @@ class PhoneControl(private val context: Context, private val settings: StateFlow
      * What to set up on the Hermes host, with this phone's address and token filled in. Hermes reaches the
      * phone through tools/hermes-phone-bridge, which keeps the tools registered while the phone is away.
      */
-    fun hermesSetup(address: String?, token: String): String = """
+    fun setup(harness: Harness, address: String?, token: String): String = when (harness) {
+        Harness.Booper -> """
+            |# Set this variable in the Booper service environment:
+            |# DUDAN_PHONE_AUTHORIZATION=Bearer $token
+            |
+            |# Merge into booper.yaml and restart Booper:
+            |mcp:
+            |  servers:
+            |    phone:
+            |      url: http://${address ?: "<this phone's Tailscale IP>"}:$PORT/mcp
+            |      headersEnv: { Authorization: DUDAN_PHONE_AUTHORIZATION }
+            |      tools: ["*"]
+        """.trimMargin()
+        Harness.Hermes -> hermesSetup(address, token)
+    }
+
+    private fun hermesSetup(address: String?, token: String): String = """
         |# dudan phone control, on the Hermes host.
         |# 1. Copy tools/hermes-phone-bridge/dudan_phone_bridge.py from the dudan repo to ~/.hermes/
         |

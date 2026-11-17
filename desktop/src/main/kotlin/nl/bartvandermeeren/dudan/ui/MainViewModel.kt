@@ -95,7 +95,7 @@ class MainViewModel(val store: DesktopSettings, private val scope: CoroutineScop
     /** A client bound to unsaved credentials, for the connection test in setup. */
     fun apiFor(config: HermesApi.ServerConfig) = HermesApi(http) { config }
 
-    val skillCatalog = SkillCatalog(api, scope)
+    val skillCatalog = SkillCatalog(api, scope) { store.current().harness }
 
     val engine = ChatEngine(api, scope, skills = skillCatalog::skills, device = TurnOrigin.Device.Desktop) { store.current() }
 
@@ -401,7 +401,7 @@ class MainViewModel(val store: DesktopSettings, private val scope: CoroutineScop
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                modelCatalogError.value = e.userMessage()
+                modelCatalogError.value = e.userMessage(settings.value.harness)
             }
         }
     }

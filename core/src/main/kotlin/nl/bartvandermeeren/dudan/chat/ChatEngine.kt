@@ -27,6 +27,7 @@ import nl.bartvandermeeren.dudan.data.AgentEvent
 import nl.bartvandermeeren.dudan.data.ApprovalRequest
 import nl.bartvandermeeren.dudan.data.AttachmentNotes
 import nl.bartvandermeeren.dudan.data.FileRef
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.data.HermesMessage
 import nl.bartvandermeeren.dudan.data.ModelChoice
@@ -193,7 +194,8 @@ class ChatEngine(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                flow.update { it.copy(loading = false, loadError = e.userMessage()) }
+                val message = e.userMessage(currentSettings().harness)
+                flow.update { it.copy(loading = false, loadError = message) }
             }
         }
     }
@@ -281,7 +283,8 @@ class ChatEngine(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                flow.update { it.copy(reviewError = e.userMessage()) }
+                val message = e.userMessage(currentSettings().harness)
+                flow.update { it.copy(reviewError = message) }
             } finally {
                 flow.update { it.copy(reviewing = false) }
             }
@@ -384,7 +387,8 @@ class ChatEngine(
                 }
                 delay(1_500L * (attempt + 1))
             }
-            updateMessage(turn.sessionId, turn.messageId) { it.copy(stopping = false, error = "Couldn't reach Hermes to stop this run.") }
+            val harness = currentSettings().harness
+            updateMessage(turn.sessionId, turn.messageId) { it.copy(stopping = false, error = "Couldn't reach $harness to stop this run.") }
         }
     }
 
@@ -402,8 +406,9 @@ class ChatEngine(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
+                val error = e.userMessage(currentSettings().harness)
                 updateMessage(sessionId, message.id) { m ->
-                    if (m.approval?.sameRequest(request) == true) m.copy(approval = request, error = e.userMessage()) else m
+                    if (m.approval?.sameRequest(request) == true) m.copy(approval = request, error = error) else m
                 }
             }
         }
@@ -428,7 +433,8 @@ class ChatEngine(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _sessions.update { it.copy(loading = false, error = e.userMessage(), loadedOnce = true) }
+                val message = e.userMessage(currentSettings().harness)
+                _sessions.update { it.copy(loading = false, error = message, loadedOnce = true) }
             }
         }
     }
@@ -451,7 +457,8 @@ class ChatEngine(
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                _sessions.update { it.copy(error = e.userMessage()) }
+                val message = e.userMessage(currentSettings().harness)
+                _sessions.update { it.copy(error = message) }
             }
         }
     }
@@ -461,7 +468,8 @@ class ChatEngine(
         scope.launch {
             runCatching { api.updateSession(sessionId, title = title) }.onFailure { e ->
                 if (e is CancellationException) throw e
-                _sessions.update { it.copy(error = e.userMessage()) }
+                val message = e.userMessage(currentSettings().harness)
+                _sessions.update { it.copy(error = message) }
                 refreshSessions()
             }
         }
@@ -512,7 +520,7 @@ class ChatEngine(
                     if (event is AgentEvent.Finished || event is AgentEvent.Failed) sawTerminal = true
                     updateMessage(sessionId, turn.messageId) { TurnReducer.apply(it, event, System.currentTimeMillis()) }
                 }
-                if (!sawTerminal) recoverRun(turn, IOException("The connection to Hermes closed early."))
+                if (!sawTerminal) recoverRun(turn, IOException("The connection to ${settings.harness} closed early."))
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
@@ -706,7 +714,7 @@ class ChatEngine(
         val runId = turn.runId
         val authFailure = cause is HermesApi.HermesException && cause.status in setOf(401, 403)
         if (!turn.usesRuns || runId == null || authFailure) {
-            fail(turn, cause.userMessage())
+            fail(turn, cause.userMessage(currentSettings().harness))
             return
         }
         updateMessage(turn.sessionId, turn.messageId) { it.copy(reconnecting = true) }
@@ -735,7 +743,7 @@ class ChatEngine(
                 return
             }
         }
-        fail(turn, cause.userMessage())
+        fail(turn, cause.userMessage(currentSettings().harness))
     }
 
     /**
@@ -755,7 +763,7 @@ class ChatEngine(
                 TurnReducer.finish(it.copy(steps = answer.steps.ifEmpty { it.steps }, attachments = answer.attachments), RunOutcome.Completed, answer.text, null, System.currentTimeMillis())
             }
         } else {
-            fail(turn, "Lost track of this run. Reopen the chat to see whether Hermes finished it.")
+            fail(turn, "Lost track of this run. Reopen the chat to see whether ${currentSettings().harness} finished it.")
         }
     }
 
@@ -861,17 +869,17 @@ fun ApprovalRequest.sameRequest(other: ApprovalRequest): Boolean =
     if (requestId != null || other.requestId != null) requestId == other.requestId
     else runId == other.runId && command == other.command
 
-fun Throwable.userMessage(): String = when (this) {
+fun Throwable.userMessage(harness: Harness): String = when (this) {
     is HermesApi.HermesException -> when {
-        status == 401 || status == 403 -> "Hermes rejected the API key ($status)."
-        status == 404 -> message.ifBlank { "Not found on the Hermes server." }
+        status == 401 || status == 403 -> "$harness rejected the API key ($status)."
+        status == 404 -> message.ifBlank { "Not found on the $harness server." }
         code == "idempotency_key_conflict" -> "These results were already reviewed from another device."
-        status == 429 -> "Hermes is busy with too many runs. Try again in a moment."
+        status == 429 -> "$harness is busy with too many runs. Try again in a moment."
         status == 0 -> message
-        else -> "Hermes error $status: $message"
+        else -> "$harness error $status: $message"
     }
-    is java.net.UnknownHostException -> "Can't find the Hermes server. Is Tailscale connected?"
-    is java.net.ConnectException -> "Can't reach the Hermes server. Is the API server running?"
-    is java.net.SocketTimeoutException -> "The Hermes server stopped responding."
+    is java.net.UnknownHostException -> "Can't find the $harness server. Is Tailscale connected?"
+    is java.net.ConnectException -> "Can't reach the $harness server. Is the API server running?"
+    is java.net.SocketTimeoutException -> "The $harness server stopped responding."
     else -> message ?: toString()
 }

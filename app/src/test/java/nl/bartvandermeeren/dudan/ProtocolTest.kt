@@ -1,5 +1,7 @@
 package nl.bartvandermeeren.dudan
 
+import nl.bartvandermeeren.dudan.data.Harness
+import nl.bartvandermeeren.dudan.chat.userMessage
 import kotlinx.coroutines.flow.toList
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.JsonPrimitive
@@ -201,6 +203,21 @@ class HistoryMapperTest {
 
 class HermesApiTest {
     @Test
+    fun sendsTheExactProviderEffortAndTier() = runBlocking {
+        val server = MockWebServer()
+        server.enqueue(MockResponse().setResponseCode(202).setBody("""{"run_id":"run_tier"}"""))
+        server.start()
+        try {
+            val api = HermesApi(OkHttpClient()) { HermesApi.ServerConfig(server.url("/").toString(), "test") }
+            api.startRun("dudan_test", "Hello", ModelChoice(effort = ReasoningEffort.Ultra, serviceTier = "ultrafast"))
+            val body = HermesJson.parseToJsonElement(server.takeRequest().body.readUtf8()) as kotlinx.serialization.json.JsonObject
+            assertEquals("""{"reasoning_effort":"ultra","service_tier":"ultrafast"}""", body["model_options"].toString())
+        } finally {
+            server.shutdown()
+        }
+    }
+
+    @Test
     fun startsRunAndStreamsEvents() = runBlocking {
         val server = MockWebServer()
         server.enqueue(MockResponse().setResponseCode(202).setBody("""{"run_id":"run_1","status":"started"}"""))
@@ -214,7 +231,7 @@ class HermesApiTest {
         )
         server.start()
         val api = HermesApi(OkHttpClient()) { HermesApi.ServerConfig(server.url("/").toString(), "secret-key") }
-        val runId = api.startRun("dudan_1", "Hallo", ModelChoice(provider = "openrouter", model = "x/y", effort = ReasoningEffort.High, fast = true))
+        val runId = api.startRun("dudan_1", "Hallo", ModelChoice(provider = "openrouter", model = "x/y", effort = ReasoningEffort.High, serviceTier = "priority"))
         assertEquals("run_1", runId)
         val start = server.takeRequest()
         assertEquals("/v1/runs", start.path)
@@ -253,6 +270,13 @@ class HermesApiTest {
 }
 
 class SmallHelpersTest {
+    @Test
+    fun connectionErrorsNameTheSelectedHarness() {
+        for (harness in Harness.entries) {
+            assertEquals("Can't reach the ${harness.name} server. Is the API server running?", java.net.ConnectException().userMessage(harness))
+        }
+    }
+
     @Test
     fun prettyModelNames() {
         assertEquals("Opus 4.6", prettyModelName("anthropic/claude-opus-4.6"))

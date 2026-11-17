@@ -1,6 +1,14 @@
-# Connect dudan to Hermes
+# Connect dudan to your agent
 
 [Back to dudan](../README.md) | [Documentation](README.md)
+
+## Booper side
+
+Select **Booper** under **Connection → Harness**. The default connection is Clark on `http://100.91.52.84:8652`. On another Booper host, use the address and port configured for `channels.dudan` in `booper.yaml`. Enable that channel and enter its token as the API key in dudan. Tap **Connect** during setup or **Save and test** in Settings. Both the phone and Windows app remember the verified connection for each harness.
+
+File uploads use the same URL and token as chat unless you enter a separate upload URL.
+
+For phone control, **Copy Booper setup** supplies the MCP server entry for `booper.yaml` and the environment variable with the phone’s bearer token. Restart Booper after applying both.
 
 ## Hermes side
 
@@ -23,7 +31,7 @@ For the Skills screen and `$` tags, stock Hermes needs a one-line fix; see [Skil
 ## Phone setup
 
 1. Install the APK. On the phone, download it from the [latest release](https://github.com/MajesteitBart/dudan/releases/latest) and open it. For a build of your own, `node tools/serve-apk.mjs <tailscale-ip> 8787` on the build PC serves everything in `artifacts/`, so the phone can open `http://<tailscale-ip>:8787/` and download it. Taildrop works too.
-2. Enter the server URL (`http://my-server:8642`), the API key, your name and the assistant's name, then tap Connect.
+2. Select the harness and enter its server URL, the API key, your name and the assistant's name, then tap Connect.
 3. Make dudan the assistant: Settings > Apps > Choose default apps > Digital assistant app > Device assistance app > dudan. The in-app Settings screen has a shortcut and shows whether it worked.
 4. On Samsung, set Settings > Advanced features > Side button > Press and hold to "Digital assistant".
 5. For "Ask about screen", enable "Use screenshot" in the same Digital assistant settings.

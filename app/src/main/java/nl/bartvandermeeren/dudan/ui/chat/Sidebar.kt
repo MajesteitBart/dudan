@@ -79,6 +79,7 @@ import nl.bartvandermeeren.dudan.ui.components.PlainIconButton
 import nl.bartvandermeeren.dudan.ui.components.glass
 import nl.bartvandermeeren.dudan.ui.components.pane
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 
 enum class SidebarMode { Docked, Overlay }
@@ -292,7 +293,7 @@ private fun SessionItem(
         GlassDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text(stringResource(R.string.delete_chat_title)) },
-            text = { Text(stringResource(R.string.delete_chat_body, session.displayTitle)) },
+            text = { Text(stringResource(R.string.delete_chat_body, session.displayTitle, LocalHarness.current.name)) },
             confirmButton = { TextButton(onClick = { confirmDelete = false; onDelete() }) { Text(stringResource(R.string.delete)) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(R.string.cancel)) } },
         )

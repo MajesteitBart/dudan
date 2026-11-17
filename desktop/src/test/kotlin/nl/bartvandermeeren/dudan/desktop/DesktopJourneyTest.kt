@@ -14,6 +14,7 @@ import androidx.compose.ui.test.performKeyInput
 import androidx.compose.ui.test.performMouseInput
 import androidx.compose.ui.test.performScrollTo
 import androidx.compose.ui.test.performTextInput
+import androidx.compose.ui.test.performTextReplacement
 import androidx.compose.ui.test.pressKey
 import androidx.compose.ui.test.rightClick
 import androidx.compose.ui.test.withKeyDown
@@ -83,8 +84,8 @@ class DesktopJourneyTest {
 
         try {
             // Setup
-            field("Server URL").performTextInput(mock!!)
-            field("API key (API_SERVER_KEY)").performTextInput("dev-key-dudan-0000000000")
+            field("Server URL").performTextReplacement(mock!!)
+            field("API key").performTextInput("dev-key-dudan-0000000000")
             field("Your name").performTextInput("Bart")
             shot("journey-01-setup")
             onNodeWithText("Connect").performClick()
@@ -409,6 +410,6 @@ class DesktopJourneyTest {
     }
 
     /** The model button in the prompt bar names a model with a "·" or the server's default. */
-    private fun ComposeUiTest.modelButton() = onAllNodes(hasText("GPT", substring = true) or hasText("Hermes", substring = false)).onFirst()
+    private fun ComposeUiTest.modelButton() = onAllNodes(hasText("GPT", substring = true) or hasText("Booper", substring = false)).onFirst()
 
 }

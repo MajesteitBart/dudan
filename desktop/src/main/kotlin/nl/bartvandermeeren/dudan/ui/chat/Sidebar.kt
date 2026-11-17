@@ -112,6 +112,7 @@ import nl.bartvandermeeren.dudan.ui.components.glass
 import nl.bartvandermeeren.dudan.ui.components.outlined
 import nl.bartvandermeeren.dudan.ui.components.pane
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import org.jetbrains.compose.resources.stringResource
 
@@ -542,7 +543,7 @@ fun ChatMenu(vm: MainViewModel, session: SessionSummary?, expanded: Boolean, onD
         GlassDialog(
             onDismissRequest = { confirmDelete = false },
             title = { Text(stringResource(Res.string.delete_chat_title)) },
-            text = { Text(stringResource(Res.string.delete_chat_body, session?.displayTitle.orEmpty())) },
+            text = { Text(stringResource(Res.string.delete_chat_body, session?.displayTitle.orEmpty(), LocalHarness.current.name)) },
             confirmButton = { TextButton(onClick = { confirmDelete = false; vm.deleteSession(deleteId) }) { Text(stringResource(Res.string.delete)) } },
             dismissButton = { TextButton(onClick = { confirmDelete = false }) { Text(stringResource(Res.string.cancel)) } },
         )

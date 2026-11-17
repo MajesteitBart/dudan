@@ -13,6 +13,7 @@ import androidx.compose.runtime.getValue
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import nl.bartvandermeeren.dudan.data.AppVisibility
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.data.ModelProfile
 import nl.bartvandermeeren.dudan.ui.DudanRoot
 import nl.bartvandermeeren.dudan.ui.MainViewModel
@@ -35,6 +36,7 @@ class MainActivity : ComponentActivity() {
             DudanTheme(
                 reduceTransparency = settings?.reduceTransparency == true,
                 accent = Accent.from(settings?.accent),
+                harness = settings?.harness ?: Harness.Default,
                 sky = Sky.from(settings?.sky),
             ) {
                 DudanRoot(vm)

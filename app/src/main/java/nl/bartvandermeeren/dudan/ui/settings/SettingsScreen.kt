@@ -104,6 +104,7 @@ import nl.bartvandermeeren.dudan.appContainer
 import nl.bartvandermeeren.dudan.assist.ListenActivity
 import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.data.LanguageVoice
 import nl.bartvandermeeren.dudan.data.ModelProfile
@@ -128,6 +129,7 @@ import nl.bartvandermeeren.dudan.ui.components.glass
 import nl.bartvandermeeren.dudan.ui.components.outlined
 import nl.bartvandermeeren.dudan.ui.theme.Accent
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import nl.bartvandermeeren.dudan.ui.theme.Sky
 import nl.bartvandermeeren.dudan.voice.WakePhrase
@@ -149,9 +151,10 @@ private sealed interface TestState {
 fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean, onBack: (() -> Unit)?) {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
-    var url by rememberSaveable { mutableStateOf(settings.serverUrl) }
+    var harness by rememberSaveable { mutableStateOf(settings.harness) }
+    var url by rememberSaveable { mutableStateOf(settings.connectionFor(settings.harness).url) }
     // Not rememberSaveable: the decrypted key must not end up in the saved-state Bundle.
-    var key by remember { mutableStateOf(settings.apiKey) }
+    var key by remember { mutableStateOf(settings.connectionFor(harness).key) }
     var name by rememberSaveable { mutableStateOf(settings.userName) }
     var assistant by rememberSaveable { mutableStateOf(settings.assistantName) }
     var language by rememberSaveable { mutableStateOf(settings.speechLanguage) }
@@ -160,18 +163,31 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
 
     if (onBack != null) BackHandler(onBack = onBack)
 
+    var attempt by remember { mutableStateOf(0) }
+    fun editedConnection() {
+        attempt++
+        test = TestState.Idle
+    }
+
     fun connect() {
+        val mine = ++attempt
+        val server = HermesApi.ServerConfig(HermesApi.normalizeBaseUrl(url), key.trim())
+        val selected = harness
+        val userName = name
+        val assistantName = assistant
+        val speechLanguage = language
         test = TestState.Testing
         scope.launch {
             val repo = vm.settingsRepository
             try {
-                val model = context.appContainer.apiFor(HermesApi.ServerConfig(HermesApi.normalizeBaseUrl(url), key.trim())).verify()
-                repo.saveSetup(url, key, name, assistant, language)
+                val model = context.appContainer.apiFor(server).verify()
+                if (mine != attempt) return@launch
+                repo.saveSetup(server.baseUrl, server.apiKey, userName, assistantName, speechLanguage, selected)
                 test = TestState.Ok(model)
                 vm.refreshSessions()
                 vm.loadModels()
             } catch (e: Exception) {
-                test = TestState.Failed(e.userMessage())
+                if (mine == attempt) test = TestState.Failed(e.userMessage(selected))
             }
         }
     }
@@ -203,7 +219,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     Spacer(Modifier.size(4.dp))
                 }
                 Text(
-                    stringResource(if (setupMode) R.string.setup_title else R.string.settings),
+                    if (setupMode) stringResource(R.string.setup_title, harness.name) else stringResource(R.string.settings),
                     style = MaterialTheme.typography.headlineSmall,
                     color = Palette.TextPrimary,
                 )
@@ -215,15 +231,26 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     horizontalArrangement = Arrangement.spacedBy(14.dp),
                 ) {
                     DudanMark(size = 40.dp, halo = true)
-                    Text(stringResource(R.string.setup_intro), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+                    Text(stringResource(R.string.setup_intro, harness.name), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
                 }
             }
 
             Section(stringResource(R.string.section_connection)) {
-                Field(url, { url = it; test = TestState.Idle }, stringResource(R.string.server_url), placeholder = "http://my-server:8642", keyboard = KeyboardType.Uri)
+                Text(stringResource(R.string.harness), style = MaterialTheme.typography.labelMedium, color = Palette.TextSecondary)
+                Segmented(Harness.entries.map { it to it.name }, harness, { selected ->
+                    if (selected != harness) {
+                        val profile = settings.connectionFor(selected)
+                        url = profile.url
+                        key = profile.key
+                        assistant = profile.assistant
+                        harness = selected
+                        editedConnection()
+                    }
+                })
+                Field(url, { url = it; editedConnection() }, stringResource(R.string.server_url), placeholder = harness.exampleUrl, keyboard = KeyboardType.Uri)
                 if (isInsecureRemote(url)) Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
                 Field(
-                    key, { key = it; test = TestState.Idle }, stringResource(R.string.api_key),
+                    key, { key = it; editedConnection() }, stringResource(R.string.api_key),
                     keyboard = KeyboardType.Password,
                     visual = if (showKey) VisualTransformation.None else PasswordVisualTransformation(),
                     trailing = {
@@ -248,7 +275,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     },
                 )
                 when (val t = test) {
-                    is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
+                    is TestState.Ok -> Notice(stringResource(R.string.connection_ok, t.model ?: harness.name), Palette.Success, ok = true)
                     is TestState.Failed -> Notice(stringResource(R.string.connection_failed, t.message), Palette.Danger, error = true)
                     else -> Unit
                 }
@@ -275,7 +302,9 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                     }
                 }
 
-                Section(stringResource(R.string.section_replies_files)) { RepliesAndFilesSettings(vm, settings) }
+                Section(stringResource(R.string.section_replies_files)) {
+                    androidx.compose.runtime.key(settings.harness, settings.serverUrl) { RepliesAndFilesSettings(vm, settings) }
+                }
 
                 Section(stringResource(R.string.section_phone_control)) { PhoneControlSettings(vm, settings) }
 
@@ -288,7 +317,7 @@ fun SettingsScreen(vm: MainViewModel, settings: AppSettings, setupMode: Boolean,
                 }
 
                 Section(stringResource(R.string.section_history)) {
-                    Toggle(stringResource(R.string.show_all_channels), stringResource(R.string.show_all_channels_detail), settings.showAllChannels) {
+                    Toggle(stringResource(R.string.show_all_channels), stringResource(R.string.show_all_channels_detail, LocalHarness.current.name), settings.showAllChannels) {
                         scope.launch {
                             vm.settingsRepository.setShowAllChannels(it)
                             vm.refreshSessions()
@@ -312,9 +341,9 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
     val name = choice.label?.takeIf { it != choice.model }
         ?: choice.model?.let(::prettyModelName)
         ?: catalog?.currentModel?.let { stringResource(R.string.model_server_default_named, prettyModelName(it)) }
-        ?: stringResource(R.string.model_default)
+        ?: stringResource(R.string.model_default, LocalHarness.current.name)
     val mode = modelModeLabel(choice)
-    Row(
+    Column(
         Modifier
             .fillMaxWidth()
             .clip(RoundedCornerShape(16.dp))
@@ -323,20 +352,18 @@ private fun ModelDefaultRow(vm: MainViewModel, settings: AppSettings, profile: M
                 picking = true
             }
             .padding(vertical = 8.dp),
-        verticalAlignment = Alignment.CenterVertically,
+        verticalArrangement = Arrangement.spacedBy(4.dp),
     ) {
-        Column(Modifier.weight(1f).padding(end = 16.dp)) {
-            Text(
-                stringResource(if (profile == ModelProfile.Chats) R.string.profile_chats else R.string.profile_assistant),
-                style = MaterialTheme.typography.bodyLarge,
-                color = Palette.TextPrimary,
-            )
-            Text(
-                stringResource(if (profile == ModelProfile.Chats) R.string.profile_chats_detail else R.string.profile_assistant_detail),
-                style = MaterialTheme.typography.bodySmall,
-                color = Palette.TextSecondary,
-            )
-        }
+        Text(
+            stringResource(if (profile == ModelProfile.Chats) R.string.profile_chats else R.string.profile_assistant),
+            style = MaterialTheme.typography.bodyLarge,
+            color = Palette.TextPrimary,
+        )
+        Text(
+            stringResource(if (profile == ModelProfile.Chats) R.string.profile_chats_detail else R.string.profile_assistant_detail),
+            style = MaterialTheme.typography.bodySmall,
+            color = Palette.TextSecondary,
+        )
         Text(if (mode.isEmpty()) name else "$name · $mode", style = MaterialTheme.typography.labelLarge, color = LocalAccent.current.soft)
     }
     if (picking) ModelPickerSheet(vm, settings, initialProfile = profile, onDismiss = { picking = false })
@@ -890,29 +917,29 @@ private fun PhoneControlSettings(vm: MainViewModel, settings: AppSettings) {
             }
         }
     }
-    Toggle(stringResource(R.string.phone_control), stringResource(R.string.phone_control_detail), settings.phoneControl) {
+    Toggle(stringResource(R.string.phone_control, LocalHarness.current.name), stringResource(R.string.phone_control_detail, LocalHarness.current.name), settings.phoneControl) {
         scope.launch { vm.settingsRepository.setPhoneControl(it) }
     }
     if (!settings.phoneControl) return
     when (val s = state) {
         is PhoneControl.State.Running -> address?.let {
-            Notice(stringResource(R.string.phone_control_reachable, "http://$it:${s.port}/mcp"), Palette.Success, ok = true)
-        } ?: Notice(stringResource(R.string.phone_control_no_tailscale), Palette.SparkAmber)
+            Notice(stringResource(R.string.phone_control_reachable, "http://$it:${s.port}/mcp", settings.harness.name), Palette.Success, ok = true)
+        } ?: Notice(stringResource(R.string.phone_control_no_tailscale, LocalHarness.current.name), Palette.SparkAmber)
         is PhoneControl.State.Failed -> Notice(stringResource(R.string.phone_control_failed, s.message), Palette.Danger, error = true)
         PhoneControl.State.Off -> Notice(stringResource(R.string.phone_control_starting), Palette.TextSecondary)
     }
     if (!opensFromBackground) {
-        Notice(stringResource(R.string.phone_control_background), Palette.SparkAmber)
+        Notice(stringResource(R.string.phone_control_background, LocalHarness.current.name), Palette.SparkAmber)
         LinkAction(stringResource(R.string.phone_control_background_allow)) {
             val intent = Intent(Settings.ACTION_MANAGE_OVERLAY_PERMISSION, "package:${context.packageName}".toUri())
             runCatching { context.startActivity(intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)) }
         }
     }
-    val copied = stringResource(R.string.phone_control_copied)
-    val renewed = stringResource(R.string.phone_control_renewed)
+    val copied = stringResource(R.string.phone_control_copied, LocalHarness.current.name)
+    val renewed = stringResource(R.string.phone_control_renewed, LocalHarness.current.name)
     Row(horizontalArrangement = Arrangement.spacedBy(24.dp)) {
-        LinkAction(stringResource(R.string.phone_control_copy)) {
-            val clip = ClipData.newPlainText("Hermes setup", control.hermesSetup(address, settings.phoneToken))
+        LinkAction(stringResource(R.string.phone_control_copy, LocalHarness.current.name)) {
+            val clip = ClipData.newPlainText("${settings.harness} setup", control.setup(settings.harness, address, settings.phoneToken))
             // Keeps the token out of the clipboard preview and keyboard suggestions.
             clip.description.extras = PersistableBundle().apply { putBoolean("android.content.extra.IS_SENSITIVE", true) }
             context.getSystemService(ClipboardManager::class.java)?.setPrimaryClip(clip)
@@ -946,13 +973,14 @@ private fun RepliesAndFilesSettings(vm: MainViewModel, settings: AppSettings) {
             scope.launch { vm.settingsRepository.setUploadUrl(it) }
         },
         stringResource(R.string.upload_server),
-        placeholder = UploadClient.baseUrlFor(settings.serverUrl, "").ifBlank { null },
+        placeholder = UploadClient.baseUrlFor(settings.serverUrl, "", settings.harness).ifBlank { null },
         keyboard = KeyboardType.Uri,
     )
     if (address.isNotBlank() && isInsecureRemote(address)) {
         Notice(stringResource(R.string.insecure_url_warning), Palette.SparkAmber)
     }
-    Text(stringResource(R.string.upload_server_detail), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
+    val detail = if (settings.harness == Harness.Booper) R.string.upload_builtin_detail else R.string.upload_server_detail
+    Text(stringResource(detail, settings.harness.name), style = MaterialTheme.typography.bodySmall, color = Palette.TextSecondary)
     result?.let { Notice(it, if (failed) Palette.Danger else Palette.Success, ok = !failed, error = failed) }
     val ok = stringResource(R.string.upload_ok)
     LinkAction(stringResource(if (checking) R.string.upload_checking else R.string.upload_check)) {

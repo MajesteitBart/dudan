@@ -1,5 +1,6 @@
 package nl.bartvandermeeren.dudan.desktop
 
+import nl.bartvandermeeren.dudan.data.Harness
 import java.io.File
 import java.nio.file.Files
 import java.util.concurrent.TimeUnit
@@ -52,6 +53,25 @@ class ConnectionTest {
         server.takeRequest(5, TimeUnit.SECONDS)
         Thread.sleep(800)
         assertEquals("", store.current().apiKey)
+        onSwing { assertEquals(TestState.Idle, form.test) }
+    }
+
+    @Test
+    fun changingHarnessDiscardsThePendingConnectionTest() {
+        server.enqueue(slowAnswer())
+        lateinit var form: ConnectionForm
+        onSwing {
+            form = ConnectionForm(vm, scope, AppSettings())
+            form.url = server.url("/").toString()
+            form.key = "booper-test-key"
+            form.connect()
+            form.selectHarness(Harness.Hermes)
+            assertEquals("", form.key)
+            assertEquals("", form.url)
+        }
+        server.takeRequest(5, TimeUnit.SECONDS)
+        Thread.sleep(800)
+        assertEquals(Harness.Booper, store.current().harness)
         onSwing { assertEquals(TestState.Idle, form.test) }
     }
 

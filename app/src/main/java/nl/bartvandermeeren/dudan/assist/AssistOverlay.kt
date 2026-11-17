@@ -82,6 +82,7 @@ import nl.bartvandermeeren.dudan.ui.components.windowGlass
 import nl.bartvandermeeren.dudan.ui.openui.LocalOpenUiHost
 import nl.bartvandermeeren.dudan.ui.openui.OpenUiHost
 import nl.bartvandermeeren.dudan.ui.openui.openExternalUrl
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.LocalReduceTransparency
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import nl.bartvandermeeren.dudan.voice.SpeechInput
@@ -290,7 +291,7 @@ private fun ResponsePanel(
 private fun NotConfiguredCard(panel: Color, onOpen: () -> Unit) {
     Box(Modifier.fillMaxWidth().glass(RoundedCornerShape(26.dp), panel, solid = Palette.OverlaySolid, wash = Color.Transparent).clickable(onClick = onOpen)) {
         Text(
-            stringResource(R.string.assist_not_configured),
+            stringResource(R.string.assist_not_configured, LocalHarness.current.name),
             style = MaterialTheme.typography.bodyLarge,
             color = Palette.TextPrimary,
             modifier = Modifier.padding(20.dp),

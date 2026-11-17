@@ -49,12 +49,15 @@ class UploadClient(
 
     data class Health(val maxBytes: Long, val chunkBytes: Int)
 
+    // The health GET can reconnect if Booper has closed an idle socket shared with chat.
+    private val healthHttp = http.newBuilder().retryOnConnectionFailure(true).build()
+
     /**
      * The service's limits. Hermes itself and other services also answer /health, so anything that
      * doesn't report `ok` with positive limits is refused with code [NOT_UPLOAD_SERVICE].
      */
     suspend fun health(): Health = withContext(Dispatchers.IO) {
-        val o = send(request(config(), "health").get().build())
+        val o = send(request(config(), "health").get().build(), healthHttp)
         val maxBytes = o.dbl("max_bytes")?.toLong()?.takeIf { it > 0 }
         val chunkBytes = o.int("chunk_bytes")?.takeIf { it > 0 }
         if (o.bool("ok") != true || maxBytes == null || chunkBytes == null) {
@@ -246,8 +249,8 @@ class UploadClient(
     }
 
     /** Cancelling the coroutine cancels the call, so a removed file stops uploading mid-chunk. */
-    private suspend fun send(request: Request): JsonObject {
-        val call = http.newCall(request)
+    private suspend fun send(request: Request, client: OkHttpClient = http): JsonObject {
+        val call = client.newCall(request)
         val response = suspendCancellableCoroutine { continuation ->
             continuation.invokeOnCancellation { call.cancel() }
             call.enqueue(object : Callback {
@@ -283,13 +286,14 @@ class UploadClient(
         private val OCTETS = "application/octet-stream".toMediaType()
 
         /**
-         * The upload service's address: [override] when set, otherwise the Hermes server's host on
+         * The upload service's address: [override] when set, otherwise the Booper server itself or the Hermes host on
          * port 8645, since the service runs next to Hermes.
          */
-        fun baseUrlFor(serverUrl: String, override: String): String {
+        fun baseUrlFor(serverUrl: String, override: String, harness: Harness): String {
             val explicit = override.trim()
             if (explicit.isNotEmpty()) return HermesApi.normalizeBaseUrl(explicit)
             val server = HermesApi.normalizeBaseUrl(serverUrl).toHttpUrlOrNull() ?: return ""
+            if (harness == Harness.Booper) return server.toString().trimEnd('/')
             // The bundled service speaks HTTP. HTTPS Hermes setups need an explicit service URL,
             // since silently downgrading an arbitrary host would expose the API key.
             if (server.isHttps) return ""

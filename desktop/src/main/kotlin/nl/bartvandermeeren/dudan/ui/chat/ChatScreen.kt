@@ -80,6 +80,7 @@ import nl.bartvandermeeren.dudan.ui.components.pane
 import nl.bartvandermeeren.dudan.ui.openui.LocalOpenUiHost
 import nl.bartvandermeeren.dudan.ui.openui.OpenUiHost
 import nl.bartvandermeeren.dudan.ui.openui.openExternalUrl
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 import org.jetbrains.compose.resources.stringResource
 
@@ -127,7 +128,7 @@ fun ChatPane(
     val activeModel = settings.modelFor(profile)
     val modelTitle = activeModel.label?.takeIf { it != activeModel.model }
         ?: (activeModel.model ?: catalog?.currentModel)?.let(::prettyModelName)
-        ?: stringResource(Res.string.model_default)
+        ?: stringResource(Res.string.model_default, LocalHarness.current.name)
     val modelSubtitle = modelModeLabel(activeModel)
 
     Column(modifier.fillMaxSize()) {
