@@ -86,7 +86,7 @@
     <string name="desktop_voice_try_again">Opnieuw proberen</string>
     <string name="desktop_voice_cancel">Download stoppen</string>
     <string name="desktop_setup_key_note">De sleutel wordt versleuteld en blijft op deze pc.</string>
-    <string name="desktop_setup_help">Hermes klaarzetten voor dudan</string>
+    <string name="desktop_setup_help">%1$s klaarzetten voor dudan</string>
     <string name="desktop_show_key">Sleutel tonen</string>
     <string name="desktop_hide_key">Sleutel verbergen</string>
     <string name="desktop_show_in_folder">Tonen in map</string>

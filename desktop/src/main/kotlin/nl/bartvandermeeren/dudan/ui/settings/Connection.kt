@@ -62,12 +62,14 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.launch
 import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.AppSettings
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.desktop.res.*
 import nl.bartvandermeeren.dudan.ui.MainViewModel
 import nl.bartvandermeeren.dudan.ui.components.CtaButton
 import nl.bartvandermeeren.dudan.ui.components.DudanMark
 import nl.bartvandermeeren.dudan.ui.components.PlainIconButton
+import nl.bartvandermeeren.dudan.ui.components.Segmented
 import nl.bartvandermeeren.dudan.ui.components.glass
 import nl.bartvandermeeren.dudan.ui.openui.openExternalUrl
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
@@ -84,7 +86,8 @@ internal sealed interface TestState {
 /** The connection's fields and their test, which Setup and Settings both show. */
 @Stable
 internal class ConnectionForm(private val vm: MainViewModel, private val scope: CoroutineScope, settings: AppSettings) {
-    var url by mutableStateOf(settings.serverUrl)
+    var harness by mutableStateOf(settings.harness)
+    var url by mutableStateOf(settings.connectionFor(settings.harness).url)
     var key by mutableStateOf(settings.apiKey)
     var name by mutableStateOf(settings.userName)
     var assistant by mutableStateOf(settings.assistantName)
@@ -103,6 +106,7 @@ internal class ConnectionForm(private val vm: MainViewModel, private val scope: 
     fun connect() {
         if (!canConnect) return
         val mine = ++attempt
+        val selected = harness
         val tested = listOf(url, key, name, assistant)
         test = TestState.Testing
         scope.launch {
@@ -110,16 +114,26 @@ internal class ConnectionForm(private val vm: MainViewModel, private val scope: 
                 val (url, key, name, assistant) = tested
                 val model = vm.apiFor(HermesApi.ServerConfig(HermesApi.normalizeBaseUrl(url), key.trim())).verify()
                 if (mine != attempt) return@launch
-                vm.store.saveSetup(url, key, name, assistant)
+                vm.store.saveSetup(url, key, name, assistant, selected)
                 test = TestState.Ok(model)
                 vm.refreshSessions()
                 vm.loadModels()
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                if (mine == attempt) test = TestState.Failed(e.userMessage())
+                if (mine == attempt) test = TestState.Failed(e.userMessage(selected))
             }
         }
+    }
+
+    fun selectHarness(selected: Harness) {
+        if (harness == selected) return
+        val profile = vm.store.current().connectionFor(selected)
+        url = profile.url
+        key = profile.key
+        assistant = profile.assistant
+        harness = selected
+        edited()
     }
 
     /** A changed address or key hasn't been tested yet, and a test still running is for the old one. */
@@ -139,9 +153,11 @@ internal fun rememberConnectionForm(vm: MainViewModel, settings: AppSettings): C
 @Composable
 internal fun ConnectionFields(form: ConnectionForm) {
     Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+        Text(stringResource(Res.string.harness), style = MaterialTheme.typography.labelMedium, color = Palette.TextSecondary)
+        Segmented(Harness.entries.map { it to it.name }, form.harness, form::selectHarness)
         FormField(
             form.url, { form.url = it; form.edited() }, stringResource(Res.string.server_url),
-            placeholder = "http://my-server:8642", keyboard = KeyboardType.Uri, onSubmit = form::connect,
+            placeholder = form.harness.exampleUrl, keyboard = KeyboardType.Uri, onSubmit = form::connect,
         )
         if (isInsecureRemote(form.url)) Notice(stringResource(Res.string.insecure_url_warning), Palette.SparkAmber)
         FormField(form.key, { form.key = it; form.edited() }, stringResource(Res.string.api_key), password = true, onSubmit = form::connect)
@@ -157,7 +173,7 @@ internal fun ConnectionFields(form: ConnectionForm) {
 internal fun ConnectionActions(form: ConnectionForm, label: String) {
     Column(Modifier.fillMaxWidth(), verticalArrangement = Arrangement.spacedBy(10.dp)) {
         when (val t = form.test) {
-            is TestState.Ok -> Notice(stringResource(Res.string.connection_ok, t.model ?: "Hermes"), Palette.Success, ok = true)
+            is TestState.Ok -> Notice(stringResource(Res.string.connection_ok, t.model ?: form.harness.name), Palette.Success, ok = true)
             is TestState.Failed -> Notice(stringResource(Res.string.connection_failed, t.message), Palette.Danger, error = true)
             else -> Unit
         }
@@ -271,7 +287,7 @@ fun SetupScreen(vm: MainViewModel, settings: AppSettings) {
             DudanMark(size = 72.dp, halo = true)
             Spacer(Modifier.height(18.dp))
             Text(
-                stringResource(Res.string.setup_title),
+                stringResource(Res.string.setup_title, form.harness.name),
                 style = MaterialTheme.typography.headlineMedium,
                 color = Palette.TextPrimary,
                 textAlign = TextAlign.Center,
@@ -279,7 +295,7 @@ fun SetupScreen(vm: MainViewModel, settings: AppSettings) {
             Spacer(Modifier.height(10.dp))
             Text(
                 // A word joiner after "://" keeps the example address on one line.
-                stringResource(Res.string.setup_intro).replace("://", "://\u2060"),
+                stringResource(Res.string.setup_intro, form.harness.name).replace("://", "://\u2060"),
                 style = MaterialTheme.typography.bodyMedium,
                 color = Palette.TextSecondary,
                 textAlign = TextAlign.Center,
@@ -302,16 +318,17 @@ fun SetupScreen(vm: MainViewModel, settings: AppSettings) {
             Row(
                 Modifier
                     .clip(RoundedCornerShape(10.dp))
-                    .clickable(role = Role.Button) { openExternalUrl(HERMES_SETUP_DOCS) }
+                    .clickable(role = Role.Button) { openExternalUrl(if (form.harness == Harness.Hermes) HERMES_SETUP_DOCS else BOOPER_SETUP_DOCS) }
                     .padding(horizontal = 8.dp, vertical = 6.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(6.dp),
             ) {
-                Text(stringResource(Res.string.desktop_setup_help), style = MaterialTheme.typography.labelMedium, color = LocalAccent.current.soft)
+                Text(stringResource(Res.string.desktop_setup_help, form.harness.name), style = MaterialTheme.typography.labelMedium, color = LocalAccent.current.soft)
                 Icon(Icons.AutoMirrored.Rounded.OpenInNew, contentDescription = null, tint = LocalAccent.current.soft, modifier = Modifier.size(14.dp))
             }
         }
     }
 }
 
+private const val BOOPER_SETUP_DOCS = "https://github.com/MajesteitBart/dudan/blob/main/docs/setup.md#booper-side"
 private const val HERMES_SETUP_DOCS = "https://github.com/MajesteitBart/dudan/blob/main/docs/setup.md#hermes-side"

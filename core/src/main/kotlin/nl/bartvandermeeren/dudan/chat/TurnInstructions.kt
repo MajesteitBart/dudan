@@ -48,8 +48,8 @@ object TurnInstructions {
     fun context(origin: TurnOrigin, phoneControl: Boolean?, speechLanguage: String? = null): String = buildList {
         val desktop = origin.device == TurnOrigin.Device.Desktop
         add(
-            if (desktop) "The user is talking to you through dudan, the Hermes app on their Windows PC."
-            else "The user is talking to you through dudan, the Hermes app on their Android phone.",
+            if (desktop) "The user is talking to you through dudan, the chat app on their Windows PC."
+            else "The user is talking to you through dudan, the chat app on their Android phone.",
         )
         when (origin.surface) {
             TurnOrigin.Surface.App -> Unit
@@ -80,7 +80,7 @@ object TurnInstructions {
             true -> add(
                 "If you have the phone tools ($PHONE_TOOLS), they act on this same phone. When they ask for something the phone does, " +
                     "such as a timer or alarm, opening an app, directions or music, do it with those tools " +
-                    "instead of explaining how or scheduling a Hermes task.",
+                    "instead of explaining how or scheduling a task.",
             )
             false -> add(
                 "Phone control is off in dudan, so you can't act on this phone. If they ask you to, tell them to turn on Phone control in dudan's settings.",

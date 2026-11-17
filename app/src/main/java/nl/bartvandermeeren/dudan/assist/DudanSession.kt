@@ -28,6 +28,7 @@ import kotlinx.coroutines.cancel
 import nl.bartvandermeeren.dudan.MainActivity
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.appContainer
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.ui.theme.Accent
 import nl.bartvandermeeren.dudan.ui.theme.DudanTheme
 import nl.bartvandermeeren.dudan.ui.theme.Sky
@@ -91,6 +92,7 @@ class DudanSession(context: Context) :
             DudanTheme(
                 reduceTransparency = state.settings?.reduceTransparency == true,
                 accent = Accent.from(state.settings?.accent),
+                harness = state.settings?.harness ?: Harness.Default,
                 sky = Sky.from(state.settings?.sky),
             ) {
                 AssistOverlay(state)

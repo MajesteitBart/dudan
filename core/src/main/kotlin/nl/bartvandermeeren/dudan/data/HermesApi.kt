@@ -179,7 +179,7 @@ class HermesApi(
 
     /** One skill's SKILL.md. Stock Hermes doesn't have this endpoint; see [ServerCapabilities.readsSkills]. */
     suspend fun skill(name: String): SkillDetail {
-        val o = getJson("v1", "skills", name).asObject() ?: throw HermesException(500, "Hermes returned no skill")
+        val o = getJson("v1", "skills", name).asObject() ?: throw HermesException(500, "The server returned no skill")
         return SkillDetail.from(o, name)
     }
 
@@ -286,7 +286,7 @@ class HermesApi(
         val request = request("v1", "runs").post(body.toBody())
         if (idempotencyKey != null) request.header("Idempotency-Key", idempotencyKey)
         val root = sendJson(request.build()).asObject()
-        val runId = root?.str("run_id") ?: throw HermesException(500, "Hermes did not return a run id")
+        val runId = root?.str("run_id") ?: throw HermesException(500, "The server did not return a run id")
         return RunAdmission(runId, root.str("status"), root.bool("replayed") ?: false)
     }
 
@@ -357,7 +357,7 @@ class HermesApi(
     }
 
     private fun jobFrom(root: JsonElement): JobInfo =
-        root.asObject()?.get("job").asObject()?.let(JobInfo::from) ?: throw HermesException(500, "Hermes returned no job")
+        root.asObject()?.get("job").asObject()?.let(JobInfo::from) ?: throw HermesException(500, "The server returned no job")
 
     // ---- Plumbing -------------------------------------------------------------------------------
 
@@ -369,7 +369,9 @@ class HermesApi(
         // Two separate Hermes options: how long the model thinks, and priority processing.
         val options = buildJsonObject {
             model.effort?.let { put("reasoning_effort", it.wire) }
-            if (model.fast) put("fast", true)
+            model.serviceTier?.let { tier ->
+                if (tier == "priority") put("fast", true) else put("service_tier", tier)
+            }
         }
         if (options.isNotEmpty()) put("model_options", options)
     }
@@ -516,7 +518,18 @@ object ModelCatalogParser {
                 }
                 val isCurrent = slug.equals(currentProvider, ignoreCase = true) && id == currentModel
                 val caps = capabilities?.get(id).asObject()
-                options += ModelOption(slug, name, id, label, isCurrent, reasoning = caps?.bool("reasoning"), fast = caps?.bool("fast"))
+                val levels = caps?.get("reasoning_levels").asArray()?.mapNotNull {
+                    ReasoningEffort.fromWire((it as? JsonPrimitive)?.contentOrNull)
+                }?.distinct()
+                val tiers = caps?.get("service_tiers").asArray()?.mapNotNull { entry ->
+                    val tier = entry.asObject() ?: return@mapNotNull null
+                    val tierId = tier.str("id")?.takeIf { it.isNotBlank() && it != "standard" } ?: return@mapNotNull null
+                    ServiceTier(tierId, tier.str("name") ?: tierId, tier.str("description"))
+                }?.distinctBy { it.id }
+                val descriptions = caps?.get("reasoning_descriptions").asObject()?.entries.orEmpty().mapNotNull { (effort, value) ->
+                    (value as? JsonPrimitive)?.contentOrNull?.let { effort to it }
+                }.toMap()
+                options += ModelOption(slug, name, id, label, isCurrent, caps?.bool("reasoning"), caps?.bool("fast"), levels, tiers, descriptions)
             }
         }
         return ModelCatalog(currentProvider, currentModel, options)

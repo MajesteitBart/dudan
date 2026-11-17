@@ -205,7 +205,7 @@ class QuickAsk(
 fun QuickAskCard(quick: QuickAsk, vm: MainViewModel, overlay: OverlayHost, onOpenInApp: () -> Unit) {
     val settings by vm.settings.collectAsState()
     val prefs by vm.prefs.collectAsState()
-    DudanTheme(settings.reduceTransparency, Accent.from(settings.accent), Sky.from(settings.sky), prefs.textScale) {
+    DudanTheme(settings.reduceTransparency, Accent.from(settings.accent), Sky.from(settings.sky), prefs.textScale, settings.harness) {
         CompositionLocalProvider(LocalOverlayHost provides overlay) {
             val shape = RoundedCornerShape(28.dp)
             Box(Modifier.fillMaxWidth().clip(shape).border(GlassDefaults.Border, shape)) {

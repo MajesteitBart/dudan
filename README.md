@@ -4,9 +4,9 @@
   <img src="assets/dudan-wordmark.png" alt="dudan" width="800">
 </p>
 
-Your Hermes agent, one side-button press away.
+Your agent, one side-button press away.
 
-dudan brings your own [Hermes agent](https://github.com/NousResearch/hermes-agent) to Android. Chat, talk hands-free, ask about what's on your screen, or send a file for the agent to work on. Your conversations live in Hermes, so you can pick them up in its dashboard or CLI too.
+dudan connects to Booper or [Hermes Agent](https://github.com/NousResearch/hermes-agent) on Android. It defaults to Clark on Booper. Chat, talk hands-free, ask about what's on your screen, or send a file for the agent to work on. Your conversations live on the selected server.
 
 <p align="center">
   <img src="docs/screenshots/overlay.jpg" alt="The assistant overlay over the home screen, with a spoken question and its answer" width="260">
@@ -36,7 +36,7 @@ dudan renders rich replies inside the chat: charts, tables, steps, tabs, forms a
 
 Attach photos, PDFs, spreadsheets, audio, video or other files, with up to eight attachments per message and files up to 250 MB. Share them straight from another Android app. Photos go to the model as images; other files go to the Hermes host, where the agent can read, transcribe or inspect them with its tools.
 
-Uploads resume after a dropped connection. Files other than photos need the small [upload service](tools/hermes-upload/README.md) alongside Hermes.
+Uploads resume after a dropped connection. Booper handles file uploads on its app channel. Hermes uses a separate [upload service](tools/hermes-upload/README.md).
 
 With a compatible Clark server, the agent can send files back too. Images show in the chat, and Save file stores any file, an APK included, where you choose. See [Files returned by Clark](docs/outbound-attachments.md).
 
@@ -62,11 +62,11 @@ Six backgrounds, eight accent colors, frosted glass and a layout that adapts to 
 
 ## Get started
 
-You'll need Android 12 or later on a 64-bit ARM phone, your own Hermes API server, and Tailscale connecting the phone and server. Download the APK from the [latest release](https://github.com/MajesteitBart/dudan/releases/latest), or build it yourself.
+You'll need Android 12 or later on a 64-bit ARM phone, a Booper app channel or Hermes API server, and Tailscale connecting the phone and server. Download the APK from the [latest release](https://github.com/MajesteitBart/dudan/releases/latest), or build it yourself.
 
 For guided installation, [copy the setup prompt and let your agent prepare Hermes and walk you through the phone setup](skills/README.md#let-your-agent-set-it-up).
 
-- [Connect Hermes and set up your phone](docs/setup.md)
+- [Connect your harness and set up your phone](docs/setup.md)
 - [Build the APK and develop locally](docs/development.md)
 - [Upgrade an existing installation](docs/upgrading.md)
 - [Behavior, limitations and model credits](docs/reference.md)

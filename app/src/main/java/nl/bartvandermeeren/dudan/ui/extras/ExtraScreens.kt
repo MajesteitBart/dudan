@@ -56,6 +56,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import kotlinx.coroutines.CancellationException
 import nl.bartvandermeeren.dudan.R
 import nl.bartvandermeeren.dudan.chat.userMessage
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.data.SkillDetail
 import nl.bartvandermeeren.dudan.data.SkillInfo
 import nl.bartvandermeeren.dudan.ui.MainViewModel
@@ -68,6 +69,7 @@ import nl.bartvandermeeren.dudan.ui.components.outlined
 import nl.bartvandermeeren.dudan.ui.openui.openExternalUrl
 import nl.bartvandermeeren.dudan.ui.theme.GoogleSansCode
 import nl.bartvandermeeren.dudan.ui.theme.LocalAccent
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import nl.bartvandermeeren.dudan.ui.theme.Palette
 
 @Composable
@@ -200,13 +202,13 @@ fun SkillsScreen(vm: MainViewModel, onBack: () -> Unit) {
     }
     val skills = catalog.skills
     ScreenFrame(stringResource(R.string.skills), onBack) {
-        if (skills == null && catalog.errorStatus == 500) HermesSkillsBug()
+        if (skills == null && catalog.errorStatus == 500 && LocalHarness.current == Harness.Hermes) HermesSkillsBug()
         else LoadingOrError(skills == null, if (skills == null) catalog.error else null) {
             val grouped = skills.orEmpty().groupBy { it.category?.takeIf { c -> c.isNotBlank() } ?: "general" }.toSortedMap()
             LazyColumn(Modifier.fillMaxSize(), state = listState, contentPadding = PaddingValues(bottom = 16.dp)) {
                 item {
                     Text(
-                        stringResource(R.string.skills_intro),
+                        stringResource(R.string.skills_intro, LocalHarness.current.name),
                         style = MaterialTheme.typography.bodyMedium,
                         color = Palette.TextSecondary,
                         modifier = Modifier.padding(horizontal = 24.dp, vertical = 8.dp),
@@ -253,7 +255,7 @@ private fun categoryLabel(category: String) = category.replace('_', ' ').replace
 private fun HermesSkillsBug() {
     val context = LocalContext.current
     Column(Modifier.padding(24.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        Text(stringResource(R.string.skills_hermes_bug), style = MaterialTheme.typography.bodyLarge, color = Palette.TextSecondary)
+        Text(stringResource(R.string.skills_hermes_bug, LocalHarness.current.name), style = MaterialTheme.typography.bodyLarge, color = Palette.TextSecondary)
         PillButton(Icons.AutoMirrored.Outlined.OpenInNew, stringResource(R.string.skills_hermes_bug_fix)) { openExternalUrl(context, SKILLS_FIX_URL) }
     }
 }
@@ -273,7 +275,7 @@ private fun SkillDetailScreen(vm: MainViewModel, skill: SkillInfo, readable: Boo
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            error = e.userMessage()
+            error = e.userMessage(vm.settings.value?.harness ?: Harness.Default)
         }
     }
     val accent = LocalAccent.current

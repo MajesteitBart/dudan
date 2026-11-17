@@ -10,6 +10,7 @@ import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.JsonObject
 import nl.bartvandermeeren.dudan.chat.SkillTags
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.data.HermesJson
 import nl.bartvandermeeren.dudan.data.ServerCapabilities
@@ -178,7 +179,7 @@ class SkillCatalogTest {
         val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
         try {
             val api = HermesApi(OkHttpClient()) { HermesApi.ServerConfig(server.url("/").toString(), "secret-key-1234567") }
-            return runBlocking { block(SkillCatalog(api, scope)) }
+            return runBlocking { block(SkillCatalog(api, scope) { Harness.Hermes }) }
         } finally {
             scope.cancel()
             server.shutdown()

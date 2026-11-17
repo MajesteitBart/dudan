@@ -11,10 +11,10 @@
     <string name="search_hint">Zoek in je gesprekken</string>
     <string name="no_results">Geen gesprekken gevonden.</string>
     <string name="skills">Skills</string>
-    <string name="skills_intro">Skills die Hermes kan gebruiken. Tik op een skill om te zien wat hij doet. Typ $ in een bericht om er een te gebruiken.</string>
+    <string name="skills_intro">Skills die %1$s kan gebruiken. Tik op een skill om te zien wat hij doet. Typ $ in een bericht om er een te gebruiken.</string>
     <string name="skill_use">Gebruik in chat</string>
     <string name="skill_files">Bestanden</string>
-    <string name="skills_hermes_bug">Hermes kon zijn skills niet ophalen: het antwoordde met fout 500. Dat is een bekende fout in Hermes, en de oplossing is één regel.</string>
+    <string name="skills_hermes_bug">%1$s kon zijn skills niet ophalen: het antwoordde met fout 500. Dat is een bekende fout in %1$s, en de oplossing is één regel.</string>
     <string name="skills_hermes_bug_fix">Zo los je het op</string>
     <string name="scheduled_tasks">Geplande taken</string>
     <string name="no_jobs">Geen geplande taken.</string>
@@ -45,7 +45,7 @@
     <string name="job_schedule_kept">Nu: %1$s. Dat blijft zo, tenzij je iets anders kiest.</string>
     <string name="job_deliver_app">Deze app</string>
     <string name="job_results">Resultaten</string>
-    <string name="job_shadow">Schaduwmodus op Clark: de resultaten zijn tegengehouden</string>
+    <string name="job_shadow">De schaduwmodus heeft de resultaten tegengehouden</string>
     <string name="schedule_once">Eenmalig</string>
     <string name="schedule_repeat">Herhalen</string>
     <string name="schedule_daily">Dagelijks</string>
@@ -102,7 +102,7 @@
     <string name="rename_chat">Gesprek hernoemen</string>
     <string name="delete">Verwijderen</string>
     <string name="delete_chat_title">Gesprek verwijderen?</string>
-    <string name="delete_chat_body">Hiermee verwijder je \"%1$s\" uit Hermes, inclusief de geschiedenis.</string>
+    <string name="delete_chat_body">Hiermee verwijder je \"%1$s\" uit %2$s, inclusief de geschiedenis.</string>
     <string name="cancel">Annuleren</string>
     <string name="save">Opslaan</string>
 
@@ -136,7 +136,7 @@
 
     <!-- Agent work -->
     <string name="status_thinking">Aan het nadenken</string>
-    <string name="status_reconnecting">Verbinding verbroken. Hermes werkt door; wachten op het resultaat</string>
+    <string name="status_reconnecting">Verbinding verbroken. %1$s werkt door; wachten op het resultaat</string>
     <string name="status_stopped">Gestopt</string>
     <string name="status_stopping">Bezig met stoppen</string>
     <string name="image_prepare_failed">Een van de afbeeldingen kon niet worden gelezen. Voeg hem opnieuw toe.</string>
@@ -171,15 +171,19 @@
 
     <!-- Models -->
     <string name="model_picker_title">Model</string>
-    <string name="model_default">Hermes</string>
+    <string name="model_default">%1$s</string>
     <string name="model_default_detail">Standaard op de server: %1$s</string>
     <string name="reasoning_title">Denkniveau</string>
-    <string name="reasoning_default">Hermes-standaard</string>
+    <string name="reasoning_default">%1$s-standaard</string>
     <string name="effort_off">Uit</string>
     <string name="effort_low">Laag</string>
     <string name="effort_medium">Gemiddeld</string>
     <string name="effort_high">Hoog</string>
     <string name="effort_xhigh">Extra hoog</string>
+    <string name="service_tier">Serviceniveau</string>
+    <string name="tier_standard">Standaard</string>
+    <string name="effort_minimal">Minimaal</string>
+    <string name="effort_ultra">Ultra</string>
     <string name="effort_max">Max</string>
     <string name="fast_mode">Snelle modus</string>
     <string name="fast_mode_detail">Voorrang bij de provider: sneller antwoord, hogere kosten</string>
@@ -209,11 +213,11 @@
     <string name="notification_channel_replies">Antwoorden</string>
     <string name="notification_channel_background">Achtergrondwerk</string>
     <string name="notification_channel_scheduled">Geplande taken</string>
-    <string name="assist_not_configured">dudan is nog niet verbonden met Hermes. Tik om het in te stellen.</string>
+    <string name="assist_not_configured">dudan is nog niet verbonden met %1$s. Tik om het in te stellen.</string>
 
     <!-- Settings -->
-    <string name="setup_title">Verbinden met Hermes</string>
-    <string name="setup_intro">Laat dudan naar je Hermes Agent API-server wijzen. Via Tailscale gebruik je de MagicDNS-naam, bijvoorbeeld http://my-server:8642.</string>
+    <string name="setup_title">Verbinden met %1$s</string>
+    <string name="setup_intro">Verbind dudan met de API-server van %1$s. Gebruik via Tailscale de MagicDNS-naam van de server.</string>
     <string name="section_connection">Verbinding</string>
     <string name="section_assistant">Assistent</string>
     <string name="section_history">Geschiedenis</string>
@@ -259,7 +263,8 @@
     <string name="voice_female">Vrouw %1$d</string>
     <string name="voice_male">Man %1$d</string>
     <string name="server_url">Server-URL</string>
-    <string name="api_key">API-sleutel (API_SERVER_KEY)</string>
+    <string name="harness">Harness</string>
+    <string name="api_key">API-sleutel</string>
     <string name="your_name">Je naam</string>
     <string name="assistant_name">Naam van de assistent</string>
     <string name="connect">Verbinden</string>
@@ -296,7 +301,7 @@
     <string name="speech_language">Spraaktaal</string>
     <string name="speech_language_hint">Automatisch, of bijvoorbeeld nl-NL</string>
     <string name="show_all_channels">Gesprekken van alle kanalen tonen</string>
-    <string name="show_all_channels_detail">Ook Telegram-, CLI- en andere Hermes-sessies tonen onder Recent</string>
+    <string name="show_all_channels_detail">Ook Telegram-, CLI- en andere %1$s-sessies tonen onder Recent</string>
     <string name="accent_color">Accentkleur</string>
     <string name="accent_moon">Maan</string>
     <string name="accent_lavender">Lavendel</string>
@@ -318,21 +323,21 @@
 
     <!-- Phone control -->
     <string name="section_phone_control">Telefoonbediening</string>
-    <string name="phone_control">Hermes deze telefoon laten gebruiken</string>
-    <string name="phone_control_detail">Hermes kan apps en links openen, timers en wekkers zetten en bedienen wat er speelt. Hermes bereikt de telefoon alleen via Tailscale, met een eigen sleutel.</string>
-    <string name="phone_control_reachable">Hermes bereikt deze telefoon op %1$s</string>
-    <string name="phone_control_no_tailscale">Tailscale is niet verbonden op deze telefoon, dus Hermes kan hem niet bereiken.</string>
+    <string name="phone_control">%1$s deze telefoon laten gebruiken</string>
+    <string name="phone_control_detail">%1$s kan apps en links openen, timers en wekkers zetten en bedienen wat er speelt. %1$s bereikt de telefoon alleen via Tailscale, met een eigen sleutel.</string>
+    <string name="phone_control_reachable">%2$s bereikt deze telefoon op %1$s</string>
+    <string name="phone_control_no_tailscale">Tailscale is niet verbonden op deze telefoon, dus %1$s kan hem niet bereiken.</string>
     <string name="phone_control_starting">Telefoonbediening starten…</string>
     <string name="phone_control_failed">Telefoonbediening is niet gestart: %1$s</string>
-    <string name="phone_control_background">Hermes kan alleen apps openen als dudan in beeld is. Maak dudan hierboven je standaardassistent, of sta Weergeven boven andere apps toe. Tot die tijd toont de telefoon een melding om op te tikken.</string>
+    <string name="phone_control_background">%1$s kan alleen apps openen als dudan in beeld is. Maak dudan hierboven je standaardassistent, of sta Weergeven boven andere apps toe. Tot die tijd toont de telefoon een melding om op te tikken.</string>
     <string name="phone_control_background_allow">Weergeven boven andere apps toestaan</string>
-    <string name="phone_control_copy">Hermes-instellingen kopiëren</string>
-    <string name="phone_control_copied">Gekopieerd. Plak het op de Hermes-server; bij elk deel staat waar het hoort.</string>
+    <string name="phone_control_copy">%1$s-instellingen kopiëren</string>
+    <string name="phone_control_copied">Gekopieerd. Plak het op de %1$s-server; bij elk deel staat waar het hoort.</string>
     <string name="phone_control_renew">Nieuwe sleutel</string>
-    <string name="phone_control_renewed">Nieuwe sleutel gemaakt. Kopieer de Hermes-instellingen opnieuw; de oude sleutel werkt niet meer.</string>
+    <string name="phone_control_renewed">Nieuwe sleutel gemaakt. Kopieer de %1$s-instellingen opnieuw; de oude sleutel werkt niet meer.</string>
     <string name="notification_channel_phone_control">Telefoonbediening</string>
-    <string name="notification_channel_phone_actions">Acties van Hermes</string>
-    <string name="phone_control_notification_title">Hermes kan deze telefoon gebruiken</string>
+    <string name="notification_channel_phone_actions">Acties van %1$s</string>
+    <string name="phone_control_notification_title">%1$s kan deze telefoon gebruiken</string>
     <string name="phone_control_notification_text">Om apps en links te openen als je daarom vraagt. Tik om dit te wijzigen.</string>
     <string name="phone_action_title">%1$s wil iets openen</string>
     <string name="phone_action_tap_to_open">Tik om %1$s te openen</string>
@@ -346,7 +351,7 @@
     <string name="file_too_large">%1$s is groter dan %2$d MB.</string>
     <string name="upload_failed">%1$s kon niet worden geüpload: %2$s</string>
     <string name="upload_rejected_key">De uploadservice weigert de API-sleutel.</string>
-    <string name="upload_unreachable">De uploadservice op de Hermes-server is niet bereikbaar. Zie Instellingen, Antwoorden en bestanden.</string>
+    <string name="upload_unreachable">De uploadservice op de %1$s-server is niet bereikbaar. Zie Instellingen, Antwoorden en bestanden.</string>
     <string name="upload_not_service">Dit adres antwoordt, maar niet als de dudan-uploadservice. Controleer de upload-URL.</string>
 
     <!-- Replies and files settings -->
@@ -354,7 +359,8 @@
     <string name="rich_replies">Rijke antwoorden</string>
     <string name="rich_replies_detail">Tabellen, grafieken, stappen, formulieren en vervolgvragen in antwoorden, getekend met OpenUI</string>
     <string name="upload_server">Uploadserver</string>
-    <string name="upload_server_detail">Bestanden tot 250 MB gaan naar de uploadservice van dudan op de Hermes-server, en de agent leest ze daar. Laat dit leeg voor poort 8645 als Hermes HTTP gebruikt. Gebruikt Hermes HTTPS, vul dan het adres van de uploadservice in.</string>
+    <string name="upload_builtin_detail">Bestanden tot 250 MB gaan naar de ingebouwde uploadservice van %1$s. Laat dit leeg om de server-URL van je verbinding te gebruiken.</string>
+    <string name="upload_server_detail">Bestanden tot 250 MB gaan naar de uploadservice van dudan op de %1$s-server, en de agent leest ze daar. Laat dit leeg voor poort 8645 als %1$s HTTP gebruikt. Gebruikt %1$s HTTPS, vul dan het adres van de uploadservice in.</string>
     <string name="upload_check">Uploadservice controleren</string>
     <string name="upload_checking">Controleren…</string>
     <string name="upload_ok">De uploadservice werkt.</string>

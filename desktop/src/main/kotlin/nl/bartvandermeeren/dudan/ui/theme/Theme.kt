@@ -22,6 +22,7 @@ import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.text.platform.Font
 import kotlinx.coroutines.delay
+import nl.bartvandermeeren.dudan.data.Harness
 
 /**
  * Dusk glass, after Superhuman's frosted panels over a twilight sky and beautifului.dev's quiet
@@ -174,6 +175,7 @@ private fun dudanColors(accent: Accent, sky: Sky) = darkColorScheme(
  * color contrast is raised. Like iOS's Reduce Transparency, this trades the look for legibility.
  */
 val LocalReduceTransparency = staticCompositionLocalOf { false }
+val LocalHarness = staticCompositionLocalOf { Harness.Default }
 
 /** [textScale] is Settings' text size: it scales every text, as Windows' own text size does, and leaves the layout be. */
 @Composable
@@ -182,13 +184,14 @@ fun DudanTheme(
     accent: Accent = Accent.Moon,
     sky: Sky = Sky.Dusk,
     textScale: Float = 1f,
+    harness: Harness = Harness.Default,
     content: @Composable () -> Unit,
 ) {
     val reduced = reduceTransparency || rememberSystemHighContrast()
     val colors = remember(accent, sky) { dudanColors(accent, sky) }
     val density = LocalDensity.current
     CompositionLocalProvider(
-        LocalReduceTransparency provides reduced,
+        LocalHarness provides harness, LocalReduceTransparency provides reduced,
         LocalAccent provides accent,
         LocalSky provides sky,
         LocalDensity provides Density(density.density, density.fontScale * textScale),

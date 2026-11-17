@@ -13,7 +13,7 @@ class TurnInstructionsTest {
     @Test
     fun appTurnsSayTheUserIsOnTheirPhoneAndThatMarkdownRenders() {
         val text = TurnInstructions.context(TurnOrigin(), phoneControl = false)
-        assertTrue(text, text.startsWith("The user is talking to you through dudan, the Hermes app on their Android phone."))
+        assertTrue(text, text.startsWith("The user is talking to you through dudan, the chat app on their Android phone."))
         assertTrue(text, text.contains("dudan renders Markdown"))
         assertFalse(text, text.contains("read aloud"))
         assertFalse(text, text.contains("side button"))
@@ -68,7 +68,7 @@ class TurnInstructionsTest {
     @Test
     fun desktopTurnsSayTheUserIsOnTheirPcAndNeverMentionThePhone() {
         val app = TurnInstructions.context(TurnOrigin(device = TurnOrigin.Device.Desktop), phoneControl = true)
-        assertTrue(app, app.startsWith("The user is talking to you through dudan, the Hermes app on their Windows PC."))
+        assertTrue(app, app.startsWith("The user is talking to you through dudan, the chat app on their Windows PC."))
         assertTrue(app, app.contains("dudan renders Markdown"))
         val quick = TurnInstructions.context(TurnOrigin(Surface.Assistant, screenshot = true, device = TurnOrigin.Device.Desktop), phoneControl = false)
         assertTrue(quick, quick.contains("with a keyboard shortcut"))

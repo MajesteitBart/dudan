@@ -110,7 +110,7 @@ class PhoneControlService : Service() {
         val open = Intent(this, MainActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
         return NotificationCompat.Builder(this, CHANNEL)
             .setSmallIcon(R.drawable.ic_notification)
-            .setContentTitle(getString(R.string.phone_control_notification_title))
+            .setContentTitle(getString(R.string.phone_control_notification_title, appContainer.settingsSnapshot.value.harness.name))
             .setContentText(getString(R.string.phone_control_notification_text))
             .setContentIntent(PendingIntent.getActivity(this, 0, open, PendingIntent.FLAG_IMMUTABLE))
             .setOngoing(true)

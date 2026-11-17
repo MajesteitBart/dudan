@@ -424,7 +424,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
             e is UploadClient.UploadException && e.status in setOf(401, 403) -> app.getString(R.string.upload_rejected_key)
             e is UploadClient.UploadException && e.code == UploadClient.NOT_UPLOAD_SERVICE -> app.getString(R.string.upload_not_service)
             e is java.net.ConnectException || e is java.net.UnknownHostException || e is java.net.SocketTimeoutException ->
-                app.getString(R.string.upload_unreachable)
+                app.getString(R.string.upload_unreachable, container.settingsSnapshot.value.harness.name)
             else -> e.message ?: e.toString()
         }
     }
@@ -503,7 +503,7 @@ class MainViewModel(app: Application) : AndroidViewModel(app) {
                     if (supported != choice) container.settings.setModel(profile, supported)
                 }
             } catch (e: Exception) {
-                modelCatalogError.value = e.userMessage()
+                modelCatalogError.value = e.userMessage(container.settingsSnapshot.value.harness)
             }
         }
     }

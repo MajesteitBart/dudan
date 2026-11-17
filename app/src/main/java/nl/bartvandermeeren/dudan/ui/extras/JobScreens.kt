@@ -101,6 +101,7 @@ import nl.bartvandermeeren.dudan.chat.userMessage
 import nl.bartvandermeeren.dudan.data.DELIVER_APP
 import nl.bartvandermeeren.dudan.data.DELIVER_NOWHERE
 import nl.bartvandermeeren.dudan.data.DeliveryTarget
+import nl.bartvandermeeren.dudan.data.Harness
 import nl.bartvandermeeren.dudan.data.HermesApi
 import nl.bartvandermeeren.dudan.data.IntervalUnit
 import nl.bartvandermeeren.dudan.data.JobChanges
@@ -155,7 +156,7 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            error = e.userMessage()
+            error = e.userMessage(vm.settings.value?.harness ?: Harness.Default)
         }
     }
     LaunchedEffect(Unit) {
@@ -177,7 +178,7 @@ fun JobsScreen(vm: MainViewModel, onBack: () -> Unit) {
         scope.launch {
             runCatching { vm.api.jobAction(job.id, action) }.onFailure { e ->
                 if (e is CancellationException) throw e
-                error = e.userMessage()
+                error = e.userMessage(vm.settings.value?.harness ?: Harness.Default)
             }
             load()
             busyJob = null
@@ -353,7 +354,7 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
         } catch (e: CancellationException) {
             throw e
         } catch (e: Exception) {
-            if (HermesApi.lacksJobEndpoint(e)) promptLoaded = true else loadError = e.jobMessage()
+            if (HermesApi.lacksJobEndpoint(e)) promptLoaded = true else loadError = e.jobMessage(vm.settings.value?.harness ?: Harness.Default)
         }
     }
 
@@ -387,7 +388,7 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.jobMessage()
+                error = e.jobMessage(vm.settings.value?.harness ?: Harness.Default)
                 busy = false
             }
         }
@@ -404,7 +405,7 @@ private fun JobEditor(vm: MainViewModel, job: JobInfo?, targets: List<DeliveryTa
             } catch (e: CancellationException) {
                 throw e
             } catch (e: Exception) {
-                error = e.jobMessage()
+                error = e.jobMessage(vm.settings.value?.harness ?: Harness.Default)
                 busy = false
             }
         }
@@ -517,9 +518,9 @@ private fun EditorError(message: String, modifier: Modifier) {
 }
 
 /** Servers refuse a task in a sentence (a bad cron, a file written by hand); show that sentence as it is. */
-private fun Throwable.jobMessage(): String {
+private fun Throwable.jobMessage(harness: Harness): String {
     val e = this as? HermesApi.HermesException
-    return if (e != null && e.status in 400..499 && e.status != 401 && e.status != 403 && e.message.isNotBlank()) e.message else userMessage()
+    return if (e != null && e.status in 400..499 && e.status != 401 && e.status != 403 && e.message.isNotBlank()) e.message else userMessage(harness)
 }
 
 /** A glass card holding one part of the editor, its title inside, like Settings' sections. */

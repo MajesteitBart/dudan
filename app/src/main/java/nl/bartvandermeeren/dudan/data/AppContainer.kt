@@ -56,7 +56,7 @@ class AppContainer(context: Context) {
     /** Attachments go to the upload service next to Hermes; see tools/hermes-upload. */
     val uploads = UploadClient(uploadHttp) { settings.current().uploads }
 
-    val skillCatalog = SkillCatalog(api, appScope)
+    val skillCatalog = SkillCatalog(api, appScope) { settingsSnapshot.value.harness }
 
     val engine = ChatEngine(api, appScope, skills = skillCatalog::skills) { settings.current() }
 
@@ -102,7 +102,7 @@ class AppContainer(context: Context) {
             }
         }
         appScope.launch {
-            settings.flow.map { it.phoneControl }.distinctUntilChanged().collect(phoneControl::sync)
+            settings.flow.map { it.phoneControl to it.harness }.distinctUntilChanged().collect { (enabled, _) -> phoneControl.sync(enabled) }
         }
         // The catch-up check for scheduled results needs a server to ask.
         appScope.launch {

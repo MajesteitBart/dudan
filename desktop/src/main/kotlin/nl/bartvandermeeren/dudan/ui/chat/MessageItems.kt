@@ -57,6 +57,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.rotate
 import androidx.compose.ui.layout.ContentScale
+import nl.bartvandermeeren.dudan.ui.theme.LocalHarness
 import org.jetbrains.compose.resources.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -204,13 +205,13 @@ fun AssistantMessageItem(
                         message.stopping -> Res.string.status_stopping
                         message.reconnecting -> Res.string.status_reconnecting
                         else -> Res.string.status_thinking
-                    },
+                    }, LocalHarness.current.name,
                 ),
             )
         }
         if (hasWork) WorkPanel(message)
         if (message.isStreaming && message.reconnecting && hasWork) {
-            Text(stringResource(Res.string.status_reconnecting), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
+            Text(stringResource(Res.string.status_reconnecting, LocalHarness.current.name), style = MaterialTheme.typography.bodyMedium, color = Palette.TextSecondary)
         }
         message.approval?.let { ApprovalCard(it, onApproval) }
         if (message.text.isNotBlank()) {

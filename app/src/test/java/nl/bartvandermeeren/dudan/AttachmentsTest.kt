@@ -1,5 +1,6 @@
 package nl.bartvandermeeren.dudan
 
+import nl.bartvandermeeren.dudan.data.Harness
 import java.io.ByteArrayInputStream
 import java.io.InputStream
 import java.security.MessageDigest
@@ -274,6 +275,21 @@ class UploadClientTest {
     }
 
     @Test
+    fun healthReconnectsAfterTheServerDropsAReusedConnection() = runBlocking {
+        MockWebServer().use { host ->
+            val healthy = MockResponse().setBody("""{"ok":true,"max_bytes":1024,"chunk_bytes":64}""")
+            host.enqueue(healthy)
+            host.enqueue(MockResponse().setSocketPolicy(SocketPolicy.DISCONNECT_AFTER_REQUEST))
+            host.enqueue(healthy)
+            val http = OkHttpClient.Builder().retryOnConnectionFailure(false).build()
+            val client = UploadClient(http) { UploadClient.Config(host.url("/").toString(), "test-key") }
+            assertEquals(UploadClient.Health(1024, 64), client.health())
+            assertEquals(UploadClient.Health(1024, 64), client.health())
+            assertEquals(3, host.requestCount)
+        }
+    }
+
+    @Test
     fun healthRefusesServicesThatAreNotTheUploadService() = runBlocking {
         val other = MockWebServer()
         other.start()
@@ -297,11 +313,13 @@ class UploadClientTest {
 
     @Test
     fun derivesTheServiceAddressFromTheHermesServer() {
-        assertEquals("http://my-server:8645", UploadClient.baseUrlFor("http://my-server:8642", ""))
-        assertEquals("http://100.88.12.34:8645", UploadClient.baseUrlFor("100.88.12.34:8642/v1", ""))
-        assertEquals("http://files.example:9000", UploadClient.baseUrlFor("http://my-server:8642", "files.example:9000/"))
-        assertEquals("", UploadClient.baseUrlFor("https://hermes.example.com", ""))
-        assertEquals("https://files.example.com", UploadClient.baseUrlFor("https://hermes.example.com", "https://files.example.com"))
+        assertEquals("https://booper.example:8652", UploadClient.baseUrlFor("https://booper.example:8652", "", Harness.Booper))
+        assertEquals("https://uploads.example", UploadClient.baseUrlFor("https://booper.example:8652", "https://uploads.example", Harness.Booper))
+        assertEquals("http://my-server:8645", UploadClient.baseUrlFor("http://my-server:8642", "", Harness.Hermes))
+        assertEquals("http://100.88.12.34:8645", UploadClient.baseUrlFor("100.88.12.34:8642/v1", "", Harness.Hermes))
+        assertEquals("http://files.example:9000", UploadClient.baseUrlFor("http://my-server:8642", "files.example:9000/", Harness.Hermes))
+        assertEquals("", UploadClient.baseUrlFor("https://hermes.example.com", "", Harness.Hermes))
+        assertEquals("https://files.example.com", UploadClient.baseUrlFor("https://hermes.example.com", "https://files.example.com", Harness.Hermes))
     }
 }
 

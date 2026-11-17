@@ -1,5 +1,6 @@
 package nl.bartvandermeeren.dudan.desktop
 
+import nl.bartvandermeeren.dudan.data.Harness
 import java.io.File
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
@@ -22,6 +23,52 @@ class DesktopSettingsTest {
     }
 
     @Test
+    fun legacyFastAndProviderTiersSurviveRestart() = runBlocking {
+        File(dir, "settings.json").writeText("""{"model":{"fast":true}}""")
+        val store = DesktopSettings(dir)
+        assertEquals("priority", store.current().model.serviceTier)
+        val advanced = ModelChoice(effort = ReasoningEffort.Ultra, serviceTier = "ultrafast")
+        store.setModel(ModelProfile.Chats, advanced)
+        assertEquals(advanced, DesktopSettings(dir).current().model)
+        store.setModel(ModelProfile.Chats, ModelChoice())
+        assertNull(DesktopSettings(dir).current().model.serviceTier)
+    }
+
+    @Test
+    fun aLegacyHermesConnectionKeepsItsUploadSidecarAndProfile() = runBlocking {
+        assertEquals(Harness.Booper, DesktopSettings(dir).current().harness)
+        File(dir, "settings.json").writeText("""{"serverUrl":"http://existing:8642","assistantName":"Scout"}""")
+        val store = DesktopSettings(dir)
+        assertEquals(Harness.Hermes, store.current().harness)
+        assertEquals("http://existing:8645", store.current().uploads.baseUrl.trimEnd('/'))
+        store.saveSetup(Harness.Booper.defaultUrl, "", "", "Clark", Harness.Booper)
+        assertEquals("http://existing:8642", DesktopSettings(dir).current().connectionFor(Harness.Hermes).url)
+    }
+
+    @Test
+    fun eachHarnessKeepsItsConnectionAcrossRestarts() = runBlocking {
+        // A profile saved before harness selection existed.
+        File(dir, "settings.json").writeText("""{"serverUrl":"http://existing:8652","assistantName":"My Clark"}""")
+        val store = DesktopSettings(dir)
+        assertEquals(Harness.Booper, store.current().harness)
+        val original = store.current().connectionFor(Harness.Booper)
+        assertEquals("http://existing:8652", original.url)
+        assertEquals("My Clark", original.assistant)
+
+        store.saveSetup("http://other:8642", "", "Bart", "Scout", Harness.Hermes)
+        val restored = DesktopSettings(dir)
+        assertEquals(Harness.Hermes, restored.current().harness)
+        assertEquals(original, restored.current().connectionFor(Harness.Booper))
+        restored.saveSetup(original.url, original.key, "Bart", original.assistant, Harness.Booper)
+
+        val active = DesktopSettings(dir).current()
+        assertEquals(Harness.Booper, active.harness)
+        assertEquals(original, active.connectionFor(active.harness))
+        assertEquals("Scout", active.connectionFor(Harness.Hermes).assistant)
+        assertEquals("http://other:8642", active.connectionFor(Harness.Hermes).url)
+    }
+
+    @Test
     fun theKeyIsStoredEncryptedAndReadBackAfterARestart() = runBlocking {
         DesktopSettings(dir).saveSetup(" http://clark:8642/ ", " secret-key ", "Bart", "")
         val raw = File(dir, "settings.json").readText()
@@ -31,7 +78,7 @@ class DesktopSettingsTest {
         assertEquals("secret-key", again.apiKey)
         assertEquals("http://clark:8642", again.serverUrl)
         // A blank assistant name is the default one.
-        assertEquals("dudan", again.assistantName)
+        assertEquals("Clark", again.assistantName)
         assertTrue(again.isConfigured)
         // Nothing on the PC acts for Hermes; rich replies are on, as on the phone.
         assertFalse(again.phoneControl)
@@ -45,11 +92,11 @@ class DesktopSettingsTest {
         assertEquals(ReasoningEffort.Low, store.current().assistantModel.effort)
         assertNull(store.current().model.effort)
 
-        store.setModel(ModelProfile.Assistant, ModelChoice("openai", "gpt-6-luna", "GPT-6 Luna", effort = null, fast = true))
+        store.setModel(ModelProfile.Assistant, ModelChoice("openai", "gpt-6-luna", "GPT-6 Luna", effort = null, serviceTier = "priority"))
         store.setModel(ModelProfile.Chats, ModelChoice("anthropic", "claude-opus-5-5", "Opus 5.5", ReasoningEffort.High))
 
         val again = DesktopSettings(dir).current()
-        assertEquals(ModelChoice("openai", "gpt-6-luna", "GPT-6 Luna", effort = null, fast = true), again.assistantModel)
+        assertEquals(ModelChoice("openai", "gpt-6-luna", "GPT-6 Luna", effort = null, serviceTier = "priority"), again.assistantModel)
         assertEquals(ModelChoice("anthropic", "claude-opus-5-5", "Opus 5.5", ReasoningEffort.High), again.model)
     }
 
