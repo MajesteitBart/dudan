@@ -45,7 +45,7 @@
     <string name="job_schedule_kept">Nu: %1$s. Dat blijft zo, tenzij je iets anders kiest.</string>
     <string name="job_deliver_app">Deze app</string>
     <string name="job_results">Resultaten</string>
-    <string name="job_shadow">Schaduwmodus op Clark: de resultaten zijn tegengehouden</string>
+    <string name="job_shadow">De schaduwmodus heeft de resultaten tegengehouden</string>
     <string name="schedule_once">Eenmalig</string>
     <string name="schedule_repeat">Herhalen</string>
     <string name="schedule_daily">Dagelijks</string>

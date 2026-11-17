@@ -35,6 +35,17 @@ class DesktopSettingsTest {
     }
 
     @Test
+    fun aLegacyHermesConnectionKeepsItsUploadSidecarAndProfile() = runBlocking {
+        assertEquals(Harness.Booper, DesktopSettings(dir).current().harness)
+        File(dir, "settings.json").writeText("""{"serverUrl":"http://existing:8642","assistantName":"Scout"}""")
+        val store = DesktopSettings(dir)
+        assertEquals(Harness.Hermes, store.current().harness)
+        assertEquals("http://existing:8645", store.current().uploads.baseUrl.trimEnd('/'))
+        store.saveSetup(Harness.Booper.defaultUrl, "", "", "Clark", Harness.Booper)
+        assertEquals("http://existing:8642", DesktopSettings(dir).current().connectionFor(Harness.Hermes).url)
+    }
+
+    @Test
     fun eachHarnessKeepsItsConnectionAcrossRestarts() = runBlocking {
         // A profile saved before harness selection existed.
         File(dir, "settings.json").writeText("""{"serverUrl":"http://existing:8652","assistantName":"My Clark"}""")

@@ -1,6 +1,7 @@
 package nl.bartvandermeeren.dudan.data
 
 import android.content.Context
+import androidx.datastore.core.DataMigration
 import androidx.datastore.preferences.core.MutablePreferences
 import androidx.datastore.preferences.core.Preferences
 import androidx.datastore.preferences.core.booleanPreferencesKey
@@ -54,7 +55,44 @@ internal fun legacyVoices(englishEngine: String?, kokoroVoice: String?, dutchEng
     "nl" to LanguageVoice(VoiceEngine.System.takeIf { dutchEngine == "System" }, supertonicVoice?.takeIf { it.isNotBlank() }),
 ).filterValues { !it.isDefault }
 
-private val Context.dataStore by preferencesDataStore(name = "settings")
+// The default preset keeps the original preference keys so existing installations keep their connection.
+private class ProfileKeys(harness: Harness) {
+    private val prefix = if (harness == Harness.Default) "" else "${harness.name}_"
+    val url = stringPreferencesKey("${prefix}server_url")
+    val key = stringPreferencesKey("${prefix}api_key_enc")
+    val assistant = stringPreferencesKey("${prefix}assistant_name")
+    val upload = stringPreferencesKey("${prefix}upload_url")
+}
+
+private val harnessKey = stringPreferencesKey("harness")
+
+internal object LegacyHarnessMigration : DataMigration<Preferences> {
+    private val legacy = ProfileKeys(Harness.Booper)
+
+    override suspend fun shouldMigrate(currentData: Preferences) =
+        currentData[harnessKey] == null && !currentData[legacy.url].isNullOrBlank()
+
+    override suspend fun migrate(currentData: Preferences): Preferences {
+        val harness = Harness.fromLegacyUrl(currentData[legacy.url])
+        return currentData.toMutablePreferences().apply {
+            this[harnessKey] = harness.name
+            if (harness == Harness.Hermes) {
+                val target = ProfileKeys(harness)
+                fun move(from: Preferences.Key<String>, to: Preferences.Key<String>) {
+                    remove(from)?.let { this[to] = it }
+                }
+                move(legacy.url, target.url)
+                move(legacy.key, target.key)
+                move(legacy.assistant, target.assistant)
+                move(legacy.upload, target.upload)
+            }
+        }
+    }
+
+    override suspend fun cleanUp() = Unit
+}
+
+private val Context.dataStore by preferencesDataStore(name = "settings", produceMigrations = { listOf(LegacyHarnessMigration) })
 
 class SettingsRepository(private val context: Context) {
     private class ModelKeys(prefix: String) {
@@ -68,7 +106,6 @@ class SettingsRepository(private val context: Context) {
     }
 
     private object Keys {
-        val harness = stringPreferencesKey("harness")
         val userName = stringPreferencesKey("user_name")
         val listenOnInvoke = booleanPreferencesKey("listen_on_invoke")
         val wakeWord = booleanPreferencesKey("wake_word")
@@ -113,15 +150,6 @@ class SettingsRepository(private val context: Context) {
     private fun Preferences.readVoices(): Map<String, LanguageVoice> = this[Keys.voices]?.let(::decodeVoices)
         ?: legacyVoices(this[Keys.legacyTtsEngine], this[Keys.legacyKokoroVoice], this[Keys.legacyDutchTtsEngine], this[Keys.legacySupertonicVoice])
 
-    // The default preset keeps the original preference keys so existing installations keep their connection.
-    private class ProfileKeys(harness: Harness) {
-        private val prefix = if (harness == Harness.Default) "" else "${harness.name}_"
-        val url = stringPreferencesKey("${prefix}server_url")
-        val key = stringPreferencesKey("${prefix}api_key_enc")
-        val assistant = stringPreferencesKey("${prefix}assistant_name")
-        val upload = stringPreferencesKey("${prefix}upload_url")
-    }
-
     private fun Preferences.connection(harness: Harness): HarnessConnection {
         val keys = ProfileKeys(harness)
         return HarnessConnection(
@@ -132,7 +160,7 @@ class SettingsRepository(private val context: Context) {
     }
 
     private fun Preferences.toSettings(): AppSettings {
-        val harness = Harness.fromName(this[Keys.harness])
+        val harness = Harness.fromName(this[harnessKey])
         val active = connection(harness)
         return AppSettings(
             harness = harness,
@@ -169,10 +197,10 @@ class SettingsRepository(private val context: Context) {
     suspend fun saveSetup(serverUrl: String, apiKey: String, userName: String, assistantName: String, speechLanguage: String, harness: Harness) {
         context.dataStore.edit {
             val url = HermesApi.normalizeBaseUrl(serverUrl)
-            val previous = Harness.fromName(it[Keys.harness])
+            val previous = Harness.fromName(it[harnessKey])
             val keys = ProfileKeys(harness)
             if (it[keys.url] != url) it.remove(keys.upload)
-            it[Keys.harness] = harness.name
+            it[harnessKey] = harness.name
             it[Keys.userName] = userName.trim()
             it[keys.assistant] = assistantName.trim()
             it[Keys.speechLanguage] = speechLanguage.trim()
@@ -220,7 +248,7 @@ class SettingsRepository(private val context: Context) {
     suspend fun setRichReplies(value: Boolean) = context.dataStore.edit { it[Keys.richReplies] = value }
     suspend fun setUploadUrl(value: String) = context.dataStore.edit {
         val url = value.trim()
-        val upload = ProfileKeys(Harness.fromName(it[Keys.harness])).upload
+        val upload = ProfileKeys(Harness.fromName(it[harnessKey])).upload
         if (url.isEmpty()) it.remove(upload) else it[upload] = HermesApi.normalizeBaseUrl(url)
     }
 

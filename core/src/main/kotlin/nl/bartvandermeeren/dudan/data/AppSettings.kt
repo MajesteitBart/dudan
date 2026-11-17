@@ -51,6 +51,13 @@ enum class Harness(val defaultUrl: String, val exampleUrl: String = defaultUrl) 
 
     companion object {
         val Default = Booper
+        /** Older releases stored one URL. Clark used port 8652. Other saved servers used Hermes upload semantics. */
+        fun fromLegacyUrl(url: String?): Harness = when {
+            url.isNullOrBlank() -> Default
+            runCatching { java.net.URI(url.trim()).port }.getOrNull() == 8652 -> Booper
+            else -> Hermes
+        }
+
         fun fromName(name: String?) = entries.find { it.name == name } ?: Default
     }
 }

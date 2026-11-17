@@ -48,7 +48,7 @@
     <!-- Clark's @dudan delivery target: the task's results go to a chat in this app. -->
     <string name="job_deliver_app">This app</string>
     <string name="job_results">Results</string>
-    <string name="job_shadow">Shadow mode on Clark: results were held back</string>
+    <string name="job_shadow">Shadow mode held back the results</string>
     <string name="schedule_once">Once</string>
     <string name="schedule_repeat">Repeat</string>
     <string name="schedule_daily">Daily</string>

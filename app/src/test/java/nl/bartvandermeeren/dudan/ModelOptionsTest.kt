@@ -1,5 +1,8 @@
 package nl.bartvandermeeren.dudan
 
+import androidx.datastore.preferences.core.preferencesOf
+import androidx.datastore.preferences.core.stringPreferencesKey
+import nl.bartvandermeeren.dudan.data.LegacyHarnessMigration
 import kotlinx.serialization.json.JsonObject
 import nl.bartvandermeeren.dudan.data.HermesJson
 import nl.bartvandermeeren.dudan.data.ModelCatalogParser
@@ -26,6 +29,27 @@ class ModelOptionsTest {
             """,
         ) as JsonObject,
     )
+
+    @Test
+    fun legacyHermesSettingsMoveAsOneConnection() = kotlinx.coroutines.runBlocking {
+        val url = stringPreferencesKey("server_url")
+        val key = stringPreferencesKey("api_key_enc")
+        val assistant = stringPreferencesKey("assistant_name")
+        val upload = stringPreferencesKey("upload_url")
+        val old = preferencesOf(url to "http://legacy:8642", key to "ciphertext", assistant to "Scout", upload to "http://files:8645")
+        assertEquals(true, LegacyHarnessMigration.shouldMigrate(old))
+        val migrated = LegacyHarnessMigration.migrate(old)
+        assertEquals("Hermes", migrated[stringPreferencesKey("harness")])
+        for (field in listOf(url, key, assistant, upload)) {
+            assertEquals(old[field], migrated[stringPreferencesKey("Hermes_" + field.name)])
+            assertNull(migrated[field])
+        }
+        assertEquals(false, LegacyHarnessMigration.shouldMigrate(migrated))
+        assertEquals(false, LegacyHarnessMigration.shouldMigrate(preferencesOf()))
+        val clark = LegacyHarnessMigration.migrate(preferencesOf(url to "http://clark:8652", key to "ciphertext"))
+        assertEquals("Booper", clark[stringPreferencesKey("harness")])
+        assertEquals("ciphertext", clark[key])
+    }
 
     @Test
     fun modelSpecificOptionsSurviveOnlyOnModelsThatOfferThem() {

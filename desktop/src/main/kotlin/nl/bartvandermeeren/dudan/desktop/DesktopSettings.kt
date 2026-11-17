@@ -72,7 +72,7 @@ class DesktopSettings(val dir: File = defaultDir()) {
 
     @Serializable
     private data class Stored(
-        val harness: String = Harness.Default.name,
+        val harness: String? = null,
         val otherConnections: Map<String, StoredConnection> = emptyMap(),
         val serverUrl: String = "",
         /** DPAPI-encrypted, Base64. */
@@ -132,7 +132,7 @@ class DesktopSettings(val dir: File = defaultDir()) {
     /** Saves the setup form in one go. Models picked on another server may not exist on this one. */
     suspend fun saveSetup(serverUrl: String, apiKey: String, userName: String, assistantName: String, harness: Harness = Harness.Default) = edit {
         val url = HermesApi.normalizeBaseUrl(serverUrl)
-        val previous = Harness.fromName(it.harness)
+        val previous = it.activeHarness()
         val sameServer = previous == harness && url == it.serverUrl
         val others = it.otherConnections.toMutableMap()
         if (previous != harness && it.serverUrl.isNotBlank()) {
@@ -184,9 +184,11 @@ class DesktopSettings(val dir: File = defaultDir()) {
     suspend fun setOtherVoice(id: String) = edit { it.copy(otherVoice = Supertonic.voice(id).id) }
     suspend fun setRichReplies(value: Boolean) = edit { it.copy(openUiReplies = value) }
 
+    private fun Stored.activeHarness() = harness?.let { Harness.fromName(it) } ?: Harness.fromLegacyUrl(serverUrl)
+
     private fun Stored.toSettings() = AppSettings(
         serverUrl = serverUrl,
-        harness = Harness.fromName(harness),
+        harness = activeHarness(),
         otherConnections = Harness.entries.mapNotNull { preset ->
             otherConnections[preset.name]?.let { preset to HarnessConnection(it.url, unprotect(it.encryptedKey), it.assistant) }
         }.toMap(),
